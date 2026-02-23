@@ -1,0 +1,154 @@
+import { useLocation } from "react-router-dom";
+import dayjs, { Dayjs } from "dayjs";
+import { useState } from "react";
+import {
+  DatePicker,
+  LocalizationProvider,
+} from "@mui/x-date-pickers";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import {
+
+  Button,
+  Stack,
+  Box,
+  Typography,
+  Container,
+  Grid,
+  TextField,
+} from "@mui/material";
+export const BookingPage = () => {
+  const location = useLocation();
+  const selectedRoom = location.state?.room;
+
+  const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
+  const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
+
+  const nights =
+    checkIn && checkOut
+      ? checkOut.diff(checkIn, "day")
+      : 0;
+
+  const total =
+    selectedRoom && nights > 0
+      ? nights * selectedRoom.price
+      : 0;
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [touched, setTouched] = useState(false);
+
+  const isEmailValid = /\S+@\S+\.\S+/.test(email);
+  const isFormValid =
+    selectedRoom &&
+    nights > 0 &&
+    fullName.trim().length > 2 &&
+    isEmailValid;
+  return (
+    <Container sx={{ py: 10 }}>
+      <Typography variant="h2" gutterBottom>
+        Book Your Stay
+      </Typography>
+
+      <Grid container spacing={8} sx={{ mt: 4 }}>
+
+        {/* LEFT COLUMN — FORM */}
+        <Grid size={{ xs: 12, md: 7 }}>
+
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <Stack spacing={4}>
+
+              <DatePicker
+                label="Check-in"
+                value={checkIn}
+                minDate={dayjs()}
+                onChange={(newValue) => setCheckIn(newValue)}
+              />
+
+              <DatePicker
+                label="Check-out"
+                value={checkOut}
+                minDate={checkIn || dayjs()}
+                onChange={(newValue) => setCheckOut(newValue)}
+              />
+
+            </Stack>
+
+          </LocalizationProvider>
+          <Stack spacing={4} sx={{ mt: 6 }}>
+            <TextField
+
+              label="Full Name"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              fullWidth
+            />
+
+            <TextField
+              label="Email Address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              fullWidth
+              error={touched && !isEmailValid}
+              helperText={
+                touched && !isEmailValid
+                  ? "Enter a valid email address"
+                  : ""
+              }
+            />
+          </Stack>
+          <Button
+            variant="contained"
+            fullWidth
+            sx={{ mt: 6, py: 2 }}
+            disabled={!isFormValid}
+            onClick={() => setTouched(true)}
+          >
+            CONFIRM RESERVATION
+          </Button>
+
+        </Grid>
+
+        {/* RIGHT COLUMN — SUMMARY */}
+        <Grid size={{ xs: 12, md: 5 }}>
+
+          <Box
+            sx={{
+              border: "1px solid #E0E0E0",
+              borderRadius: 3,
+              p: 4,
+              position: { md: "sticky" },
+              top: { md: 100 },
+            }}
+          >
+
+            {selectedRoom ? (
+              <>
+                <Typography variant="h5" gutterBottom>
+                  {selectedRoom.name}
+                </Typography>
+
+                <Typography sx={{ mb: 2 }}>
+                  ${selectedRoom.price} per night
+                </Typography>
+
+                <Box sx={{ borderTop: "1px solid #eee", my: 3 }} />
+
+                <Typography>
+                  {nights > 0 ? `${nights} nights` : "Select dates"}
+                </Typography>
+
+                <Typography variant="h6" sx={{ mt: 2 }}>
+                  Total: ${total}
+                </Typography>
+              </>
+            ) : (
+              <Typography>Select a room first.</Typography>
+            )}
+
+          </Box>
+
+        </Grid>
+
+      </Grid>
+    </Container>
+  );
+};

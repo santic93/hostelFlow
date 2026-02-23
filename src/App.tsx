@@ -6,7 +6,8 @@ import { HomePage } from "./features/home/HomePage";
 
 import { RoomDetailPage } from "./features/rooms/RoomDetailPage";
 import { RoomsPage } from "./features/rooms/RoomsPage";
-import { BookingPage } from "./pages/BookingPage";
+import { BookingPage } from "./features/booking/BookingPage";
+import AdminPage from "./features/admin/AdminPage";
 
 
 const router = createBrowserRouter([
@@ -21,6 +22,7 @@ const router = createBrowserRouter([
       { path: "rooms/:id", element: <RoomDetailPage /> },
 
       { path: "booking", element: <BookingPage /> },
+        { path: "admin", element: <AdminPage /> },
     ],
   },
 ]);

@@ -17,7 +17,8 @@ import {
   TextField,
 } from "@mui/material";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase"
+import { db } from "../../lib/firebase"
+import { query, where, getDocs } from "firebase/firestore";
 export const BookingPage = () => {
   const location = useLocation();
   const selectedRoom = location.state?.room;
@@ -48,12 +49,47 @@ export const BookingPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const checkAvailability = async () => {
+    const q = query(
+      collection(db, "reservations"),
+      where("roomId", "==", selectedRoom.id)
+    );
 
+    const snapshot = await getDocs(q);
+
+    const newCheckIn = checkIn?.toDate();
+    const newCheckOut = checkOut?.toDate();
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data();
+
+      const existingCheckIn = data.checkIn.toDate();
+      const existingCheckOut = data.checkOut.toDate();
+
+      const isOverlapping =
+        newCheckIn < existingCheckOut &&
+        newCheckOut > existingCheckIn;
+
+      if (isOverlapping) {
+        return false;
+      }
+    }
+
+    return true;
+  };
   const handleConfirm = async () => {
     if (!isFormValid) return;
 
     try {
       setLoading(true);
+
+      const available = await checkAvailability();
+
+      if (!available) {
+        alert("Selected dates are not available for this room.");
+        setLoading(false);
+        return;
+      }
 
       await addDoc(collection(db, "reservations"), {
         roomId: selectedRoom.id,
@@ -76,19 +112,19 @@ export const BookingPage = () => {
     }
   };
   if (success) {
-  return (
-    <Container sx={{ py: 15, textAlign: "center" }}>
-      <Typography variant="h2" gutterBottom>
-        Reservation Confirmed
-      </Typography>
+    return (
+      <Container sx={{ py: 15, textAlign: "center" }}>
+        <Typography variant="h2" gutterBottom>
+          Reservation Confirmed
+        </Typography>
 
-      <Typography sx={{ mb: 4 }}>
-        We’ve received your booking request.
-        A confirmation email will be sent shortly.
-      </Typography>
-    </Container>
-  );
-}
+        <Typography sx={{ mb: 4 }}>
+          We’ve received your booking request.
+          A confirmation email will be sent shortly.
+        </Typography>
+      </Container>
+    );
+  }
   return (
     <Container sx={{ py: 10 }}>
       <Typography variant="h2" gutterBottom>

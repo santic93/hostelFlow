@@ -53,7 +53,7 @@ const AdminPage = () => {
             </Typography>
 
             <Grid container spacing={4} sx={{ mb: 6 }}>
-                <Grid item size={{ xs: 12, md: 6 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Total Reservations</Typography>
@@ -64,7 +64,7 @@ const AdminPage = () => {
                     </Card>
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                     <Card>
                         <CardContent>
                             <Typography variant="h6">Total Revenue</Typography>

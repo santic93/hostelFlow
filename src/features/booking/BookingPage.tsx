@@ -37,7 +37,7 @@ export const BookingPage = () => {
       : 0;
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [touched, setTouched] = useState(false);
+  const [touched,] = useState(false);
 
   const isEmailValid = /\S+@\S+\.\S+/.test(email);
   const isFormValid =
@@ -67,8 +67,8 @@ export const BookingPage = () => {
       const existingCheckOut = data.checkOut.toDate();
 
       const isOverlapping =
-        newCheckIn < existingCheckOut &&
-        newCheckOut > existingCheckIn;
+        newCheckIn && newCheckIn < existingCheckOut &&
+        newCheckOut && newCheckOut > existingCheckIn;
 
       if (isOverlapping) {
         return false;

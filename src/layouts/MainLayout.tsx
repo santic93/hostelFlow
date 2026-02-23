@@ -36,12 +36,13 @@ export const MainLayout = () => {
             </Typography>
 
             <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <Button component={RouterLink} to="/rooms" color="inherit">
+              <Button component={RouterLink} to="/rooms" style={{color:"#ab003c"}}>
+             
                 ROOMS
               </Button>
 
               
-              <Button component={RouterLink} to="/contact" color="inherit">
+              <Button component={RouterLink} to="/contact" style={{color:"#ab003c"}}>
                 CONTACT
               </Button>
 

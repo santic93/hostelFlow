@@ -97,21 +97,22 @@ export const BookingPage = () => {
         return;
       }
 
-      await addDoc(
-        collection(db, "hostels", hostelSlug, "reservations"),
-        {
-          roomId: selectedRoom.id,
-          roomName: selectedRoom.name,
-          pricePerNight: selectedRoom.price,
-          checkIn: checkIn?.toDate(),
-          checkOut: checkOut?.toDate(),
-          nights,
-          total,
-          fullName,
-          email,
-          createdAt: serverTimestamp(),
-        }
-      );
+  await addDoc(
+  collection(db, "hostels", hostelSlug, "reservations"),
+  {
+    roomId: selectedRoom.id,
+    roomName: selectedRoom.name,
+    pricePerNight: selectedRoom.price,
+    checkIn: checkIn?.toDate(),
+    checkOut: checkOut?.toDate(),
+    nights,
+    total,
+    fullName,
+    email,
+    status: "pending", // 👈 NUEVO
+    createdAt: serverTimestamp(),
+  }
+);
 
       setSuccess(true);
     } catch (error) {

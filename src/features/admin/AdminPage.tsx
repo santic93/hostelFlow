@@ -14,37 +14,42 @@ import {
     query,
 } from "firebase/firestore";
 import { db } from "../../lib/firebase";
+import { useAuth } from "../../context/AuthContext";
 
 const AdminPage = () => {
+    const { hostelSlug } = useAuth();
+    
     const [reservations, setReservations] = useState<any[]>([]);
     const [totalRevenue, setTotalRevenue] = useState(0);
 
-    useEffect(() => {
-        const fetchReservations = async () => {
-            const q = query(
-                collection(db, "reservations"),
-                orderBy("createdAt", "desc")
-            );
+useEffect(() => {
+  if (!hostelSlug) return; // 👈 protección clave
 
-            const snapshot = await getDocs(q);
+  const fetchReservations = async () => {
+    const q = query(
+      collection(db, "hostels", hostelSlug, "reservations"),
+      orderBy("createdAt", "desc")
+    );
 
-            const data = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...doc.data(),
-            }));
+    const snapshot = await getDocs(q);
 
-            setReservations(data);
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
 
-            const revenue = data.reduce(
-                (sum, reservation: any) => sum + reservation.total,
-                0
-            );
+    setReservations(data);
 
-            setTotalRevenue(revenue);
-        };
+    const revenue = data.reduce(
+      (sum: number, reservation: any) => sum + reservation.total,
+      0
+    );
 
-        fetchReservations();
-    }, []);
+    setTotalRevenue(revenue);
+  };
+
+  fetchReservations();
+}, [hostelSlug]);
 
     return (
         <Container sx={{ py: 10 }}>

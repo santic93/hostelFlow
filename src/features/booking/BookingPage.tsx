@@ -19,7 +19,9 @@ import {
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase"
 import { query, where, getDocs } from "firebase/firestore";
+import { useAuth } from "../../context/AuthContext";
 export const BookingPage = () => {
+  const { hostelSlug } = useAuth();
   const location = useLocation();
   const selectedRoom = location.state?.room;
 
@@ -49,49 +51,53 @@ export const BookingPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const checkAvailability = async () => {
-    const q = query(
-      collection(db, "reservations"),
-      where("roomId", "==", selectedRoom.id)
-    );
+const checkAvailability = async () => {
+  if (!hostelSlug || !selectedRoom) return false;
 
-    const snapshot = await getDocs(q);
+  const q = query(
+    collection(db, "hostels", hostelSlug, "reservations"),
+    where("roomId", "==", selectedRoom.id)
+  );
 
-    const newCheckIn = checkIn?.toDate();
-    const newCheckOut = checkOut?.toDate();
+  const snapshot = await getDocs(q);
 
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
+  const newCheckIn = checkIn?.toDate();
+  const newCheckOut = checkOut?.toDate();
 
-      const existingCheckIn = data.checkIn.toDate();
-      const existingCheckOut = data.checkOut.toDate();
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
 
-      const isOverlapping =
-        newCheckIn && newCheckIn < existingCheckOut &&
-        newCheckOut && newCheckOut > existingCheckIn;
+    const existingCheckIn = data.checkIn.toDate();
+    const existingCheckOut = data.checkOut.toDate();
 
-      if (isOverlapping) {
-        return false;
-      }
+    const isOverlapping =
+      newCheckIn &&
+      newCheckIn < existingCheckOut &&
+      newCheckOut &&
+      newCheckOut > existingCheckIn;
+
+    if (isOverlapping) return false;
+  }
+
+  return true;
+};
+ const handleConfirm = async () => {
+  if (!isFormValid || !hostelSlug || !selectedRoom) return;
+
+  try {
+    setLoading(true);
+
+    const available = await checkAvailability();
+
+    if (!available) {
+      alert("Selected dates are not available for this room.");
+      setLoading(false);
+      return;
     }
 
-    return true;
-  };
-  const handleConfirm = async () => {
-    if (!isFormValid) return;
-
-    try {
-      setLoading(true);
-
-      const available = await checkAvailability();
-
-      if (!available) {
-        alert("Selected dates are not available for this room.");
-        setLoading(false);
-        return;
-      }
-
-      await addDoc(collection(db, "reservations"), {
+    await addDoc(
+      collection(db, "hostels", hostelSlug, "reservations"),
+      {
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
         pricePerNight: selectedRoom.price,
@@ -102,15 +108,16 @@ export const BookingPage = () => {
         fullName,
         email,
         createdAt: serverTimestamp(),
-      });
+      }
+    );
 
-      setSuccess(true);
-    } catch (error) {
-      console.error("Error saving reservation:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setSuccess(true);
+  } catch (error) {
+    console.error("Error saving reservation:", error);
+  } finally {
+    setLoading(false);
+  }
+};
   if (success) {
     return (
       <Container sx={{ py: 15, textAlign: "center" }}>
@@ -125,6 +132,9 @@ export const BookingPage = () => {
       </Container>
     );
   }
+  if (!hostelSlug) {
+  return null; // o un loader si querés algo más elegante
+}
   return (
     <Container sx={{ py: 10 }}>
       <Typography variant="h2" gutterBottom>

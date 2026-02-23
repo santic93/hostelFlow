@@ -16,6 +16,8 @@ import {
   Grid,
   TextField,
 } from "@mui/material";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../lib/firebase"
 export const BookingPage = () => {
   const location = useLocation();
   const selectedRoom = location.state?.room;
@@ -42,6 +44,51 @@ export const BookingPage = () => {
     nights > 0 &&
     fullName.trim().length > 2 &&
     isEmailValid;
+
+
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const handleConfirm = async () => {
+    if (!isFormValid) return;
+
+    try {
+      setLoading(true);
+
+      await addDoc(collection(db, "reservations"), {
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name,
+        pricePerNight: selectedRoom.price,
+        checkIn: checkIn?.toDate(),
+        checkOut: checkOut?.toDate(),
+        nights,
+        total,
+        fullName,
+        email,
+        createdAt: serverTimestamp(),
+      });
+
+      setSuccess(true);
+    } catch (error) {
+      console.error("Error saving reservation:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  if (success) {
+  return (
+    <Container sx={{ py: 15, textAlign: "center" }}>
+      <Typography variant="h2" gutterBottom>
+        Reservation Confirmed
+      </Typography>
+
+      <Typography sx={{ mb: 4 }}>
+        We’ve received your booking request.
+        A confirmation email will be sent shortly.
+      </Typography>
+    </Container>
+  );
+}
   return (
     <Container sx={{ py: 10 }}>
       <Typography variant="h2" gutterBottom>
@@ -99,10 +146,10 @@ export const BookingPage = () => {
             variant="contained"
             fullWidth
             sx={{ mt: 6, py: 2 }}
-            disabled={!isFormValid}
-            onClick={() => setTouched(true)}
+            disabled={!isFormValid || loading}
+            onClick={handleConfirm}
           >
-            CONFIRM RESERVATION
+            {loading ? "Processing..." : "CONFIRM RESERVATION"}
           </Button>
 
         </Grid>

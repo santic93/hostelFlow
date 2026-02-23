@@ -1,4 +1,4 @@
-import { Outlet, Link as RouterLink } from "react-router-dom";
+import { Outlet, Link as RouterLink, useNavigate } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -7,8 +7,11 @@ import {
   Box,
   Container,
 } from "@mui/material";
+import { useAuth } from "../context/AuthContext";
 
 export const MainLayout = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   return (
     <>
       <AppBar
@@ -57,6 +60,11 @@ export const MainLayout = () => {
               >
                 BOOK YOUR STAY
               </Button>
+              {user && (
+  <Button onClick={() => navigate("/admin")}>
+    Admin
+  </Button>
+)}
             </Box>
           </Toolbar>
         </Container>

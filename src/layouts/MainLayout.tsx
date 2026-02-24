@@ -1,33 +1,27 @@
-import { Outlet, Link as RouterLink } from "react-router-dom";
-import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  Box,
-  Container,
-} from "@mui/material";
+import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
+import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+
 
 export const MainLayout = () => {
   const { user, role, hostelSlug } = useAuth();
+  const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
 
-  if (!user || role !== "admin" || !hostelSlug) return null;
+  // ✅ nunca return null: esto es layout público del tenant
+  if (!slugFromUrl) return <Outlet />;
+
   return (
     <>
       <AppBar
         position="static"
         elevation={0}
-        sx={{
-          backgroundColor: "transparent",
-          borderBottom: "1px solid #D6CEC9",
-        }}
+        sx={{ backgroundColor: "transparent", borderBottom: "1px solid #D6CEC9" }}
       >
         <Container maxWidth="lg">
           <Toolbar disableGutters sx={{ py: 2 }}>
             <Typography
               component={RouterLink}
-              to="/"
+              to={`/${slugFromUrl}`} // ✅ home del tenant
               sx={{
                 textDecoration: "none",
                 color: "#730202",
@@ -40,28 +34,27 @@ export const MainLayout = () => {
             </Typography>
 
             <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <Button component={RouterLink} to="/rooms" style={{ color: "#ab003c" }}>
-
+              <Button component={RouterLink} to={`/${slugFromUrl}/rooms`} style={{ color: "#ab003c" }}>
                 ROOMS
               </Button>
 
-
-              <Button component={RouterLink} to="/contact" style={{ color: "#ab003c" }}>
+              {/* Si todavía no tenés contact, dejalo al home */}
+              <Button component={RouterLink} to={`/${slugFromUrl}`} style={{ color: "#ab003c" }}>
                 CONTACT
               </Button>
 
+              {/* booking se hace desde una room -> llevamos a rooms */}
               <Button
                 variant="contained"
                 component={RouterLink}
-                to="/booking"
-                sx={{
-                  ml: 2,
-                  px: 3,
-                }}
+                to={`/${slugFromUrl}/rooms`}
+                sx={{ ml: 2, px: 3 }}
               >
                 BOOK YOUR STAY
               </Button>
-              {user && (
+
+              {/* ✅ Admin solo si realmente es admin */}
+              {user && role === "admin" && hostelSlug && (
                 <Button component={RouterLink} to={`/${hostelSlug}/admin`}>
                   Admin / {hostelSlug}
                 </Button>

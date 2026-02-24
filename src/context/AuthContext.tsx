@@ -1,7 +1,7 @@
 // AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 import { getOrCreateHostel } from "../services/hostelService";
 
@@ -27,9 +27,16 @@ export const AuthProvider = ({ children }: any) => {
   const [hostelSlug, setHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
   const [loading, setLoading] = useState(true);
-
 useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+  let unsubscribeUserDoc: (() => void) | null = null;
+
+  const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    // cada vez que cambia auth, limpiamos listener anterior
+    if (unsubscribeUserDoc) {
+      unsubscribeUserDoc();
+      unsubscribeUserDoc = null;
+    }
+
     setLoading(true);
 
     if (!firebaseUser) {
@@ -43,45 +50,45 @@ useEffect(() => {
     setUser(firebaseUser);
 
     const userRef = doc(db, "users", firebaseUser.uid);
-    const snap = await getDoc(userRef);
 
-    // Si no existe perfil -> lo creo como guest por default
-    if (!snap.exists()) {
-      await setDoc(userRef, { role: "guest" }, { merge: true });
-      setRole("guest");
-      setHostelSlug(null);
-      setLoading(false);
-      return;
-    }
+    // ✅ escucha en tiempo real el doc de perfil
+    unsubscribeUserDoc = onSnapshot(
+      userRef,
+      (snap) => {
+        if (!snap.exists()) {
+          // perfil todavía no está creado (o no llegó)
+          setRole("guest");
+          setHostelSlug(null);
+          setLoading(false);
+          return;
+        }
 
-    const data = snap.data() as any;
-    const nextRole: Role = data?.role === "admin" ? "admin" : "guest";
-    setRole(nextRole);
+        const data = snap.data() as any;
+        const nextRole: Role = data?.role === "admin" ? "admin" : "guest";
 
-    if (nextRole === "admin") {
-      // el admin debe tener hostelSlug
-      let slug: string | null = data?.hostelSlug ?? null;
+        setRole(nextRole);
+        setHostelSlug(nextRole === "admin" ? (data?.hostelSlug ?? null) : null);
 
-      if (!slug) {
-        // solo si no existe lo creo/asigno
-        slug = await getOrCreateHostel(firebaseUser);
-        await setDoc(userRef, { hostelSlug: slug }, { merge: true });
+        setLoading(false);
+      },
+      (err) => {
+        console.error("AuthProvider user doc error:", err);
+        setRole("guest");
+        setHostelSlug(null);
+        setLoading(false);
       }
-
-      setHostelSlug(slug);
-    } else {
-      setHostelSlug(null);
-    }
-
-    setLoading(false);
+    );
   });
 
-  return unsubscribe;
+  return () => {
+    if (unsubscribeUserDoc) unsubscribeUserDoc();
+    unsubscribeAuth();
+  };
 }, []);
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
-      {!loading && children}
-    </AuthContext.Provider>
+    {children}
+  </AuthContext.Provider>
   );
 };
 

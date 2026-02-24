@@ -15,36 +15,36 @@ import RegisterPage from "./pages/RegisterPage";
 import RootRedirect from "./routes/RootRedirect";
 
 const router = createBrowserRouter([
+  // ✅ root público (sin tenant)
   { path: "/", element: <RootRedirect /> },
+  { path: "/register", element: <RegisterPage /> },
+
+  // ✅ compat /admin global
+  { path: "/admin", element: <AdminRedirect /> },
+
+  // ✅ tenant site (todo lo que depende de :hostelSlug)
   {
-    path: "/",
+    path: "/:hostelSlug",
     element: <MainLayout />,
     children: [
-      { path: ":hostelSlug", element: <HomePage /> },
-      { path: ":hostelSlug/rooms", element: <RoomsPage /> },
-      { path: ":hostelSlug/rooms/:id", element: <RoomDetailPage /> },
-      { path: ":hostelSlug/booking/:roomId", element: <BookingPage /> },
-      { path: "register", element: <RegisterPage /> },
-      // auth tenant
-      { path: ":hostelSlug/login", element: <LoginPage /> },
+      { index: true, element: <HomePage /> },
+      { path: "rooms", element: <RoomsPage /> },
+      { path: "rooms/:id", element: <RoomDetailPage /> },
+      { path: "booking/:roomId", element: <BookingPage /> },
 
-      // admin tenant
+      { path: "login", element: <LoginPage /> },
+
       {
-        path: ":hostelSlug/admin",
+        path: "admin",
         element: (
           <ProtectedRoute>
             <AdminPage />
           </ProtectedRoute>
         ),
       },
-
-      // compat
-      { path: "admin", element: <AdminRedirect /> },
-      { path: "login", element: <Navigate to="/selina/login" replace /> },
     ],
   },
 ]);
-
 
 function App() {
   return (

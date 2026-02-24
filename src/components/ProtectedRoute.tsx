@@ -1,19 +1,19 @@
-// ProtectedRoute.tsx
 import { Navigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import type { JSX } from "react";
 
 
 export default function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const { user, role, hostelSlug } = useAuth();
-  const { hostelSlug: slugFromUrl } = useParams();
+  const { user, role, hostelSlug, loading } = useAuth();
+  const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
 
-  if (!user) return <Navigate to={`/${slugFromUrl ?? "selina"}/login`} replace />;
+  if (loading) return null; // o loader
 
-  // ✅ solo admin entra
-  if (role !== "admin") return <Navigate to={`/${slugFromUrl ?? "selina"}`} replace />;
+  if (!user) return <Navigate to={`/${slugFromUrl}/login`} replace />;
 
-  // ✅ si el admin tiene hostelSlug asignado, fuerza que coincida con el tenant de la url
+  if (role !== "admin") return <Navigate to={`/${slugFromUrl}`} replace />;
+
+  // si admin tiene hostelSlug, forzamos el tenant correcto
   if (hostelSlug && slugFromUrl && hostelSlug !== slugFromUrl) {
     return <Navigate to={`/${hostelSlug}/admin`} replace />;
   }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
-
+import { useParams } from "react-router-dom";
 import { Box, Typography, Grid, Paper } from "@mui/material";
 import { db } from "../../../services/firebase";
 
@@ -10,20 +10,20 @@ type Reservation = {
 };
 
 export default function DashboardSection() {
+    const { hostelSlug } = useParams<{ hostelSlug: string }>();
     const [totalRevenue, setTotalRevenue] = useState(0);
     const [totalReservations, setTotalReservations] = useState(0);
     const [totalRooms, setTotalRooms] = useState(0);
 
     const fetchData = async () => {
-        
-        const roomsSnap = await getDocs(collection(db, "rooms"));
+        if (!hostelSlug) return;
 
-        const reservations = reservationsSnap.docs.map((doc) => doc.data() as Reservation);
+        const roomsSnap = await getDocs(collection(db, "hostels", hostelSlug, "rooms"));
+        const reservationsSnap = await getDocs(collection(db, "hostels", hostelSlug, "reservations"));
 
-        const revenue = reservations.reduce(
-            (acc, curr) => acc + (curr.total ?? 0),
-            0
-        );
+        const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
+
+        const revenue = reservations.reduce((acc, curr) => acc + (curr.total ?? 0), 0);
 
         setTotalRevenue(revenue);
         setTotalReservations(reservations.length);
@@ -32,8 +32,7 @@ export default function DashboardSection() {
 
     useEffect(() => {
         fetchData();
-    }, []);
-
+    }, [hostelSlug]);
     const Card = ({ title, value }: { title: string; value: any }) => (
         <Paper elevation={3} sx={{ p: 3 }}>
             <Typography variant="h6">{title}</Typography>

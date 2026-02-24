@@ -5,20 +5,25 @@ import { DataGrid, } from "@mui/x-data-grid";
 import { Box, Button, Typography } from "@mui/material";
 import { db } from "../../../services/firebase";
 import RoomFormModal from "../components/RoomFormModal";
+import { useParams } from "react-router-dom";
 
 type Room = {
-    id: string;
-    name: string;
-    price: number;
-    capacity: number;
+  id: string;
+  name: string;
+  price: number;
+  capacity: number;
 };
 export default function RoomsSection() {
+  const { hostelSlug } = useParams<{ hostelSlug: string }>();
+
   const [openModal, setOpenModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
   const [rooms, setRooms] = useState<Room[]>([]);
 
   const fetchRooms = async () => {
-    const snapshot = await getDocs(collection(db, "rooms"));
+    if (!hostelSlug) return;
+
+    const snapshot = await getDocs(collection(db, "hostels", hostelSlug, "rooms"));
 
     const data: Room[] = snapshot.docs.map((docSnap) => {
       const raw = docSnap.data();
@@ -34,13 +39,13 @@ export default function RoomsSection() {
 
     setRooms(data);
   };
-
   useEffect(() => {
     fetchRooms();
-  }, []);
+  }, [hostelSlug]);
 
   const handleDelete = async (id: string) => {
-    await deleteDoc(doc(db, "rooms", id));
+    if (!hostelSlug) return;
+    await deleteDoc(doc(db, "hostels", hostelSlug, "rooms", id));
     setRooms((prev) => prev.filter((room) => room.id !== id));
   };
 
@@ -107,6 +112,7 @@ export default function RoomsSection() {
         onClose={() => setOpenModal(false)}
         initialData={selectedRoom}
         onSuccess={fetchRooms}
+        hostelSlug={hostelSlug}
       />
     </Box>
   );

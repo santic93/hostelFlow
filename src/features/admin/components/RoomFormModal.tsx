@@ -15,12 +15,14 @@ type RoomFormValues = {
 type Props = {
   open: boolean;
   onClose: () => void;
+  hostelSlug?: string;
   initialData?: {
     id: string;
     name: string;
     price: number;
     capacity: number;
     description: string;
+
   } | null;
   onSuccess: () => void;
 };
@@ -30,6 +32,7 @@ export default function RoomFormModal({
   onClose,
   initialData,
   onSuccess,
+  hostelSlug,
 }: Props) {
   const {
     register,
@@ -60,10 +63,18 @@ export default function RoomFormModal({
   }, [initialData, reset]);
 
   const onSubmit = async (data: RoomFormValues) => {
+    if (!hostelSlug) {
+      alert("Missing hostelSlug");
+      return;
+    }
+
     if (initialData?.id) {
-      await updateDoc(doc(db, "rooms", initialData.id), data);
+      await updateDoc(
+        doc(db, "hostels", hostelSlug, "rooms", initialData.id),
+        data
+      );
     } else {
-      await addDoc(collection(db, "rooms"), {
+      await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
         ...data,
         createdAt: new Date(),
       });

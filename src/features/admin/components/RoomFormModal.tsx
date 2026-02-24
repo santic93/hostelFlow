@@ -10,7 +10,7 @@ type RoomFormValues = {
   price: number;
   capacity: number;
   description: string;
-  imageUrl?: string; // ✅
+  imageUrl?: string; // ✅ opcional
 };
 type Props = {
   open: boolean;
@@ -46,6 +46,7 @@ export default function RoomFormModal({
       price: 0,
       capacity: 1,
       description: "",
+      imageUrl: "",
     },
   });
   const [file, setFile] = useState<File | null>(null);
@@ -59,71 +60,35 @@ export default function RoomFormModal({
         price: 0,
         capacity: 1,
         description: "",
+        imageUrl: "",
+
       });
     }
   }, [initialData, reset]);
 
-  const onSubmit = async (data: RoomFormValues) => {
-    if (!hostelSlug) {
-      alert("Missing hostelSlug");
-      return;
-    }
+const onSubmit = async (data: RoomFormValues) => {
+  if (!hostelSlug) return;
 
-    try {
-      setSaving(true);
-
-      let imageUrl = initialData ? (initialData as any)?.imageUrl ?? "" : "";
-
-      // 1) Si hay archivo nuevo, subimos a Storage y obtenemos URL
-      if (file) {
-        const roomId = initialData?.id ?? crypto.randomUUID();
-
-        // path: hostels/{slug}/rooms/{roomId}/cover.jpg
-        const storageRef = ref(storage, `hostels/${hostelSlug}/rooms/${roomId}/cover`);
-
-        await uploadBytes(storageRef, file);
-        imageUrl = await getDownloadURL(storageRef);
-
-        // si estás creando, usamos roomId manual (setDoc) para que coincida con el storage path
-        if (!initialData?.id) {
-          await setDoc(
-            doc(db, "hostels", hostelSlug, "rooms", roomId),
-            {
-              ...data,
-              imageUrl,
-              createdAt: new Date(),
-            },
-            { merge: true }
-          );
-
-          onSuccess();
-          onClose();
-          setFile(null);
-          return;
-        }
-      }
-
-      // 2) Update o create sin file
-      if (initialData?.id) {
-        await updateDoc(doc(db, "hostels", hostelSlug, "rooms", initialData.id), {
-          ...data,
-          ...(imageUrl ? { imageUrl } : {}),
-        });
-      } else {
-        await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
-          ...data,
-          imageUrl: imageUrl ?? "",
-          createdAt: new Date(),
-        });
-      }
-
-      onSuccess();
-      onClose();
-      setFile(null);
-    } finally {
-      setSaving(false);
-    }
+  const payload = {
+    name: data.name,
+    price: Number(data.price),
+    capacity: Number(data.capacity),
+    description: data.description ?? "",
+    imageUrl: data.imageUrl?.trim() ?? "", // ✅
   };
+
+  if (initialData?.id) {
+    await updateDoc(doc(db, "hostels", hostelSlug, "rooms", initialData.id), payload);
+  } else {
+    await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
+      ...payload,
+      createdAt: new Date(),
+    });
+  }
+
+  onSuccess();
+  onClose();
+};
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -168,7 +133,22 @@ export default function RoomFormModal({
             rows={3}
             {...register("description")}
           />
+
+          ////esto por ahora reemplaza la imagen
+          <TextField
+            label="Image URL (optional)"
+            {...register("imageUrl", {
+              pattern: {
+                value: /^https?:\/\/.+/i,
+                message: "Debe ser una URL válida (http/https)",
+              },
+            })}
+            error={!!errors.imageUrl}
+            helperText={errors.imageUrl?.message ?? "Ej: https://.../foto.jpg"}
+          />
         </Box>
+
+        ///SE IMPLEMENTA EL DIA DE MAÑANA CON IMAGEN Y STORAGE DE FIREBASE
         {/* <Button variant="outlined" component="label">
           Upload image
           <input

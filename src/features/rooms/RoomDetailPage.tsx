@@ -6,6 +6,7 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 
 import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
+import SafeImage from "../../components/SafeImage";
 
 export const RoomDetailPage = () => {
   const { hostelSlug, id } = useParams<{ hostelSlug: string; id: string }>();
@@ -54,7 +55,12 @@ export const RoomDetailPage = () => {
       </Button>
 
       <Container sx={{ py: 10 }}>
-        <Box
+        <SafeImage
+          src={room.imageUrl}
+          alt={room.name}
+          sx={{ mb: 3 }}
+        />
+        {/* <Box
           component="img"
      src={room.imageUrl || "https://via.placeholder.com/800x600?text=Room"}
           sx={{
@@ -65,7 +71,7 @@ export const RoomDetailPage = () => {
             mb: 6,
             bgcolor: "grey.100",
           }}
-        />
+        /> */}
 
         <Typography variant="h2" gutterBottom>
           {room.name}

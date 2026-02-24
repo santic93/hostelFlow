@@ -11,9 +11,11 @@ import AdminPage from "./features/admin/AdminPage";
 import LoginPage from "./features/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRedirect from "./features/admin/AdminRedirect";
+import RegisterPage from "./pages/RegisterPage";
+import RootRedirect from "./routes/RootRedirect";
 
 const router = createBrowserRouter([
-  { path: "/", element: <Navigate to="/selina" replace /> },
+  { path: "/", element: <RootRedirect /> },
   {
     path: "/",
     element: <MainLayout />,
@@ -22,7 +24,7 @@ const router = createBrowserRouter([
       { path: ":hostelSlug/rooms", element: <RoomsPage /> },
       { path: ":hostelSlug/rooms/:id", element: <RoomDetailPage /> },
       { path: ":hostelSlug/booking/:roomId", element: <BookingPage /> },
-
+      { path: "register", element: <RegisterPage /> },
       // auth tenant
       { path: ":hostelSlug/login", element: <LoginPage /> },
 

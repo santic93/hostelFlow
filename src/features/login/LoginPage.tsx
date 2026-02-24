@@ -19,7 +19,7 @@ const LoginPage = () => {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/admin");
+   navigate("/admin", { replace: true });
     } catch (error) {
       alert("Invalid credentials");
     }

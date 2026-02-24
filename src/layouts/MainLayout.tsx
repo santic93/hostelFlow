@@ -1,4 +1,4 @@
-import { Outlet, Link as RouterLink, useNavigate } from "react-router-dom";
+import { Outlet, Link as RouterLink } from "react-router-dom";
 import {
   AppBar,
   Toolbar,
@@ -10,8 +10,9 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 export const MainLayout = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+  const { user, role, hostelSlug } = useAuth();
+
+  if (!user || role !== "admin" || !hostelSlug) return null;
   return (
     <>
       <AppBar
@@ -39,13 +40,13 @@ export const MainLayout = () => {
             </Typography>
 
             <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <Button component={RouterLink} to="/rooms" style={{color:"#ab003c"}}>
-             
+              <Button component={RouterLink} to="/rooms" style={{ color: "#ab003c" }}>
+
                 ROOMS
               </Button>
 
-              
-              <Button component={RouterLink} to="/contact" style={{color:"#ab003c"}}>
+
+              <Button component={RouterLink} to="/contact" style={{ color: "#ab003c" }}>
                 CONTACT
               </Button>
 
@@ -61,10 +62,10 @@ export const MainLayout = () => {
                 BOOK YOUR STAY
               </Button>
               {user && (
-  <Button onClick={() => navigate("/admin")}>
-    Admin
-  </Button>
-)}
+                <Button component={RouterLink} to={`/${hostelSlug}/admin`}>
+                  Admin / {hostelSlug}
+                </Button>
+              )}
             </Box>
           </Toolbar>
         </Container>

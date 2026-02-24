@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
 import {
-
+    MenuItem,
+    Select,
     Typography,
-
-    Card,
-    CardContent,
-    Grid,
-
-
 } from "@mui/material";
 import {
     collection,
@@ -24,6 +19,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import type { GridColDef } from "@mui/x-data-grid";
 import { Chip, Box, Button } from "@mui/material";
 import RoomsSection from "./sections/RoomsSection";
+import DashboardSection from "./sections/DashboardSection";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
     id: string;
@@ -139,19 +135,17 @@ const AdminPage = () => {
         },
         {
             field: "status",
-            headerName: "Status",
-            flex: 1,
+            headerName: "Estado",
+            width: 150,
             renderCell: (params) => {
-                const status = params.row.status || "pending";
-
                 const color =
-                    status === "confirmed"
+                    params.value === "confirmed"
                         ? "success"
-                        : status === "cancelled"
+                        : params.value === "cancelled"
                             ? "error"
                             : "warning";
 
-                return <Chip label={status} color={color} />;
+                return <Chip label={params.value} color={color} />;
             },
         },
         {
@@ -159,65 +153,36 @@ const AdminPage = () => {
             headerName: "Actions",
             flex: 1.5,
             renderCell: (params) => (
-                <Box sx={{ display: "flex", gap: 1 }}>
-                    <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        onClick={() =>
-                            updateStatus(params.row.id, "confirmed")
-                        }
-                    >
-                        Confirm
-                    </Button>
 
-                    <Button
-                        size="small"
-                        variant="contained"
-                        color="error"
-                        onClick={() =>
-                            updateStatus(params.row.id, "cancelled")
-                        }
-                    >
-                        Cancel
-                    </Button>
-                </Box>
+                <Select
+                    size="small"
+                    value={params.row.status}
+                    onChange={(e) =>
+                        updateStatus(params.row.id, e.target.value as ReservationStatus)
+                    }
+                >
+                    <MenuItem value="pending">Pending</MenuItem>
+                    <MenuItem value="confirmed">Confirmed</MenuItem>
+                    <MenuItem value="cancelled">Cancelled</MenuItem>
+                </Select>
+
             ),
         },
     ];
+    const handleDelete = async (id: string) => {
+        const confirm = window.confirm("¿Eliminar reserva?");
+        if (!confirm) return;
+
+        await deleteDoc(doc(db, "reservations", id));
+        fetchReservations();
+    };
     return (
         <AdminLayout>
             {(section) => {
                 if (section === "dashboard") {
                     return (
                         <>
-                            <Typography variant="h3" gutterBottom>
-                                Dashboard
-                            </Typography>
-
-                            <Grid container spacing={4} sx={{ mb: 6 }}>
-                                <Grid size={{ xs: 12, md: 6 }}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant="h6">Total Reservations</Typography>
-                                            <Typography variant="h4">
-                                                {reservations.length}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-
-                                <Grid size={{ xs: 12, md: 6 }}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant="h6">Total Revenue</Typography>
-                                            <Typography variant="h4">
-                                                ${totalRevenue}
-                                            </Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                            </Grid>
+                            <DashboardSection />
                         </>
                     );
                 }

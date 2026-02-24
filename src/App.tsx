@@ -1,18 +1,17 @@
-import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { theme } from "./theme/theme";
-import { MainLayout } from "./layouts/MainLayout";
-import { HomePage } from "./features/home/HomePage";
-
-import { RoomDetailPage } from "./features/rooms/RoomDetailPage";
-import { RoomsPage } from "./features/rooms/RoomsPage";
-import { BookingPage } from "./features/booking/BookingPage";
-import AdminPage from "./features/admin/AdminPage";
-import LoginPage from "./features/login/LoginPage";
+import { RoomDetailPage } from "./pages/rooms/RoomDetailPage";
+import { RoomsPage } from "./pages/rooms/RoomsPage";
+import AdminPage from "./pages/admin/AdminPage";
+import LoginPage from "./pages/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRedirect from "./features/admin/AdminRedirect";
-import RegisterPage from "./pages/RegisterPage";
+import AdminRedirect from "./pages/admin/AdminRedirect";
 import RootRedirect from "./routes/RootRedirect";
+import RegisterPage from "./pages/register/RegisterPage";
+import { HomePage } from "./pages/home/HomePage";
+import { BookingPage } from "./pages/booking/BookingPage";
+import { MainLayout } from "./layouts/main/MainLayout";
 
 const router = createBrowserRouter([
   // ✅ root público (sin tenant)

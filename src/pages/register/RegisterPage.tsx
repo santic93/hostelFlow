@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert } from "@mui/material";
 import { auth, db } from "../services/firebase";
+import HotelLoading from "../components/HotelLoading";
 
 
 function slugify(input: string) {
@@ -123,7 +124,9 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
-
+  if (loading) {
+    return <HotelLoading text={step === 1 ? "Creando tu cuenta..." : "Creando tu hostel..."} />;
+  }
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
       <Typography variant="h4" gutterBottom>

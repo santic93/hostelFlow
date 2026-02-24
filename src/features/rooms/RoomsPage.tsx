@@ -1,8 +1,9 @@
 import { Container, Typography, Grid, Box, Button } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { rooms } from "./rooms.data";
 
 export const RoomsPage = () => {
+    const { hostelSlug } = useParams();
 
     return (
         <Container sx={{ py: 10 }}>
@@ -42,7 +43,7 @@ export const RoomsPage = () => {
                             variant="outlined"
                             fullWidth
                             component={RouterLink}
-                            to={`/rooms/${room.id}`}
+                            to={`/${hostelSlug}/booking/${room.id}`}
                         >
                             VIEW ROOM
                         </Button>

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { auth } from "../lib/firebase";
-import { getOrCreateHostel } from "../lib/hostelService";
+import { getOrCreateHostel } from "../services/hostelService";
+
 type AuthContextType = {
   user: User | null;
   hostelSlug: string | null;
@@ -16,22 +17,22 @@ export const AuthProvider = ({ children }: any) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [hostelSlug, setHostelSlug] = useState<string | null>(null);
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const slug = await getOrCreateHostel(user);
-        setHostelSlug(slug);
-        setUser(user);
-      } else {
-        setUser(null);
-        setHostelSlug(null);
-      }
-      setLoading(false);
-    });
+ 
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      const slug = await getOrCreateHostel(firebaseUser);
+      setHostelSlug(slug);
+      setUser(firebaseUser);
+    } else {
+      setUser(null);
+      setHostelSlug(null);
+    }
+    setLoading(false);
+  });
 
-    return unsubscribe;
-  }, []);
-
+  return unsubscribe;
+}, []);
   return (
     <AuthContext.Provider value={{ user, hostelSlug }}>
       {!loading && children}

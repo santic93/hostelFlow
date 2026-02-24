@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { theme } from "./theme/theme";
 import { MainLayout } from "./layouts/MainLayout";
@@ -12,14 +12,19 @@ import LoginPage from "./features/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const router = createBrowserRouter([
+  { path: "/", element: <Navigate to="/selina" replace /> },
   {
+
     path: "/",
     element: <MainLayout />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: "rooms", element: <RoomsPage /> },
-      { path: "rooms/:id", element: <RoomDetailPage /> },
-      { path: "booking", element: <BookingPage /> },
+      // 🌍 Web pública por slug
+      { path: ":hostelSlug", element: <HomePage /> },
+      { path: ":hostelSlug/rooms", element: <RoomsPage /> },
+      { path: ":hostelSlug/rooms/:id", element: <RoomDetailPage /> },
+      { path: ":hostelSlug/booking/:roomId", element: <BookingPage /> },
+
+      // 🔐 Admin
       {
         path: "admin",
         element: (
@@ -28,10 +33,13 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+
       { path: "login", element: <LoginPage /> },
     ],
   },
 ]);
+
+
 function App() {
   return (
     <ThemeProvider theme={theme}>

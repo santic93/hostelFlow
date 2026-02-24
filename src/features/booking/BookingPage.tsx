@@ -1,14 +1,12 @@
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import dayjs, { Dayjs } from "dayjs";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DatePicker,
   LocalizationProvider,
 } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
-
   Button,
   Stack,
   Box,
@@ -17,18 +15,45 @@ import {
   Grid,
   TextField,
 } from "@mui/material";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../lib/firebase"
 import { query, where, getDocs } from "firebase/firestore";
-import { useAuth } from "../../context/AuthContext";
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
+import { rooms } from "../rooms/rooms.data"
 export const BookingPage = () => {
-  const { hostelSlug } = useAuth();
-  const location = useLocation();
-  const selectedRoom = location.state?.room;
+  const navigate = useNavigate();
+  const { hostelSlug, roomId } = useParams();
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
+
+
+  const [selectedRoom, setSelectedRoom] = useState<any>(null);
+
+
+  useEffect(() => {
+    if (!roomId) return;
+
+    const room = rooms.find((r) => r.id === roomId);
+    if (room) {
+      setSelectedRoom(room);
+    }
+  }, [roomId]);
+  // useEffect(() => {
+  //   const fetchRoom = async () => {
+  //     if (!hostelSlug || !roomId) return;
+
+  //     const docSnap = await getDoc(
+  //       doc(db, "hostels", hostelSlug, "rooms", roomId)
+  //     );
+
+  //     if (docSnap.exists()) {
+  //       setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
+  //     }
+  //   };
+
+  //   fetchRoom();
+  // }, [hostelSlug, roomId]);
 
   const nights =
     checkIn && checkOut
@@ -138,7 +163,7 @@ export const BookingPage = () => {
   if (!hostelSlug) {
     return null; // o un loader si querés algo más elegante
   }
-  const navigate = useNavigate();
+  
   return (
     <>
       <Button

@@ -41,7 +41,7 @@ export const BookingPage = () => {
       : 0;
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [touched,] = useState(false);
+
 
   const isEmailValid = /\S+@\S+\.\S+/.test(email);
   const isFormValid =
@@ -53,36 +53,36 @@ export const BookingPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-const checkAvailability = async () => {
-  if (!hostelSlug || !selectedRoom || !checkIn || !checkOut) return false;
+  const checkAvailability = async () => {
+    if (!hostelSlug || !selectedRoom || !checkIn || !checkOut) return false;
 
-  const q = query(
-    collection(db, "hostels", hostelSlug, "reservations"),
-    where("roomId", "==", selectedRoom.id)
-  );
+    const q = query(
+      collection(db, "hostels", hostelSlug, "reservations"),
+      where("roomId", "==", selectedRoom.id)
+    );
 
-  const snapshot = await getDocs(q);
+    const snapshot = await getDocs(q);
 
-  const newCheckIn = checkIn.toDate();
-  const newCheckOut = checkOut.toDate();
+    const newCheckIn = checkIn.toDate();
+    const newCheckOut = checkOut.toDate();
 
-  for (const docSnap of snapshot.docs) {
-    const data = docSnap.data();
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
 
-    if (data.status === "cancelled") continue;
+      if (data.status === "cancelled") continue;
+      if (!data.checkIn || !data.checkOut) continue;
+      const existingCheckIn = data.checkIn.toDate();
+      const existingCheckOut = data.checkOut.toDate();
 
-    const existingCheckIn = data.checkIn.toDate();
-    const existingCheckOut = data.checkOut.toDate();
+      const isOverlapping =
+        newCheckIn < existingCheckOut &&
+        newCheckOut > existingCheckIn;
 
-    const isOverlapping =
-      newCheckIn < existingCheckOut &&
-      newCheckOut > existingCheckIn;
+      if (isOverlapping) return false;
+    }
 
-    if (isOverlapping) return false;
-  }
-
-  return true;
-};
+    return true;
+  };
   const handleConfirm = async () => {
     if (!isFormValid || !hostelSlug || !selectedRoom) return;
 
@@ -97,22 +97,22 @@ const checkAvailability = async () => {
         return;
       }
 
-  await addDoc(
-  collection(db, "hostels", hostelSlug, "reservations"),
-  {
-    roomId: selectedRoom.id,
-    roomName: selectedRoom.name,
-    pricePerNight: selectedRoom.price,
-    checkIn: checkIn?.toDate(),
-    checkOut: checkOut?.toDate(),
-    nights,
-    total,
-    fullName,
-    email,
-    status: "pending", // 👈 NUEVO
-    createdAt: serverTimestamp(),
-  }
-);
+      await addDoc(
+        collection(db, "hostels", hostelSlug, "reservations"),
+        {
+          roomId: selectedRoom.id,
+          roomName: selectedRoom.name,
+          pricePerNight: selectedRoom.price,
+          checkIn: checkIn?.toDate(),
+          checkOut: checkOut?.toDate(),
+          nights,
+          total,
+          fullName,
+          email,
+          status: "pending", // 👈 NUEVO
+          createdAt: serverTimestamp(),
+        }
+      );
 
       setSuccess(true);
     } catch (error) {
@@ -191,9 +191,9 @@ const checkAvailability = async () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 fullWidth
-                error={touched && !isEmailValid}
+                error={!isEmailValid}
                 helperText={
-                  touched && !isEmailValid
+                  !isEmailValid
                     ? "Enter a valid email address"
                     : ""
                 }

@@ -6,7 +6,7 @@ import {
 } from "@mui/material";
 import {
     collection,
-    deleteDoc,
+   
     doc,
     getDocs,
     orderBy,
@@ -37,7 +37,7 @@ const AdminPage = () => {
     const { hostelSlug } = useAuth();
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
-    const [totalRevenue, setTotalRevenue] = useState(0);
+   
     const fetchReservations = async () => {
         if (!hostelSlug) return;
 
@@ -65,12 +65,8 @@ const AdminPage = () => {
 
         setReservations(data);
 
-        const revenue = data.reduce(
-            (sum: number, reservation) => sum + reservation.total,
-            0
-        );
+   
 
-        setTotalRevenue(revenue);
     };
 
     useEffect(() => {
@@ -175,18 +171,18 @@ const AdminPage = () => {
             ),
         },
     ];
-    const handleDelete = async (id: string) => {
-        if (!hostelSlug) return;
+    // const handleDelete = async (id: string) => {
+    //     if (!hostelSlug) return;
 
-        const confirm = window.confirm("¿Eliminar reserva?");
-        if (!confirm) return;
+    //     const confirm = window.confirm("¿Eliminar reserva?");
+    //     if (!confirm) return;
 
-        await deleteDoc(
-            doc(db, "hostels", hostelSlug, "reservations", id)
-        );
+    //     await deleteDoc(
+    //         doc(db, "hostels", hostelSlug, "reservations", id)
+    //     );
 
-        fetchReservations();
-    };
+    //     fetchReservations();
+    // };
     return (
         <AdminLayout>
             {(section) => {

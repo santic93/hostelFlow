@@ -15,7 +15,7 @@ export default function DashboardSection() {
     const [totalRooms, setTotalRooms] = useState(0);
 
     const fetchData = async () => {
-        const reservationsSnap = await getDocs(collection(db, "reservations"));
+        
         const roomsSnap = await getDocs(collection(db, "rooms"));
 
         const reservations = reservationsSnap.docs.map((doc) => doc.data() as Reservation);

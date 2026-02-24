@@ -6,6 +6,7 @@ import {
 } from "@mui/material";
 import {
     collection,
+    deleteDoc,
     doc,
     getDocs,
     orderBy,
@@ -17,7 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 import { AdminLayout } from "../../layouts/admin/AdminLayout";
 import { DataGrid } from "@mui/x-data-grid";
 import type { GridColDef } from "@mui/x-data-grid";
-import { Chip, Box, Button } from "@mui/material";
+import { Chip, Box, } from "@mui/material";
 import RoomsSection from "./sections/RoomsSection";
 import DashboardSection from "./sections/DashboardSection";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
@@ -37,44 +38,49 @@ const AdminPage = () => {
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
     const [totalRevenue, setTotalRevenue] = useState(0);
+    const fetchReservations = async () => {
+        if (!hostelSlug) return;
+
+        const q = query(
+            collection(db, "hostels", hostelSlug, "reservations"),
+            orderBy("createdAt", "desc")
+        );
+
+        const snapshot = await getDocs(q);
+
+        const data: Reservation[] = snapshot.docs.map((doc) => {
+            const raw = doc.data();
+
+            return {
+                id: doc.id,
+                fullName: raw.fullName ?? "",
+                roomName: raw.roomName ?? "",
+                email: raw.email ?? "",
+                total: raw.total ?? 0,
+                status: raw.status ?? "pending",
+                checkIn: raw.checkIn?.toDate() ?? null,
+                checkOut: raw.checkOut?.toDate() ?? null,
+            };
+        });
+
+        setReservations(data);
+
+        const revenue = data.reduce(
+            (sum: number, reservation) => sum + reservation.total,
+            0
+        );
+
+        setTotalRevenue(revenue);
+    };
 
     useEffect(() => {
         if (!hostelSlug) return; // 👈 protección clave
 
-        const fetchReservations = async () => {
-            const q = query(
-                collection(db, "hostels", hostelSlug, "reservations"),
-                orderBy("createdAt", "desc")
-            );
 
-            const snapshot = await getDocs(q);
-
-            const data: Reservation[] = snapshot.docs.map((doc) => {
-                const raw = doc.data();
-
-                return {
-                    id: doc.id,
-                    fullName: raw.fullName ?? "",
-                    roomName: raw.roomName ?? "",
-                    email: raw.email ?? "",
-                    total: raw.total ?? 0,
-                    status: raw.status ?? "pending",
-                    checkIn: raw.checkIn?.toDate() ?? null,
-                    checkOut: raw.checkOut?.toDate() ?? null,
-                };
-            });
-
-            setReservations(data);
-
-            const revenue = data.reduce(
-                (sum: number, reservation: any) => sum + reservation.total,
-                0
-            );
-
-            setTotalRevenue(revenue);
-        };
 
         fetchReservations();
+
+
     }, [hostelSlug]);
     const updateStatus = async (
         id: string,
@@ -170,10 +176,15 @@ const AdminPage = () => {
         },
     ];
     const handleDelete = async (id: string) => {
+        if (!hostelSlug) return;
+
         const confirm = window.confirm("¿Eliminar reserva?");
         if (!confirm) return;
 
-        await deleteDoc(doc(db, "reservations", id));
+        await deleteDoc(
+            doc(db, "hostels", hostelSlug, "reservations", id)
+        );
+
         fetchReservations();
     };
     return (

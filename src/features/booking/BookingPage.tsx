@@ -53,36 +53,36 @@ export const BookingPage = () => {
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const checkAvailability = async () => {
-    if (!hostelSlug || !selectedRoom) return false;
+const checkAvailability = async () => {
+  if (!hostelSlug || !selectedRoom || !checkIn || !checkOut) return false;
 
-    const q = query(
-      collection(db, "hostels", hostelSlug, "reservations"),
-      where("roomId", "==", selectedRoom.id)
-    );
+  const q = query(
+    collection(db, "hostels", hostelSlug, "reservations"),
+    where("roomId", "==", selectedRoom.id)
+  );
 
-    const snapshot = await getDocs(q);
+  const snapshot = await getDocs(q);
 
-    const newCheckIn = checkIn?.toDate();
-    const newCheckOut = checkOut?.toDate();
+  const newCheckIn = checkIn.toDate();
+  const newCheckOut = checkOut.toDate();
 
-    for (const doc of snapshot.docs) {
-      const data = doc.data();
+  for (const docSnap of snapshot.docs) {
+    const data = docSnap.data();
 
-      const existingCheckIn = data.checkIn.toDate();
-      const existingCheckOut = data.checkOut.toDate();
+    if (data.status === "cancelled") continue;
 
-      const isOverlapping =
-        newCheckIn &&
-        newCheckIn < existingCheckOut &&
-        newCheckOut &&
-        newCheckOut > existingCheckIn;
+    const existingCheckIn = data.checkIn.toDate();
+    const existingCheckOut = data.checkOut.toDate();
 
-      if (isOverlapping) return false;
-    }
+    const isOverlapping =
+      newCheckIn < existingCheckOut &&
+      newCheckOut > existingCheckIn;
 
-    return true;
-  };
+    if (isOverlapping) return false;
+  }
+
+  return true;
+};
   const handleConfirm = async () => {
     if (!isFormValid || !hostelSlug || !selectedRoom) return;
 

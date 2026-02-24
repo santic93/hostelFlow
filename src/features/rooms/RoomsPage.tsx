@@ -1,19 +1,10 @@
-import { Container, Typography, Grid, Box, Button } from "@mui/material";
-import { Link as RouterLink, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
+import { Container, Typography, Grid, Box, Button } from "@mui/material";
+
+import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
-
-
-
-type Room = {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    capacity?: number;
-    imageUrl?: string; // si no lo tenés, lo dejamos opcional
-};
 
 export const RoomsPage = () => {
     const { hostelSlug } = useParams<{ hostelSlug: string }>();
@@ -29,10 +20,10 @@ export const RoomsPage = () => {
                 return {
                     id: d.id,
                     name: raw.name ?? "",
-                    description: raw.description ?? "",
                     price: raw.price ?? 0,
-                    capacity: raw.capacity ?? 0,
-                    imageUrl: raw.imageUrl ?? raw.image ?? "", // por si venías usando "image"
+                    capacity: raw.capacity ?? 1,
+                    description: raw.description ?? "",
+                    imageUrl: raw.imageUrl ?? "",
                 };
             });
 
@@ -53,13 +44,14 @@ export const RoomsPage = () => {
                     <Grid key={room.id} sx={{ xs: 12, md: 4 }}>
                         <Box
                             component="img"
-                            src={room.imageUrl || "https://via.placeholder.com/800x600?text=Room"}
+                           src={room.imageUrl || "https://via.placeholder.com/1200x600?text=Room"}
                             sx={{
                                 width: "100%",
                                 aspectRatio: "4 / 3",
                                 objectFit: "cover",
                                 borderRadius: 2,
                                 mb: 3,
+                                bgcolor: "grey.100",
                             }}
                         />
 
@@ -69,15 +61,13 @@ export const RoomsPage = () => {
                             {room.description}
                         </Typography>
 
-                        <Typography sx={{ mb: 3 }}>
-                            From ${room.price} / night
-                        </Typography>
+                        <Typography sx={{ mb: 3 }}>From ${room.price} / night</Typography>
 
                         <Button
                             variant="outlined"
                             fullWidth
                             component={RouterLink}
-                            to={`/${hostelSlug}/rooms/${room.id}`} // ✅ detalle
+                            to={`/${hostelSlug}/rooms/${room.id}`}
                         >
                             VIEW ROOM
                         </Button>

@@ -3,7 +3,8 @@ export interface Room {
   name: string;
   price: number;
   description: string;
-  image: string;
+  capacity: number;
+  imageUrl: string; // ✅ URL de Firebase Storage
 }
 
 import room1 from "../../assets/images/room1.jpeg";
@@ -15,9 +16,9 @@ export const rooms: Room[] = [
     id: "deluxe",
     name: "Deluxe Room",
     price: 32,
-    description:
-      "Spacious private room with modern design and city views.",
-    image: room1,
+    description: "Spacious private room with modern design and city views.",
+    imageUrl: room1,
+    capacity: 0
   },
   {
     id: "suite",
@@ -25,7 +26,8 @@ export const rooms: Room[] = [
     price: 48,
     description:
       "Premium suite with queen bed and private bathroom.",
-    image: room2,
+    imageUrl: room2,
+    capacity: 2
   },
   {
     id: "shared",
@@ -33,6 +35,7 @@ export const rooms: Room[] = [
     price: 18,
     description:
       "Comfortable shared dorm with lockers and social vibe.",
-    image: room3,
+    imageUrl: room3,
+    capacity: 6
   },
 ];

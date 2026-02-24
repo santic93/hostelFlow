@@ -1,17 +1,17 @@
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box } from "@mui/material";
+import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
+import { addDoc, collection, updateDoc, doc, setDoc } from "firebase/firestore";
 
-import { useEffect } from "react";
-import { db } from "../../../services/firebase";
-
+import { useEffect, useState } from "react";
+import { db, storage } from "../../../services/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 type RoomFormValues = {
   name: string;
   price: number;
   capacity: number;
   description: string;
+  imageUrl?: string; // ✅
 };
-
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -48,7 +48,8 @@ export default function RoomFormModal({
       description: "",
     },
   });
-
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
   useEffect(() => {
     if (initialData) {
       reset(initialData);
@@ -68,20 +69,60 @@ export default function RoomFormModal({
       return;
     }
 
-    if (initialData?.id) {
-      await updateDoc(
-        doc(db, "hostels", hostelSlug, "rooms", initialData.id),
-        data
-      );
-    } else {
-      await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
-        ...data,
-        createdAt: new Date(),
-      });
-    }
+    try {
+      setSaving(true);
 
-    onSuccess();
-    onClose();
+      let imageUrl = initialData ? (initialData as any)?.imageUrl ?? "" : "";
+
+      // 1) Si hay archivo nuevo, subimos a Storage y obtenemos URL
+      if (file) {
+        const roomId = initialData?.id ?? crypto.randomUUID();
+
+        // path: hostels/{slug}/rooms/{roomId}/cover.jpg
+        const storageRef = ref(storage, `hostels/${hostelSlug}/rooms/${roomId}/cover`);
+
+        await uploadBytes(storageRef, file);
+        imageUrl = await getDownloadURL(storageRef);
+
+        // si estás creando, usamos roomId manual (setDoc) para que coincida con el storage path
+        if (!initialData?.id) {
+          await setDoc(
+            doc(db, "hostels", hostelSlug, "rooms", roomId),
+            {
+              ...data,
+              imageUrl,
+              createdAt: new Date(),
+            },
+            { merge: true }
+          );
+
+          onSuccess();
+          onClose();
+          setFile(null);
+          return;
+        }
+      }
+
+      // 2) Update o create sin file
+      if (initialData?.id) {
+        await updateDoc(doc(db, "hostels", hostelSlug, "rooms", initialData.id), {
+          ...data,
+          ...(imageUrl ? { imageUrl } : {}),
+        });
+      } else {
+        await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
+          ...data,
+          imageUrl: imageUrl ?? "",
+          createdAt: new Date(),
+        });
+      }
+
+      onSuccess();
+      onClose();
+      setFile(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -128,6 +169,24 @@ export default function RoomFormModal({
             {...register("description")}
           />
         </Box>
+        {/* <Button variant="outlined" component="label">
+          Upload image
+          <input
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0] ?? null;
+              setFile(f);
+            }}
+          />
+        </Button> */}
+
+        {file && (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Selected: {file.name}
+          </Typography>
+        )}
       </DialogContent>
 
       <DialogActions>
@@ -135,9 +194,9 @@ export default function RoomFormModal({
         <Button
           variant="contained"
           onClick={handleSubmit(onSubmit)}
-          disabled={!isValid}
+          disabled={!isValid || saving}
         >
-          Guardar
+          {saving ? "Saving..." : "Guardar"}
         </Button>
       </DialogActions>
     </Dialog>

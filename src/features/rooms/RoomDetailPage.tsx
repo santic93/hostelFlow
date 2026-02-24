@@ -3,16 +3,9 @@ import { useParams, Link as RouterLink } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { Container, Typography, Box, Button } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+
+import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
-
-
-type Room = {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  imageUrl?: string;
-};
 
 export const RoomDetailPage = () => {
   const { hostelSlug, id } = useParams<{ hostelSlug: string; id: string }>();
@@ -36,9 +29,10 @@ export const RoomDetailPage = () => {
       setRoom({
         id: snap.id,
         name: raw.name ?? "",
-        description: raw.description ?? "",
         price: raw.price ?? 0,
-        imageUrl: raw.imageUrl ?? raw.image ?? "",
+        capacity: raw.capacity ?? 1,
+        description: raw.description ?? "",
+        imageUrl: raw.imageUrl ?? "",
       });
       setLoading(false);
     };
@@ -53,7 +47,7 @@ export const RoomDetailPage = () => {
     <>
       <Button
         component={RouterLink}
-        to={`/${hostelSlug}/rooms`} // ✅ back correcto
+        to={`/${hostelSlug}/rooms`}
         startIcon={<ArrowBackIosNewIcon />}
       >
         Back to Rooms
@@ -62,13 +56,14 @@ export const RoomDetailPage = () => {
       <Container sx={{ py: 10 }}>
         <Box
           component="img"
-          src={room.imageUrl || "https://via.placeholder.com/1200x600?text=Room"}
+     src={room.imageUrl || "https://via.placeholder.com/800x600?text=Room"}
           sx={{
             width: "100%",
             maxHeight: 500,
             objectFit: "cover",
             borderRadius: 2,
             mb: 6,
+            bgcolor: "grey.100",
           }}
         />
 
@@ -83,7 +78,7 @@ export const RoomDetailPage = () => {
         <Button
           variant="contained"
           component={RouterLink}
-          to={`/${hostelSlug}/booking/${room.id}`} // ✅ booking correcto
+          to={`/${hostelSlug}/booking/${room.id}`}
         >
           BOOK THIS ROOM
         </Button>

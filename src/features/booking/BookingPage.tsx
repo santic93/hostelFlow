@@ -15,8 +15,8 @@ import {
   Grid,
   TextField,
 } from "@mui/material";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../lib/firebase"
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../../services/firebase"
 import { query, where, getDocs } from "firebase/firestore";
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import { rooms } from "../rooms/rooms.data"
@@ -163,7 +163,7 @@ export const BookingPage = () => {
   if (!hostelSlug) {
     return null; // o un loader si querés algo más elegante
   }
-  
+
   return (
     <>
       <Button

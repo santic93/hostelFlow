@@ -1,5 +1,5 @@
 import { Container, Typography, Grid, Box, Button } from "@mui/material";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useParams } from "react-router-dom";
 import { rooms } from "./rooms.data";
 
 export const RoomsPage = () => {

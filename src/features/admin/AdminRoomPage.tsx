@@ -4,7 +4,7 @@ import type { Room } from "../../types/room";
 import type { GridColDef } from "@mui/x-data-grid";
 import { DataGrid, } from "@mui/x-data-grid";
 import { Button, Box, Typography } from "@mui/material";
-import { db } from "../../lib/firebase";
+import { db } from "../../services/firebase";
 
 
 export default function AdminRoomsPage() {

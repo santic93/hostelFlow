@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 
 import { Box, Typography, Grid, Paper } from "@mui/material";
-import { db } from "../../../lib/firebase";
+import { db } from "../../../services/firebase";
 
 type Reservation = {
     total: number;

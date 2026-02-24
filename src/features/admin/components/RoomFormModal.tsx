@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
 
 import { useEffect } from "react";
-import { db } from "../../../lib/firebase";
+import { db } from "../../../services/firebase";
 
 type RoomFormValues = {
   name: string;

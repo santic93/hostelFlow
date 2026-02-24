@@ -9,7 +9,7 @@ import {
 import { signInWithEmailAndPassword } from "firebase/auth";
 
 import { useNavigate } from "react-router-dom";
-import { auth } from "../../lib/firebase";
+import { auth } from "../../services/firebase";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");

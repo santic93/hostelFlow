@@ -6,14 +6,14 @@ import {
 } from "@mui/material";
 import {
     collection,
-   
+
     doc,
     getDocs,
     orderBy,
     query,
     updateDoc,
 } from "firebase/firestore";
-import { db } from "../../lib/firebase";
+import { db } from "../../services/firebase";
 import { useAuth } from "../../context/AuthContext";
 import { AdminLayout } from "../../layouts/admin/AdminLayout";
 import { DataGrid } from "@mui/x-data-grid";
@@ -21,6 +21,7 @@ import type { GridColDef } from "@mui/x-data-grid";
 import { Chip, Box, } from "@mui/material";
 import RoomsSection from "./sections/RoomsSection";
 import DashboardSection from "./sections/DashboardSection";
+import { useParams } from "react-router-dom";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
     id: string;
@@ -34,10 +35,10 @@ type Reservation = {
 };
 
 const AdminPage = () => {
-    const { hostelSlug } = useAuth();
+    const { hostelSlug } = useParams<{ hostelSlug: string }>(); // ✅ tenant real
 
     const [reservations, setReservations] = useState<Reservation[]>([]);
-   
+
     const fetchReservations = async () => {
         if (!hostelSlug) return;
 
@@ -48,51 +49,38 @@ const AdminPage = () => {
 
         const snapshot = await getDocs(q);
 
-        const data: Reservation[] = snapshot.docs.map((doc) => {
-            const raw = doc.data();
+        const data: Reservation[] = snapshot.docs.map((docu) => {
+            const raw = docu.data() as any;
 
             return {
-                id: doc.id,
+                id: docu.id,
                 fullName: raw.fullName ?? "",
                 roomName: raw.roomName ?? "",
                 email: raw.email ?? "",
                 total: raw.total ?? 0,
                 status: raw.status ?? "pending",
-                checkIn: raw.checkIn?.toDate() ?? null,
-                checkOut: raw.checkOut?.toDate() ?? null,
+                checkIn: raw.checkIn?.toDate?.() ?? null,
+                checkOut: raw.checkOut?.toDate?.() ?? null,
             };
         });
 
         setReservations(data);
-
-   
-
     };
 
     useEffect(() => {
-        if (!hostelSlug) return; // 👈 protección clave
-
-
-
+        if (!hostelSlug) return;
         fetchReservations();
-
-
     }, [hostelSlug]);
-    const updateStatus = async (
-        id: string,
-        newStatus: ReservationStatus
-    ) => {
+
+    const updateStatus = async (id: string, newStatus: ReservationStatus) => {
         if (!hostelSlug) return;
 
-        await updateDoc(
-            doc(db, "hostels", hostelSlug, "reservations", id),
-            { status: newStatus }
-        );
+        await updateDoc(doc(db, "hostels", hostelSlug, "reservations", id), {
+            status: newStatus,
+        });
 
         setReservations((prev) =>
-            prev.map((res) =>
-                res.id === id ? { ...res, status: newStatus } : res
-            )
+            prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res))
         );
     };
     const columns: GridColDef<Reservation>[] = [
@@ -125,8 +113,8 @@ const AdminPage = () => {
             headerName: "Check Out",
             flex: 1,
             renderCell: (params) =>
-                params.row.checkIn
-                    ? params.row.checkIn.toLocaleDateString()
+                params.row.checkOut
+                    ? params.row.checkOut.toLocaleDateString()
                     : "-"
         },
         {

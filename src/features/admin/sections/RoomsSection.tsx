@@ -3,7 +3,7 @@ import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import type { GridColDef } from "@mui/x-data-grid";
 import { DataGrid, } from "@mui/x-data-grid";
 import { Box, Button, Typography } from "@mui/material";
-import { db } from "../../../lib/firebase";
+import { db } from "../../../services/firebase";
 import RoomFormModal from "../components/RoomFormModal";
 
 type Room = {

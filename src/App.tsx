@@ -10,23 +10,25 @@ import { BookingPage } from "./features/booking/BookingPage";
 import AdminPage from "./features/admin/AdminPage";
 import LoginPage from "./features/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AdminRedirect from "./features/admin/AdminRedirect";
 
 const router = createBrowserRouter([
   { path: "/", element: <Navigate to="/selina" replace /> },
   {
-
     path: "/",
     element: <MainLayout />,
     children: [
-      // 🌍 Web pública por slug
       { path: ":hostelSlug", element: <HomePage /> },
       { path: ":hostelSlug/rooms", element: <RoomsPage /> },
       { path: ":hostelSlug/rooms/:id", element: <RoomDetailPage /> },
       { path: ":hostelSlug/booking/:roomId", element: <BookingPage /> },
 
-      // 🔐 Admin
+      // auth tenant
+      { path: ":hostelSlug/login", element: <LoginPage /> },
+
+      // admin tenant
       {
-        path: "admin",
+        path: ":hostelSlug/admin",
         element: (
           <ProtectedRoute>
             <AdminPage />
@@ -34,7 +36,9 @@ const router = createBrowserRouter([
         ),
       },
 
-      { path: "login", element: <LoginPage /> },
+      // compat
+      { path: "admin", element: <AdminRedirect /> },
+      { path: "login", element: <Navigate to="/selina/login" replace /> },
     ],
   },
 ]);

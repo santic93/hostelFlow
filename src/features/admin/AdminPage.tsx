@@ -23,16 +23,17 @@ import { AdminLayout } from "../../layouts/admin/AdminLayout";
 import { DataGrid } from "@mui/x-data-grid";
 import type { GridColDef } from "@mui/x-data-grid";
 import { Chip, Box, Button } from "@mui/material";
+import RoomsSection from "./sections/RoomsSection";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
-  id: string;
-  fullName: string;
-  roomName: string;
-  email: string;
-  checkIn: Date | null;
-  checkOut: Date | null;
-  total: number;
-  status: ReservationStatus;
+    id: string;
+    fullName: string;
+    roomName: string;
+    email: string;
+    checkIn: Date | null;
+    checkOut: Date | null;
+    total: number;
+    status: ReservationStatus;
 };
 
 const AdminPage = () => {
@@ -79,10 +80,10 @@ const AdminPage = () => {
 
         fetchReservations();
     }, [hostelSlug]);
-   const updateStatus = async (
-  id: string,
-  newStatus: ReservationStatus
-) => {
+    const updateStatus = async (
+        id: string,
+        newStatus: ReservationStatus
+    ) => {
         if (!hostelSlug) return;
 
         await updateDoc(
@@ -248,9 +249,7 @@ const AdminPage = () => {
                 if (section === "rooms") {
                     return (
                         <>
-                            <Typography variant="h3">
-                                Rooms management (next step)
-                            </Typography>
+                            <RoomsSection />
                         </>
                     );
                 }

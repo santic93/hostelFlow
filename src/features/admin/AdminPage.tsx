@@ -23,18 +23,17 @@ import { AdminLayout } from "../../layouts/admin/AdminLayout";
 import { DataGrid } from "@mui/x-data-grid";
 import type { GridColDef } from "@mui/x-data-grid";
 import { Chip, Box, Button } from "@mui/material";
-
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
-    id: string;
-    fullName: string;
-    roomName: string;
-    email: string;
-    checkIn: any;
-    checkOut: any;
-    total: number;
-    status?: "pending" | "confirmed" | "cancelled";
+  id: string;
+  fullName: string;
+  roomName: string;
+  email: string;
+  checkIn: Date | null;
+  checkOut: Date | null;
+  total: number;
+  status: ReservationStatus;
 };
-
 
 const AdminPage = () => {
     const { hostelSlug } = useAuth();
@@ -53,12 +52,16 @@ const AdminPage = () => {
 
             const snapshot = await getDocs(q);
 
-            const data = snapshot.docs.map((doc) => {
+            const data: Reservation[] = snapshot.docs.map((doc) => {
                 const raw = doc.data();
 
                 return {
                     id: doc.id,
-                    ...raw,
+                    fullName: raw.fullName ?? "",
+                    roomName: raw.roomName ?? "",
+                    email: raw.email ?? "",
+                    total: raw.total ?? 0,
+                    status: raw.status ?? "pending",
                     checkIn: raw.checkIn?.toDate() ?? null,
                     checkOut: raw.checkOut?.toDate() ?? null,
                 };
@@ -76,7 +79,10 @@ const AdminPage = () => {
 
         fetchReservations();
     }, [hostelSlug]);
-    const updateStatus = async (id: string, newStatus: string) => {
+   const updateStatus = async (
+  id: string,
+  newStatus: ReservationStatus
+) => {
         if (!hostelSlug) return;
 
         await updateDoc(
@@ -110,19 +116,19 @@ const AdminPage = () => {
             field: "checkIn",
             headerName: "Check In",
             flex: 1,
-      renderCell: (params) =>
-  params.row.checkIn
-    ? params.row.checkIn.toLocaleDateString()
-    : "-"
+            renderCell: (params) =>
+                params.row.checkIn
+                    ? params.row.checkIn.toLocaleDateString()
+                    : "-"
         },
         {
             field: "checkOut",
             headerName: "Check Out",
             flex: 1,
-       renderCell: (params) =>
-  params.row.checkIn
-    ? params.row.checkIn.toLocaleDateString()
-    : "-"
+            renderCell: (params) =>
+                params.row.checkIn
+                    ? params.row.checkIn.toLocaleDateString()
+                    : "-"
         },
         {
             field: "total",

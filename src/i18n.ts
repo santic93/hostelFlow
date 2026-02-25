@@ -35,6 +35,13 @@ const resources = {
         privacy: "Privacidad",
 
       },
+      roomDetail: {
+  loading: "Cargando habitación...",
+  notFound: "Habitación no encontrada",
+  backToRooms: "Volver a habitaciones",
+  fromPerNight: "Desde ${{price}} / noche",
+  bookThisRoom: "RESERVAR ESTA HABITACIÓN",
+},
       common: {
         language: "Idioma",
       },
@@ -61,17 +68,24 @@ const resources = {
           "From cozy shared rooms to private suites, every detail is crafted to inspire.",
         learnMore: "LEARN MORE",
       },
-   seo: {
-  homeTitle: "REDSTAYS — Book your stay",
-  homeTitleWithHostel: "{{hostel}} — Book your stay",
-  homeDesc: "Book rooms and manage your hostel with REDSTAYS.",
-  homeDescWithHostel: "Book rooms at {{hostel}}. Fast and simple.",
-},
+      seo: {
+        homeTitle: "REDSTAYS — Book your stay",
+        homeTitleWithHostel: "{{hostel}} — Book your stay",
+        homeDesc: "Book rooms and manage your hostel with REDSTAYS.",
+        homeDescWithHostel: "Book rooms at {{hostel}}. Fast and simple.",
+      },
       footer: {
         rights: "All rights reserved.",
         terms: "Terms",
         privacy: "Privacy",
       },
+      roomDetail: {
+  loading: "Loading room...",
+  notFound: "Room not found",
+  backToRooms: "Back to rooms",
+  fromPerNight: "From ${{price}} / night",
+  bookThisRoom: "BOOK THIS ROOM",
+},
       common: {
         language: "Language",
       },
@@ -97,12 +111,12 @@ const resources = {
           "De dormitórios aconchegantes a suítes privadas, cada detalhe foi pensado para inspirar.",
         learnMore: "SAIBA MAIS",
       },
-   seo: {
-  homeTitle: "REDSTAYS — Reserve sua estadia",
-  homeTitleWithHostel: "{{hostel}} — Reserve sua estadia",
-  homeDesc: "Reserve quartos e gerencie seu hostel com a REDSTAYS.",
-  homeDescWithHostel: "Reserve quartos em {{hostel}}. Rápido e simples.",
-},
+      seo: {
+        homeTitle: "REDSTAYS — Reserve sua estadia",
+        homeTitleWithHostel: "{{hostel}} — Reserve sua estadia",
+        homeDesc: "Reserve quartos e gerencie seu hostel com a REDSTAYS.",
+        homeDescWithHostel: "Reserve quartos em {{hostel}}. Rápido e simples.",
+      },
       footer: {
         rights: "Todos os direitos reservados.",
 
@@ -110,6 +124,13 @@ const resources = {
 
         privacy: "Privacidade",
       },
+      roomDetail: {
+  loading: "Carregando quarto...",
+  notFound: "Quarto não encontrado",
+  backToRooms: "Voltar para quartos",
+  fromPerNight: "A partir de ${{price}} / noite",
+  bookThisRoom: "RESERVAR ESTE QUARTO",
+},
       common: {
         language: "Idioma",
       },

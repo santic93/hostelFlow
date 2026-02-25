@@ -1,12 +1,27 @@
 import { Box, Typography, Button, Grid } from "@mui/material";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useParams } from "react-router-dom";
 
 import { RoomsPage } from "../rooms/RoomsPage";
+import { useHostelPublic } from "../../hooks/useHostelPublic";
+import { Seo } from "../../components/Seo";
 export const HomePage = () => {
+    const { hostelSlug } = useParams<{ hostelSlug: string }>();
+    const { hostel } = useHostelPublic(hostelSlug);
+
+    const base = window.location.origin;
+    const canonical = hostelSlug ? `${base}/${hostelSlug}` : `${base}/`;
+
+    const title = hostel?.name
+        ? `${hostel.name} — Book your stay`
+        : "REDSTAYS — Book your stay";
+
+    const description = hostel?.name
+        ? `Book rooms at ${hostel.name}. Fast reservation and simple experience.`
+        : "Book rooms and manage your hostel with REDSTAYS.";
 
     return (
         <Box>
-
+            <Seo title={title} description={description} canonical={canonical} />
             <Grid
                 container
                 sx={{ minHeight: "80vh" }}
@@ -101,7 +116,7 @@ export const HomePage = () => {
             {/* ROOMS PREVIEW */}
             <Box sx={{ mt: 16 }}>
 
-               
+
                 <Grid container spacing={6}>
 
 

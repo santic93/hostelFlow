@@ -22,6 +22,7 @@ import { Chip, Box, } from "@mui/material";
 import RoomsSection from "./sections/RoomsSection";
 import DashboardSection from "./sections/DashboardSection";
 import { useParams } from "react-router-dom";
+import { Seo } from "../../components/Seo";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
     id: string;
@@ -172,51 +173,55 @@ const AdminPage = () => {
     //     fetchReservations();
     // };
     return (
-        <AdminLayout>
-            {(section) => {
-                if (section === "dashboard") {
-                    return (
-                        <>
-                            <DashboardSection />
-                        </>
-                    );
-                }
+        <>
+            <Seo title="Admin — REDSTAYS" description="Admin panel" noindex />
+            <AdminLayout>
 
-                if (section === "reservations") {
-                    return (
-                        <>
-                            <Typography variant="h3" gutterBottom>
-                                Reservations
-                            </Typography>
+                {(section) => {
+                    if (section === "dashboard") {
+                        return (
+                            <>
+                                <DashboardSection />
+                            </>
+                        );
+                    }
 
-                            <Box sx={{ height: 600, width: "100%" }}>
-                                <DataGrid
-                                    rows={reservations}
-                                    columns={columns}
-                                    pageSizeOptions={[5, 10, 20]}
-                                    initialState={{
-                                        pagination: {
-                                            paginationModel: { pageSize: 10, page: 0 },
-                                        },
-                                    }}
-                                    disableRowSelectionOnClick
-                                />
-                            </Box>
-                        </>
-                    );
-                }
+                    if (section === "reservations") {
+                        return (
+                            <>
+                                <Typography variant="h3" gutterBottom>
+                                    Reservations
+                                </Typography>
 
-                if (section === "rooms") {
-                    return (
-                        <>
-                            <RoomsSection />
-                        </>
-                    );
-                }
+                                <Box sx={{ height: 600, width: "100%" }}>
+                                    <DataGrid
+                                        rows={reservations}
+                                        columns={columns}
+                                        pageSizeOptions={[5, 10, 20]}
+                                        initialState={{
+                                            pagination: {
+                                                paginationModel: { pageSize: 10, page: 0 },
+                                            },
+                                        }}
+                                        disableRowSelectionOnClick
+                                    />
+                                </Box>
+                            </>
+                        );
+                    }
 
-                return null;
-            }}
-        </AdminLayout>
+                    if (section === "rooms") {
+                        return (
+                            <>
+                                <RoomsSection />
+                            </>
+                        );
+                    }
+
+                    return null;
+                }}
+            </AdminLayout>
+        </>
     );
 };
 

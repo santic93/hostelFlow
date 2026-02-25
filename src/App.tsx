@@ -12,8 +12,11 @@ import RegisterPage from "./pages/register/RegisterPage";
 import { HomePage } from "./pages/home/HomePage";
 import { BookingPage } from "./pages/booking/BookingPage";
 import { MainLayout } from "./layouts/main/MainLayout";
+import { TermsPage } from "./pages/terms/TermsPage";
+import { PrivacyPage } from "./pages/privacyPage/PrivacyPage";
 
 const router = createBrowserRouter([
+
   // ✅ root público (sin tenant)
   { path: "/", element: <RootRedirect /> },
   { path: "/register", element: <RegisterPage /> },
@@ -32,6 +35,8 @@ const router = createBrowserRouter([
       { path: "booking/:roomId", element: <BookingPage /> },
 
       { path: "login", element: <LoginPage /> },
+      { path: "terms", element: <TermsPage /> },
+      { path: "privacy", element: <PrivacyPage /> },
 
       {
         path: "admin",

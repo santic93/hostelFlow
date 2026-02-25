@@ -10,6 +10,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../services/firebase";
+import { Seo } from "../../components/Seo";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
@@ -19,40 +20,44 @@ const LoginPage = () => {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-   navigate("/admin", { replace: true });
+      navigate("/admin", { replace: true });
     } catch (error) {
       alert("Invalid credentials");
     }
   };
 
   return (
-    <Container sx={{ py: 15, maxWidth: 400 }}>
-      <Typography variant="h4" gutterBottom>
-        Admin Login
-      </Typography>
+    <>
+      <Seo title="Login — REDSTAYS" description="Login" noindex />
+      <Container sx={{ py: 15, maxWidth: 400 }}>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-        <TextField
-          label="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+        <Typography variant="h4" gutterBottom>
+          Admin Login
+        </Typography>
 
-        <TextField
-          label="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <TextField
+            label="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
-        <Button
-          variant="contained"
-          onClick={handleLogin}
-        >
-          Login
-        </Button>
-      </Box>
-    </Container>
+          <TextField
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <Button
+            variant="contained"
+            onClick={handleLogin}
+          >
+            Login
+          </Button>
+        </Box>
+      </Container>
+    </>
   );
 };
 

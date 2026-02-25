@@ -68,6 +68,18 @@ export const MainLayout = () => {
       <Container maxWidth="lg">
         <Box py={8}>
           <Outlet />
+          <Box component="footer" sx={{ borderTop: "1px solid #D6CEC9", py: 4, mt: 8 }}>
+            <Container maxWidth="lg" sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                © {new Date().getFullYear()} REDSTAYS. All rights reserved.
+              </Typography>
+
+              <Box sx={{ display: "flex", gap: 2 }}>
+                <Button component={RouterLink} to={`/${slugFromUrl}/terms`} size="small">Terms</Button>
+                <Button component={RouterLink} to={`/${slugFromUrl}/privacy`} size="small">Privacy</Button>
+              </Box>
+            </Container>
+          </Box>
         </Box>
       </Container>
     </>

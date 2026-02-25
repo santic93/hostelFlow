@@ -9,45 +9,57 @@ import { BookingPage } from "./pages/booking/BookingPage";
 import { MainLayout } from "./layouts/main/MainLayout";
 import { TermsPage } from "./pages/terms/TermsPage";
 import { PrivacyPage } from "./pages/privacyPage/PrivacyPage";
-import { AdminLayout } from "./layouts/admin/AdminLayout";
-import AdminDashboardPage from "./pages/admin/AdminBoardPage";
-import AdminReservationsPage from "./pages/admin/AdminReservationsPage";
-import AdminRoomsPage from "./pages/admin/AdminRoomPage";
 import TenantGuard from "./layouts/tenant/TenantGuard";
 import DateI18nProvider from "./providers/DateI18nProvider";
-
-const router = createBrowserRouter([
+import AppErrorPage from "./pages/AppErrorPage";
+import RootRedirect from "./routes/RootLanding";
+import LoginPage from "./pages/login/LoginPage";
+import RegisterPage from "./pages/register/RegisterPage";
+import AdminRedirect from "./pages/admin/AdminRedirect";
+import AdminPage from "./pages/admin/AdminPage";
+export const router = createBrowserRouter([
   {
-    path: "/:hostelSlug",
-    element: <TenantGuard />,
+    path: "/",
+    errorElement: <AppErrorPage />,
     children: [
-      {
-        element: <MainLayout />,
-        children: [
-          { index: true, element: <HomePage /> },
-          { path: "rooms", element: <RoomsPage /> },
-          { path: "rooms/:id", element: <RoomDetailPage /> },
-          { path: "booking/:roomId", element: <BookingPage /> },
-          { path: "terms", element: <TermsPage /> },
-          { path: "privacy", element: <PrivacyPage /> },
+      // ✅ GLOBAL
+      { index: true, element: <RootRedirect /> },
+      { path: "login", element: <LoginPage /> },
+      { path: "register", element: <RegisterPage /> },
+      { path: "admin", element: <AdminRedirect /> },
 
+      // ✅ TENANT (guard primero)
+      {
+        path: ":hostelSlug",
+        element: <TenantGuard />,
+        children: [
           {
-            path: "admin",
-            element: (
-              <ProtectedRoute>
-                <AdminLayout />
-              </ProtectedRoute>
-            ),
+            element: <MainLayout />,
             children: [
-              { index: true, element: <AdminDashboardPage /> },
-              { path: "reservations", element: <AdminReservationsPage /> },
-              { path: "rooms", element: <AdminRoomsPage /> },
+              { index: true, element: <HomePage /> },
+              { path: "rooms", element: <RoomsPage /> },
+              { path: "rooms/:id", element: <RoomDetailPage /> },
+              { path: "booking/:roomId", element: <BookingPage /> },
+              { path: "terms", element: <TermsPage /> },
+              { path: "privacy", element: <PrivacyPage /> },
+
+              {
+                path: "admin",
+                element: (
+                  <ProtectedRoute>
+                    <AdminPage />
+                  </ProtectedRoute>
+                ),
+              },
             ],
           },
         ],
       },
+
+      // ✅ Catch-all (si querés explícito)
+      { path: "*", element: <AppErrorPage /> },
     ],
-  }
+  },
 ]);
 function App() {
   return (

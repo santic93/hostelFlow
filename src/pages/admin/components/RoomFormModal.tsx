@@ -1,10 +1,10 @@
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { addDoc, collection, updateDoc, doc, setDoc } from "firebase/firestore";
+import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
 
 import { useEffect, useState } from "react";
-import { db, storage } from "../../../services/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db } from "../../../services/firebase";
+
 type RoomFormValues = {
   name: string;
   price: number;
@@ -66,29 +66,29 @@ export default function RoomFormModal({
     }
   }, [initialData, reset]);
 
-const onSubmit = async (data: RoomFormValues) => {
-  if (!hostelSlug) return;
+  const onSubmit = async (data: RoomFormValues) => {
+    if (!hostelSlug) return;
 
-  const payload = {
-    name: data.name,
-    price: Number(data.price),
-    capacity: Number(data.capacity),
-    description: data.description ?? "",
-    imageUrl: data.imageUrl?.trim() ?? "", // ✅
+    const payload = {
+      name: data.name,
+      price: Number(data.price),
+      capacity: Number(data.capacity),
+      description: data.description ?? "",
+      imageUrl: data.imageUrl?.trim() ?? "", // ✅
+    };
+
+    if (initialData?.id) {
+      await updateDoc(doc(db, "hostels", hostelSlug, "rooms", initialData.id), payload);
+    } else {
+      await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
+        ...payload,
+        createdAt: new Date(),
+      });
+    }
+
+    onSuccess();
+    onClose();
   };
-
-  if (initialData?.id) {
-    await updateDoc(doc(db, "hostels", hostelSlug, "rooms", initialData.id), payload);
-  } else {
-    await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
-      ...payload,
-      createdAt: new Date(),
-    });
-  }
-
-  onSuccess();
-  onClose();
-};
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -133,7 +133,7 @@ const onSubmit = async (data: RoomFormValues) => {
             rows={3}
             {...register("description")}
           />
-{/* 
+          {/* 
           ////esto por ahora reemplaza la imagen */}
           <TextField
             label="Image URL (optional)"

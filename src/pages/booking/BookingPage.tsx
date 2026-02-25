@@ -1,14 +1,12 @@
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { useMemo } from "react";
+import { DatePicker } from "@mui/x-date-pickers";
 // locales dayjs
 import "dayjs/locale/es";
 import "dayjs/locale/pt-br";
 // MUI date pickers locales
-import { enUS, esES, ptBR } from "@mui/x-date-pickers/locales";
+
 import {
   Button,
   Stack,
@@ -50,12 +48,6 @@ export const BookingPage = () => {
     dayjs.locale(dayjsLocale);
   }, [dayjsLocale]);
 
-  // localeText para DatePickers (botones, placeholders, etc.)
-  const localeText = useMemo(() => {
-    if (lng === "pt") return ptBR.components.MuiLocalizationProvider.defaultProps.localeText;
-    if (lng === "en") return enUS.components.MuiLocalizationProvider.defaultProps.localeText;
-    return esES.components.MuiLocalizationProvider.defaultProps.localeText;
-  }, [lng]);
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
@@ -196,11 +188,6 @@ export const BookingPage = () => {
         <Grid container spacing={8} sx={{ mt: 4 }}>
           {/* LEFT */}
           <Grid size={{ xs: 12, md: 7 }}>
-           <LocalizationProvider
-  dateAdapter={AdapterDayjs}
-  adapterLocale={dayjsLocale}
-  localeText={localeText}
->
               <Stack spacing={4}>
                 <DatePicker
                   label={t("booking.checkIn")}
@@ -216,7 +203,7 @@ export const BookingPage = () => {
                   onChange={(newValue) => setCheckOut(newValue)}
                 />
               </Stack>
-            </LocalizationProvider>
+       
 
             <Stack spacing={4} sx={{ mt: 6 }}>
               <TextField

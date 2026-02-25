@@ -7,13 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../services/firebase";
 
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-}
+
 function extractTenantSlug(input: string) {
   const raw = input.trim();
   if (!raw) return "";

@@ -1,89 +1,40 @@
-import { Box, Button, Container, Typography } from "@mui/material";
-import { doc, getDoc } from "firebase/firestore";
-import { useEffect, useState } from "react";
-import { Outlet, useNavigate, useParams } from "react-router-dom";
-import { db } from "../../services/firebase";
+import { Outlet, useParams, Link as RouterLink } from "react-router-dom";
+import { Container, Typography, Button, Stack } from "@mui/material";
+import { useHostelPublic } from "../../hooks/useHostelPublic";
 
-
-type Status = "loading" | "ok" | "notfound" | "error";
 
 export default function TenantGuard() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const navigate = useNavigate();
-  const [status, setStatus] = useState<Status>("loading");
-  const [hostelName, setHostelName] = useState<string>("");
+  const { hostel, loading } = useHostelPublic(hostelSlug);
 
-  useEffect(() => {
-    const run = async () => {
-      if (!hostelSlug) return;
+  if (loading) {
+    return (
+      <Container sx={{ py: 10 }}>
+        <Typography>Cargando...</Typography>
+      </Container>
+    );
+  }
 
-      try {
-        setStatus("loading");
-        const snap = await getDoc(doc(db, "hostels", hostelSlug));
-
-        if (!snap.exists()) {
-          setStatus("notfound");
-          return;
-        }
-
-        const data = snap.data() as any;
-        setHostelName(data?.name ?? hostelSlug);
-        setStatus("ok");
-      } catch (e) {
-        setStatus("error");
-      }
-    };
-
-    run();
-  }, [hostelSlug]);
-
-  if (status === "loading") {
+  // si no existe el hostel => UX pro
+  if (!hostel) {
     return (
       <Container sx={{ py: 12 }}>
-        <Typography variant="h5">Cargando hostel...</Typography>
-      </Container>
-    );
-  }
-
-  if (status === "notfound") {
-    return (
-      <Container sx={{ py: 12, maxWidth: 600 }}>
-        <Typography variant="h3" gutterBottom>
-          Hostel no encontrado
-        </Typography>
-        <Typography sx={{ color: "text.secondary", mb: 3 }}>
-          El link <b>/{hostelSlug}</b> no existe o está mal escrito.
+        <Typography variant="h3" gutterBottom>Hostel no encontrado</Typography>
+        <Typography sx={{ color: "text.secondary", mb: 4 }}>
+          El link <b>{hostelSlug}</b> no existe. Revisá el slug o buscá otro.
         </Typography>
 
-        <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-          <Button variant="contained" onClick={() => navigate("/", { replace: true })}>
-            Volver al inicio
+        <Stack direction="row" spacing={2}>
+          <Button variant="contained" component={RouterLink} to="/">
+            Buscar hostel
           </Button>
-          <Button variant="outlined" onClick={() => navigate("/login")}>
-            Admin Login
+          <Button variant="outlined" component={RouterLink} to="/login">
+            Admin login
           </Button>
-        </Box>
+        </Stack>
       </Container>
     );
   }
 
-  if (status === "error") {
-    return (
-      <Container sx={{ py: 12, maxWidth: 600 }}>
-        <Typography variant="h3" gutterBottom>
-          Error cargando hostel
-        </Typography>
-        <Typography sx={{ color: "text.secondary", mb: 3 }}>
-          Probá de nuevo.
-        </Typography>
-        <Button variant="contained" onClick={() => window.location.reload()}>
-          Reintentar
-        </Button>
-      </Container>
-    );
-  }
-
-  // status === "ok"
-  // Podés guardar hostelName en contexto luego, si querés
   return <Outlet />;
 }

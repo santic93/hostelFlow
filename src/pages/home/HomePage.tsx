@@ -10,7 +10,7 @@ import { useTranslation } from "react-i18next";
 export const HomePage = () => {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { hostel } = useHostelPublic(hostelSlug);
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   const base = window.location.origin;
   const canonical = hostelSlug ? `${base}/${hostelSlug}` : `${base}/`;

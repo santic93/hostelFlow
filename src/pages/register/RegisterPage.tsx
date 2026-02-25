@@ -38,21 +38,29 @@ export default function RegisterPage() {
   const handleCreateAccount = async () => {
     setMessage(null);
 
-    if (!email.trim()) return setMessage({ type: "error", text: "Ingresá un email" });
-    if (password.length < 6) return setMessage({ type: "error", text: "Password mínimo 6 caracteres" });
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password;
+
+    if (!cleanEmail) return setMessage({ type: "error", text: "Ingresá un email" });
+    if (cleanPass.length < 6) return setMessage({ type: "error", text: "Password mínimo 6 caracteres" });
 
     try {
       setLoading(true);
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
+
       setCreatedUser(cred.user);
-      setStep(2);
+      setStep(2); // ✅ recién cuando realmente se creó la cuenta
       setMessage({ type: "success", text: "Cuenta creada ✅ Ahora creá tu hostel." });
     } catch (err: any) {
+      console.error("REGISTER ERROR =>", err);
+
       if (err?.code === "auth/email-already-in-use") {
-        setMessage({ type: "error", text: "Ese email ya está en uso." });
+        setMessage({ type: "error", text: "Ese email ya está en uso. Probá iniciar sesión en Admin Login." });
+      } else if (err?.code === "auth/invalid-email") {
+        setMessage({ type: "error", text: "Email inválido." });
       } else {
-        setMessage({ type: "error", text: "Error creando cuenta. Revisá consola." });
-        console.error(err);
+        setMessage({ type: "error", text: err?.code ? `Error: ${err.code}` : "Error creando cuenta" });
       }
     } finally {
       setLoading(false);
@@ -129,8 +137,8 @@ export default function RegisterPage() {
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
       <Button component={Link} to="/login" variant="text">
-  Ya tengo cuenta (login)
-</Button>
+        Ya tengo cuenta (login)
+      </Button>
       <Typography variant="h4" gutterBottom>
         Crear mi Hostel
       </Typography>
@@ -142,16 +150,33 @@ export default function RegisterPage() {
       )}
 
       {/* STEP 1 */}
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
-        <TextField label="Email admin" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        <Button variant="contained" disabled={loading} onClick={handleCreateAccount}>
-          {loading ? "Creando..." : "Crear cuenta"}
-        </Button>
-      </Box>
-
+      <Collapse in={step === 1}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
+          <TextField
+            label="Email admin"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          <TextField
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+          />
+          <Button variant="contained" disabled={loading} onClick={handleCreateAccount}>
+            {loading ? "Creando..." : "Crear cuenta"}
+          </Button>
+        </Box>
+      </Collapse>
+      {step === 2 && (
+        <Alert severity="success" sx={{ mt: 3 }}>
+          Cuenta creada: <b>{email.trim().toLowerCase()}</b> ✅
+        </Alert>
+      )}
       {/* STEP 2 (aparece solo cuando step=2) */}
-      <Collapse in={step === 2}>
+   <Collapse in={step === 2 && !!auth.currentUser}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 4 }}>
           <TextField
             label="Nombre del hostel"

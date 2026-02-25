@@ -14,35 +14,40 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-useEffect(() => {
-  if (searchParams.get("forbidden") === "1") {
-    setMsg({ type: "error", text: "Tu usuario no tiene permisos de administrador." });
-  }
-}, [searchParams]);
+  useEffect(() => {
+    if (searchParams.get("forbidden") === "1") {
+      setMsg({ type: "error", text: "Tu usuario no tiene permisos de administrador." });
+    }
+  }, [searchParams]);
 
-const handleLogin = async () => {
-  setMsg(null);
+  const handleLogin = async () => {
+    setMsg(null);
 
-  if (!email.trim()) return setMsg({ type: "error", text: "Ingresá tu email" });
-  if (password.length < 6) return setMsg({ type: "error", text: "Password mínimo 6 caracteres" });
+    if (!email.trim()) return setMsg({ type: "error", text: "Ingresá tu email" });
+    if (password.length < 6) return setMsg({ type: "error", text: "Password mínimo 6 caracteres" });
 
-  try {
-    setLoading(true);
-    await signInWithEmailAndPassword(auth, email.trim(), password);
+    try {
+      setLoading(true);
+      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 
-    // IMPORTANTE: no navegamos “a ciegas” si el AuthContext no actualizó aún
-    // vamos a /admin global, y ahí AdminRedirect decide
-    navigate("/admin", { replace: true });
-  } catch (err: any) {
-    console.error("LOGIN ERROR =>", err);
-    setMsg({
-      type: "error",
-      text: err?.code ? `Error: ${err.code}` : "Error al iniciar sesión",
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      // IMPORTANTE: no navegamos “a ciegas” si el AuthContext no actualizó aún
+      // vamos a /admin global, y ahí AdminRedirect decide
+      navigate("/admin", { replace: true });
+    } catch (err: any) {
+      console.error("LOGIN ERROR =>", err);
+
+      const code = err?.code || "";
+      const text =
+        code === "auth/invalid-credential" ? "Email o contraseña incorrectos." :
+          code === "auth/user-not-found" ? "No existe un usuario con ese email." :
+            code === "auth/wrong-password" ? "Contraseña incorrecta." :
+              code ? `Error: ${code}` : "Error al iniciar sesión";
+
+      setMsg({ type: "error", text });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleReset = async () => {
     setMsg(null);

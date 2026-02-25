@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
-import { Container, Typography, Box, Button } from "@mui/material";
+import { Container, Typography, Button } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";

@@ -1,10 +1,7 @@
 import { useNavigate, useParams } from "react-router-dom";
 import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
-import {
-  DatePicker,
-  LocalizationProvider,
-} from "@mui/x-date-pickers";
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import {
   Button,
@@ -14,28 +11,45 @@ import {
   Container,
   Grid,
   TextField,
+  Alert,
 } from "@mui/material";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../../services/firebase"
-import { query, where, getDocs } from "firebase/firestore";
-import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
-import { rooms } from "../rooms/rooms.data"
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
+import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import { useTranslation } from "react-i18next";
+
+import { db } from "../../services/firebase";
+
 export const BookingPage = () => {
   const navigate = useNavigate();
   const { hostelSlug, roomId } = useParams();
+  const { t } = useTranslation();
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
+
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
 
-  const isEmailValid = /^\S+@\S+\.\S+$/.test(email);
-
-  // si está vacío, no muestres error todavía
-  const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
-
-
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
+
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  // mensajes UX
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const isEmailValid = /^\S+@\S+\.\S+$/.test(email);
+  const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
 
   useEffect(() => {
     const fetchRoom = async () => {
@@ -52,39 +66,13 @@ export const BookingPage = () => {
 
     fetchRoom();
   }, [hostelSlug, roomId]);
-  // useEffect(() => {
-  //   const fetchRoom = async () => {
-  //     if (!hostelSlug || !roomId) return;
 
-  //     const docSnap = await getDoc(
-  //       doc(db, "hostels", hostelSlug, "rooms", roomId)
-  //     );
+  const nights = checkIn && checkOut ? Math.max(0, checkOut.diff(checkIn, "day")) : 0;
+  const total = selectedRoom && nights > 0 ? nights * selectedRoom.price : 0;
 
-  //     if (docSnap.exists()) {
-  //       setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
-  //     }
-  //   };
-
-  //   fetchRoom();
-  // }, [hostelSlug, roomId]);
-
-  const nights =
-    checkIn && checkOut ? Math.max(0, checkOut.diff(checkIn, "day")) : 0;
-
-  const total =
-    selectedRoom && nights > 0
-      ? nights * selectedRoom.price
-      : 0;
-  const [fullName, setFullName] = useState("");
   const isFormValid =
-    selectedRoom &&
-    nights > 0 &&
-    fullName.trim().length > 2 &&
-    isEmailValid;
+    !!selectedRoom && nights > 0 && fullName.trim().length > 2 && isEmailValid;
 
-
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
   const checkAvailability = async () => {
     if (!hostelSlug || !selectedRoom || !checkIn || !checkOut) return false;
 
@@ -99,135 +87,128 @@ export const BookingPage = () => {
     const newCheckOut = checkOut.toDate();
 
     for (const docSnap of snapshot.docs) {
-      const data = docSnap.data();
+      const data = docSnap.data() as any;
 
       if (data.status === "cancelled") continue;
       if (!data.checkIn || !data.checkOut) continue;
+
       const existingCheckIn = data.checkIn.toDate();
       const existingCheckOut = data.checkOut.toDate();
 
-      const isOverlapping =
-        newCheckIn < existingCheckOut &&
-        newCheckOut > existingCheckIn;
-
+      const isOverlapping = newCheckIn < existingCheckOut && newCheckOut > existingCheckIn;
       if (isOverlapping) return false;
     }
 
     return true;
   };
+
   const handleConfirm = async () => {
+    setFormError(null);
+
     if (!isFormValid || !hostelSlug || !selectedRoom) return;
 
     try {
       setLoading(true);
 
       const available = await checkAvailability();
-
       if (!available) {
-        alert("Selected dates are not available for this room.");
-        setLoading(false);
+        setFormError(t("booking.unavailable"));
         return;
       }
 
-      await addDoc(
-        collection(db, "hostels", hostelSlug, "reservations"),
-        {
-          roomId: selectedRoom.id,
-          roomName: selectedRoom.name,
-          pricePerNight: selectedRoom.price,
-          checkIn: checkIn?.toDate(),
-          checkOut: checkOut?.toDate(),
-          nights,
-          total,
-          fullName,
-          email,
-          status: "pending", // 👈 NUEVO
-          createdAt: serverTimestamp(),
-        }
-      );
+      await addDoc(collection(db, "hostels", hostelSlug, "reservations"), {
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name,
+        pricePerNight: selectedRoom.price,
+        checkIn: checkIn?.toDate(),
+        checkOut: checkOut?.toDate(),
+        nights,
+        total,
+        fullName,
+        email,
+        status: "pending",
+        createdAt: serverTimestamp(),
+      });
 
       setSuccess(true);
     } catch (error) {
       console.error("Error saving reservation:", error);
+      setFormError(t("booking.errorSaving"));
     } finally {
       setLoading(false);
     }
   };
+
   if (success) {
     return (
       <Container sx={{ py: 15, textAlign: "center" }}>
         <Typography variant="h2" gutterBottom>
-          Reservation Confirmed
+          {t("booking.successTitle")}
         </Typography>
-
-        <Typography sx={{ mb: 4 }}>
-          We’ve received your booking request.
-          A confirmation email will be sent shortly.
-        </Typography>
+        <Typography sx={{ mb: 4 }}>{t("booking.successText")}</Typography>
       </Container>
     );
   }
-  if (!hostelSlug) {
-    return null; // o un loader si querés algo más elegante
-  }
+
+  if (!hostelSlug) return null;
 
   return (
     <>
-      <Button
-        onClick={() => navigate(-1)}
-        startIcon={<ArrowBackIosNewIcon />}
-      >
-        Back
+      <Button onClick={() => navigate(-1)} startIcon={<ArrowBackIosNewIcon />}>
+        {t("booking.back")}
       </Button>
+
       <Container sx={{ py: 10 }}>
         <Typography variant="h2" gutterBottom>
-          Book Your Stay
+          {t("booking.title")}
         </Typography>
 
+        {formError && (
+          <Alert severity="error" sx={{ mt: 3 }}>
+            {formError}
+          </Alert>
+        )}
+
         <Grid container spacing={8} sx={{ mt: 4 }}>
-
-          {/* LEFT COLUMN — FORM */}
+          {/* LEFT */}
           <Grid size={{ xs: 12, md: 7 }}>
-
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <Stack spacing={4}>
-
                 <DatePicker
-                  label="Check-in"
+                  label={t("booking.checkIn")}
                   value={checkIn}
                   minDate={dayjs()}
                   onChange={(newValue) => setCheckIn(newValue)}
                 />
 
                 <DatePicker
-                  label="Check-out"
+                  label={t("booking.checkOut")}
                   value={checkOut}
                   minDate={checkIn || dayjs()}
                   onChange={(newValue) => setCheckOut(newValue)}
                 />
-
               </Stack>
-
             </LocalizationProvider>
+
             <Stack spacing={4} sx={{ mt: 6 }}>
               <TextField
-
-                label="Full Name"
+                label={t("booking.fullName")}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 fullWidth
               />
 
               <TextField
-                label="Email Address"
+                label={t("booking.email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => setEmailTouched(true)}
                 fullWidth
                 error={showEmailError}
-                helperText={showEmailError ? "Enter a valid email address" : ""}
+                helperText={showEmailError ? t("booking.emailInvalid") : ""}
               />
             </Stack>
+
             <Button
               variant="contained"
               fullWidth
@@ -235,14 +216,12 @@ export const BookingPage = () => {
               disabled={!isFormValid || loading}
               onClick={handleConfirm}
             >
-              {loading ? "Processing..." : "CONFIRM RESERVATION"}
+              {loading ? t("booking.processing") : t("booking.confirm")}
             </Button>
-
           </Grid>
 
-          {/* RIGHT COLUMN — SUMMARY */}
+          {/* RIGHT */}
           <Grid size={{ xs: 12, md: 5 }}>
-
             <Box
               sx={{
                 border: "1px solid #E0E0E0",
@@ -252,7 +231,6 @@ export const BookingPage = () => {
                 top: { md: 100 },
               }}
             >
-
               {selectedRoom ? (
                 <>
                   <Typography variant="h5" gutterBottom>
@@ -260,27 +238,24 @@ export const BookingPage = () => {
                   </Typography>
 
                   <Typography sx={{ mb: 2 }}>
-                    ${selectedRoom.price} per night
+                    {t("booking.summaryPerNight", { price: selectedRoom.price })}
                   </Typography>
 
                   <Box sx={{ borderTop: "1px solid #eee", my: 3 }} />
 
                   <Typography>
-                    {nights > 0 ? `${nights} nights` : "Select dates"}
+                    {nights > 0 ? t("booking.summaryNights", { n: nights }) : t("booking.summarySelectDates")}
                   </Typography>
 
                   <Typography variant="h6" sx={{ mt: 2 }}>
-                    Total: ${total}
+                    {t("booking.summaryTotal", { total })}
                   </Typography>
                 </>
               ) : (
-                <Typography>Select a room first.</Typography>
+                <Typography>{t("booking.summarySelectRoom")}</Typography>
               )}
-
             </Box>
-
           </Grid>
-
         </Grid>
       </Container>
     </>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
-import { Container, Typography, Grid, Box, Button } from "@mui/material";
+import { Container, Typography, Grid, Button } from "@mui/material";
 import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
 import SafeImage from "../../components/SafeImage";

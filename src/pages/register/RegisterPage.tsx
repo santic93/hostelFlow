@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert } from "@mui/material";
@@ -37,9 +37,7 @@ export default function RegisterPage() {
 
   const handleCreateAccount = async () => {
     setMessage(null);
-    console.log("before setStep", step);
-    setStep(2);
-    console.log("after setStep -> 2");
+
     if (!email.trim()) return setMessage({ type: "error", text: "Ingresá un email" });
     if (password.length < 6) return setMessage({ type: "error", text: "Password mínimo 6 caracteres" });
 
@@ -130,6 +128,9 @@ export default function RegisterPage() {
   }
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
+      <Button component={Link} to="/login" variant="text">
+  Ya tengo cuenta (login)
+</Button>
       <Typography variant="h4" gutterBottom>
         Crear mi Hostel
       </Typography>

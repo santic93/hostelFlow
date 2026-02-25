@@ -14,17 +14,17 @@ import { BookingPage } from "./pages/booking/BookingPage";
 import { MainLayout } from "./layouts/main/MainLayout";
 import { TermsPage } from "./pages/terms/TermsPage";
 import { PrivacyPage } from "./pages/privacyPage/PrivacyPage";
+import { AdminLayout } from "./layouts/admin/AdminLayout";
+import AdminDashboardPage from "./pages/admin/AdminBoardPage";
+import AdminReservationsPage from "./pages/admin/AdminReservationsPage";
+import AdminRoomsPage from "./pages/admin/AdminRoomPage";
 
 const router = createBrowserRouter([
-
-  // ✅ root público (sin tenant)
   { path: "/", element: <RootRedirect /> },
   { path: "/register", element: <RegisterPage /> },
-
-  // ✅ compat /admin global
+  { path: "/login", element: <LoginPage /> },
   { path: "/admin", element: <AdminRedirect /> },
 
-  // ✅ tenant site (todo lo que depende de :hostelSlug)
   {
     path: "/:hostelSlug",
     element: <MainLayout />,
@@ -33,23 +33,24 @@ const router = createBrowserRouter([
       { path: "rooms", element: <RoomsPage /> },
       { path: "rooms/:id", element: <RoomDetailPage /> },
       { path: "booking/:roomId", element: <BookingPage /> },
-
-      { path: "login", element: <LoginPage /> },
       { path: "terms", element: <TermsPage /> },
       { path: "privacy", element: <PrivacyPage /> },
-
       {
         path: "admin",
         element: (
           <ProtectedRoute>
-            <AdminPage />
+            <AdminLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: "reservations", element: <AdminReservationsPage /> },
+          { path: "rooms", element: <AdminRoomsPage /> },
+        ],
       },
     ],
   },
 ]);
-
 function App() {
   return (
     <ThemeProvider theme={theme}>

@@ -2,10 +2,11 @@ import { Box, Button, Container, TextField, Typography, Alert } from "@mui/mater
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
-     import { collection, getDocs, limit, query } from "firebase/firestore";
+import { collection, getDocs, limit, query } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../services/firebase";
+import HotelLoading from "../components/HotelLoading";
 
 
 function extractTenantSlug(input: string) {
@@ -36,12 +37,18 @@ function extractTenantSlug(input: string) {
 export default function RootRedirect() {
   const { user, role, hostelSlug, loading } = useAuth();
   const navigate = useNavigate();
-const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [slug, setSlug] = useState("");
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (loading) return null;
+  const [recent, setRecent] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("recentTenants") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  if (loading) return <HotelLoading text="Cargando..." />;
 
   // admin logueado -> panel
   if (user && role === "admin" && hostelSlug) {
@@ -49,7 +56,7 @@ const [suggestions, setSuggestions] = useState<string[]>([]);
   }
 
   const handleEnter = async () => {
-    
+
     setError(null);
 
     const cleaned = extractTenantSlug(slug);
@@ -63,24 +70,29 @@ const [suggestions, setSuggestions] = useState<string[]>([]);
       const snap = await getDoc(doc(db, "hostels", cleaned));
 
 
-// ...
+      // ...
 
-if (!snap.exists()) {
-  // Traemos algunos slugs existentes para sugerir (modo demo)
-  const listSnap = await getDocs(query(collection(db, "hostels"), limit(20)));
-  const all = listSnap.docs.map(d => d.id);
+      if (!snap.exists()) {
+        // Traemos algunos slugs existentes para sugerir (modo demo)
+        const listSnap = await getDocs(query(collection(db, "hostels"), limit(20)));
+        const all = listSnap.docs.map(d => d.id);
 
-  // sugerencias: los más parecidos por "incluye" (simple y efectivo)
-  const c = cleaned.toLowerCase();
-  const close = all
-    .filter(s => s.toLowerCase().includes(c.slice(0, 3))) // usa primeras 3 letras
-    .slice(0, 5);
+        // sugerencias: los más parecidos por "incluye" (simple y efectivo)
+        const c = cleaned.toLowerCase();
+        const close = all
+          .filter(s => s.toLowerCase().includes(c.slice(0, 3))) // usa primeras 3 letras
+          .slice(0, 5);
 
-  setSuggestions(close);
+        setSuggestions(close);
 
-  setError(`No encontramos el hostel "${cleaned}". ¿Quisiste decir alguno de estos?`);
-  return;
-}
+        setError(`No encontramos el hostel "${cleaned}". ¿Quisiste decir alguno de estos?`);
+        return;
+      }
+
+      // guardar reciente
+      const next = [cleaned, ...recent.filter((x) => x !== cleaned)].slice(0, 6);
+      setRecent(next);
+      localStorage.setItem("recentTenants", JSON.stringify(next));
 
       navigate(`/${cleaned}`);
     } catch (e) {
@@ -100,13 +112,39 @@ if (!snap.exists()) {
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-{suggestions.length > 0 && (
-  <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
-    {suggestions.map((s) => (
-      <Button key={s} size="small" variant="outlined" onClick={() => navigate(`/${s}`)}>
-        {s}
-      </Button>
-    ))}
+      {suggestions.length > 0 && (
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mb: 2 }}>
+          {suggestions.map((s) => (
+            <Button key={s} size="small" variant="outlined" onClick={() => {  
+              setError(null);
+              setSuggestions([]);
+              const next = [s, ...recent.filter((x) => x !== s)].slice(0, 6);
+              setRecent(next);
+              localStorage.setItem("recentTenants", JSON.stringify(next));
+              navigate(`/${s}`);
+            }}>
+              {s}
+            </Button>
+          ))}
+        </Box>
+      )}
+      {recent.length > 0 && (
+  <Box sx={{ mb: 2 }}>
+    <Typography variant="body2" sx={{ color: "text.secondary", mb: 1 }}>
+      Recientes
+    </Typography>
+    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+      {recent.map((s) => (
+        <Button
+          key={s}
+          size="small"
+          variant="outlined"
+          onClick={() => navigate(`/${s}`)}
+        >
+          {s}
+        </Button>
+      ))}
+    </Box>
   </Box>
 )}
       <Box sx={{ display: "flex", gap: 2 }}>

@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert } from "@mui/material";
-import { auth, db } from "../services/firebase";
-import HotelLoading from "../components/HotelLoading";
+import { auth, db } from "../../services/firebase";
+import HotelLoading from "../../components/HotelLoading";
+
 
 
 function slugify(input: string) {

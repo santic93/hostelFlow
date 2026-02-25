@@ -133,8 +133,8 @@ const onSubmit = async (data: RoomFormValues) => {
             rows={3}
             {...register("description")}
           />
-
-          ////esto por ahora reemplaza la imagen
+{/* 
+          ////esto por ahora reemplaza la imagen */}
           <TextField
             label="Image URL (optional)"
             {...register("imageUrl", {
@@ -148,7 +148,7 @@ const onSubmit = async (data: RoomFormValues) => {
           />
         </Box>
 
-        ///SE IMPLEMENTA EL DIA DE MAÑANA CON IMAGEN Y STORAGE DE FIREBASE
+        {/* ///SE IMPLEMENTA EL DIA DE MAÑANA CON IMAGEN Y STORAGE DE FIREBASE */}
         {/* <Button variant="outlined" component="label">
           Upload image
           <input

@@ -28,6 +28,30 @@ export const AuthProvider = ({ children }: any) => {
   const [hostelSlug, setHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
   const [loading, setLoading] = useState(true);
+  // dentro del componente AuthProvider, justo después de tus estados existentes:
+  const [showLoading, setShowLoading] = useState(true);
+  // tiempo mínimo que quieres mostrar el loader (ms)
+  const MIN_LOADING_MS = 700;
+  useEffect(() => {
+    // si Firebase dice que está cargando -> mostrar loader inmediatamente
+    // si Firebase ya terminó -> esperar MIN_LOADING_MS antes de ocultarlo
+    let timer: number | undefined;
+
+    if (loading) {
+      // cuando entra loading, lo mostramos YA
+      setShowLoading(true);
+    } else {
+      // cuando loading pasa a false, esperar un poquito antes de ocultar
+      timer = window.setTimeout(() => {
+        setShowLoading(false);
+      }, MIN_LOADING_MS);
+    }
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [loading]);
+
   useEffect(() => {
     let unsubscribeUserDoc: (() => void) | null = null;
 
@@ -88,7 +112,7 @@ export const AuthProvider = ({ children }: any) => {
   }, []);
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
-      {loading ? <HotelLoading text="Entrando al sistema..." /> : children}
+      {showLoading ? <HotelLoading text="Entrando al sistema..." /> : children}
     </AuthContext.Provider>
   );
 };

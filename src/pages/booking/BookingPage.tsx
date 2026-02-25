@@ -15,7 +15,7 @@ import {
   Grid,
   TextField,
 } from "@mui/material";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../services/firebase"
 import { query, where, getDocs } from "firebase/firestore";
 import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
@@ -26,19 +26,32 @@ export const BookingPage = () => {
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
+  const [email, setEmail] = useState("");
+  const [emailTouched, setEmailTouched] = useState(false);
+
+  const isEmailValid = /^\S+@\S+\.\S+$/.test(email);
+
+  // si está vacío, no muestres error todavía
+  const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
 
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
 
-
   useEffect(() => {
-    if (!roomId) return;
+    const fetchRoom = async () => {
+      if (!hostelSlug || !roomId) return;
 
-    const room = rooms.find((r) => r.id === roomId);
-    if (room) {
-      setSelectedRoom(room);
-    }
-  }, [roomId]);
+      const docSnap = await getDoc(doc(db, "hostels", hostelSlug, "rooms", roomId));
+
+      if (docSnap.exists()) {
+        setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
+      } else {
+        setSelectedRoom(null);
+      }
+    };
+
+    fetchRoom();
+  }, [hostelSlug, roomId]);
   // useEffect(() => {
   //   const fetchRoom = async () => {
   //     if (!hostelSlug || !roomId) return;
@@ -56,19 +69,13 @@ export const BookingPage = () => {
   // }, [hostelSlug, roomId]);
 
   const nights =
-    checkIn && checkOut
-      ? checkOut.diff(checkIn, "day")
-      : 0;
+    checkIn && checkOut ? Math.max(0, checkOut.diff(checkIn, "day")) : 0;
 
   const total =
     selectedRoom && nights > 0
       ? nights * selectedRoom.price
       : 0;
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-
-
-  const isEmailValid = /\S+@\S+\.\S+/.test(email);
   const isFormValid =
     selectedRoom &&
     nights > 0 &&
@@ -215,13 +222,10 @@ export const BookingPage = () => {
                 label="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setEmailTouched(true)}
                 fullWidth
-                error={!isEmailValid}
-                helperText={
-                  !isEmailValid
-                    ? "Enter a valid email address"
-                    : ""
-                }
+                error={showEmailError}
+                helperText={showEmailError ? "Enter a valid email address" : ""}
               />
             </Stack>
             <Button

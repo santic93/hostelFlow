@@ -55,11 +55,11 @@ export const RoomsPage = () => {
                                 bgcolor: "grey.100",
                             }}
                         /> */}
-<SafeImage
-  src={room.imageUrl}
-  alt={room.name}
-  sx={{ mb: 3 }}
-/>
+                        <SafeImage
+                            src={room.imageUrl}
+                            alt={room.name}
+                            sx={{ mb: 3 }}
+                        />
                         <Typography variant="h5">{room.name}</Typography>
 
                         <Typography variant="body2" sx={{ color: "text.secondary", mb: 2 }}>

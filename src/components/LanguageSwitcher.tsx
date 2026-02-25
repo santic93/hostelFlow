@@ -8,7 +8,10 @@ export default function LanguageSwitcher() {
     <Select
       size="small"
       value={i18n.language?.slice(0, 2) || "es"}
-      onChange={(e) => i18n.changeLanguage(e.target.value)}
+      onChange={(e) => {
+        localStorage.setItem("userLangOverride", "1"); // ✅ marca elección manual
+        i18n.changeLanguage(e.target.value);
+      }}
       sx={{ minWidth: 110 }}
     >
       <MenuItem value="es">ES</MenuItem>

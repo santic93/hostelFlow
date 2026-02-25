@@ -12,6 +12,8 @@ const resources = {
         admin: "Admin",
       },
       home: {
+        heroLine1: "...",
+        heroLine2: "...",
         title1: "Hostel independiente",
         title2: "en el corazón de la ciudad",
         aboutTitle: "Sobre nuestro hostel",
@@ -20,6 +22,11 @@ const resources = {
         aboutP2:
           "Desde habitaciones compartidas hasta suites privadas, cada detalle está pensado para inspirar.",
         learnMore: "VER MÁS",
+      }, seo: {
+        homeTitle: "REDSTAYS — Reservá tu estadía",
+        homeTitleWithHostel: "{{hostel}} — Reservá tu estadía",
+        homeDesc: "Reservá habitaciones y gestioná tu hostel con REDSTAYS.",
+        homeDescWithHostel: "Reservá habitaciones en {{hostel}}. Rápido y simple.",
       },
 
       footer: {
@@ -43,6 +50,8 @@ const resources = {
         admin: "Admin",
       },
       home: {
+        heroLine1: "...",
+        heroLine2: "...",
         title1: "Independent hostel",
         title2: "in the heart of the city",
         aboutTitle: "About our hostel",
@@ -52,6 +61,12 @@ const resources = {
           "From cozy shared rooms to private suites, every detail is crafted to inspire.",
         learnMore: "LEARN MORE",
       },
+   seo: {
+  homeTitle: "REDSTAYS — Book your stay",
+  homeTitleWithHostel: "{{hostel}} — Book your stay",
+  homeDesc: "Book rooms and manage your hostel with REDSTAYS.",
+  homeDescWithHostel: "Book rooms at {{hostel}}. Fast and simple.",
+},
       footer: {
         rights: "All rights reserved.",
         terms: "Terms",
@@ -71,6 +86,8 @@ const resources = {
         admin: "Admin",
       },
       home: {
+        heroLine1: "...",
+        heroLine2: "...",
         title1: "Hostel independente",
         title2: "no coração da cidade",
         aboutTitle: "Sobre o nosso hostel",
@@ -80,13 +97,19 @@ const resources = {
           "De dormitórios aconchegantes a suítes privadas, cada detalhe foi pensado para inspirar.",
         learnMore: "SAIBA MAIS",
       },
-      footer: {
-rights: "Todos os direitos reservados.",
-
-terms: "Termos",
-
-privacy: "Privacidade",
+   seo: {
+  homeTitle: "REDSTAYS — Reserve sua estadia",
+  homeTitleWithHostel: "{{hostel}} — Reserve sua estadia",
+  homeDesc: "Reserve quartos e gerencie seu hostel com a REDSTAYS.",
+  homeDescWithHostel: "Reserve quartos em {{hostel}}. Rápido e simples.",
 },
+      footer: {
+        rights: "Todos os direitos reservados.",
+
+        terms: "Termos",
+
+        privacy: "Privacidade",
+      },
       common: {
         language: "Idioma",
       },
@@ -115,10 +138,12 @@ export const setTenantLanguage = (lng?: string | null) => {
   const normalized = (lng || "").slice(0, 2).toLowerCase();
   if (!allowed.includes(normalized)) return;
 
-  // si el usuario ya eligió idioma manualmente, NO lo pisamos
-  const userPicked = localStorage.getItem("i18nextLng");
-  if (userPicked) return;
+  // ✅ si el usuario eligió manualmente, no pisar
+  const userOverride = localStorage.getItem("userLangOverride");
+  if (userOverride === "1") return;
 
-  i18n.changeLanguage(normalized);
+  if (i18n.language?.slice(0, 2) !== normalized) {
+    i18n.changeLanguage(normalized);
+  }
 };
 export default i18n;

@@ -13,27 +13,29 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const navigate = useNavigate();
 
-  const handleLogin = async () => {
-    setMsg(null);
-    if (!email.trim()) return setMsg({ type: "error", text: "Ingresá tu email" });
-    if (password.length < 6) return setMsg({ type: "error", text: "Password mínimo 6 caracteres" });
+const handleLogin = async () => {
+  setMsg(null);
 
-    try {
-      setLoading(true);
-      await signInWithEmailAndPassword(auth, email.trim(), password);
-      navigate("/admin", { replace: true }); // AdminRedirect decide a qué hostel ir
-    } catch (err: any) {
-      const code = err?.code;
-      const text =
-        code === "auth/invalid-credential" ? "Credenciales inválidas" :
-        code === "auth/user-not-found" ? "Usuario no encontrado" :
-        code === "auth/wrong-password" ? "Password incorrecta" :
-        "Error al iniciar sesión";
-      setMsg({ type: "error", text });
-    } finally {
-      setLoading(false);
-    }
-  };
+  if (!email.trim()) return setMsg({ type: "error", text: "Ingresá tu email" });
+  if (password.length < 6) return setMsg({ type: "error", text: "Password mínimo 6 caracteres" });
+
+  try {
+    setLoading(true);
+    await signInWithEmailAndPassword(auth, email.trim(), password);
+
+    // IMPORTANTE: no navegamos “a ciegas” si el AuthContext no actualizó aún
+    // vamos a /admin global, y ahí AdminRedirect decide
+    navigate("/admin", { replace: true });
+  } catch (err: any) {
+    console.error("LOGIN ERROR =>", err);
+    setMsg({
+      type: "error",
+      text: err?.code ? `Error: ${err.code}` : "Error al iniciar sesión",
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleReset = async () => {
     setMsg(null);

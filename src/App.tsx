@@ -7,7 +7,7 @@ import AdminPage from "./pages/admin/AdminPage";
 import LoginPage from "./pages/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRedirect from "./pages/admin/AdminRedirect";
-import RootRedirect from "./routes/RootRedirect";
+import RootRedirect from "./routes/RootLanding";
 import RegisterPage from "./pages/register/RegisterPage";
 import { HomePage } from "./pages/home/HomePage";
 import { BookingPage } from "./pages/booking/BookingPage";
@@ -18,38 +18,40 @@ import { AdminLayout } from "./layouts/admin/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminBoardPage";
 import AdminReservationsPage from "./pages/admin/AdminReservationsPage";
 import AdminRoomsPage from "./pages/admin/AdminRoomPage";
+import TenantGuard from "./layouts/tenant/TenantGuard";
 
 const router = createBrowserRouter([
-  { path: "/", element: <RootRedirect /> },
-  { path: "/register", element: <RegisterPage /> },
-  { path: "/login", element: <LoginPage /> },
-  { path: "/admin", element: <AdminRedirect /> },
-
   {
     path: "/:hostelSlug",
-    element: <MainLayout />,
+    element: <TenantGuard />,
     children: [
-      { index: true, element: <HomePage /> },
-      { path: "rooms", element: <RoomsPage /> },
-      { path: "rooms/:id", element: <RoomDetailPage /> },
-      { path: "booking/:roomId", element: <BookingPage /> },
-      { path: "terms", element: <TermsPage /> },
-      { path: "privacy", element: <PrivacyPage /> },
       {
-        path: "admin",
-        element: (
-          <ProtectedRoute>
-            <AdminLayout />
-          </ProtectedRoute>
-        ),
+        element: <MainLayout />,
         children: [
-          { index: true, element: <AdminDashboardPage /> },
-          { path: "reservations", element: <AdminReservationsPage /> },
-          { path: "rooms", element: <AdminRoomsPage /> },
+          { index: true, element: <HomePage /> },
+          { path: "rooms", element: <RoomsPage /> },
+          { path: "rooms/:id", element: <RoomDetailPage /> },
+          { path: "booking/:roomId", element: <BookingPage /> },
+          { path: "terms", element: <TermsPage /> },
+          { path: "privacy", element: <PrivacyPage /> },
+
+          {
+            path: "admin",
+            element: (
+              <ProtectedRoute>
+                <AdminLayout />
+              </ProtectedRoute>
+            ),
+            children: [
+              { index: true, element: <AdminDashboardPage /> },
+              { path: "reservations", element: <AdminReservationsPage /> },
+              { path: "rooms", element: <AdminRoomsPage /> },
+            ],
+          },
         ],
       },
     ],
-  },
+  }
 ]);
 function App() {
   return (

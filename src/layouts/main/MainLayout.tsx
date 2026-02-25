@@ -1,14 +1,17 @@
 import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
 import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import LanguageSwitcher from "../../components/LanguageSwitcher";
 
 
+
+import { useTranslation } from "react-i18next";
 
 export const MainLayout = () => {
   const { user, role, hostelSlug } = useAuth();
   const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
+  const { t } = useTranslation();
 
-  // ✅ nunca return null: esto es layout público del tenant
   if (!slugFromUrl) return <Outlet />;
 
   return (
@@ -22,7 +25,7 @@ export const MainLayout = () => {
           <Toolbar disableGutters sx={{ py: 2 }}>
             <Typography
               component={RouterLink}
-              to={`/${slugFromUrl}`} // ✅ home del tenant
+              to={`/${slugFromUrl}`}
               sx={{
                 textDecoration: "none",
                 color: "#730202",
@@ -36,30 +39,29 @@ export const MainLayout = () => {
 
             <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
               <Button component={RouterLink} to={`/${slugFromUrl}/rooms`} style={{ color: "#ab003c" }}>
-                ROOMS
+                {t("nav.rooms")}
               </Button>
 
-              {/* Si todavía no tenés contact, dejalo al home */}
               <Button component={RouterLink} to={`/${slugFromUrl}`} style={{ color: "#ab003c" }}>
-                CONTACT
+                {t("nav.contact")}
               </Button>
 
-              {/* booking se hace desde una room -> llevamos a rooms */}
               <Button
                 variant="contained"
                 component={RouterLink}
                 to={`/${slugFromUrl}/rooms`}
                 sx={{ ml: 2, px: 3 }}
               >
-                BOOK YOUR STAY
+                {t("nav.book")}
               </Button>
 
-              {/* ✅ Admin solo si realmente es admin */}
               {user && role === "admin" && hostelSlug && (
                 <Button component={RouterLink} to={`/${hostelSlug}/admin`}>
-                  Admin / {hostelSlug}
+                  {t("nav.admin")} / {hostelSlug}
                 </Button>
               )}
+
+              <LanguageSwitcher />
             </Box>
           </Toolbar>
         </Container>
@@ -68,15 +70,23 @@ export const MainLayout = () => {
       <Container maxWidth="lg">
         <Box py={8}>
           <Outlet />
+
           <Box component="footer" sx={{ borderTop: "1px solid #D6CEC9", py: 4, mt: 8 }}>
-            <Container maxWidth="lg" sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
+            <Container
+              maxWidth="lg"
+              sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}
+            >
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                © {new Date().getFullYear()} REDSTAYS. All rights reserved.
+                © {new Date().getFullYear()} REDSTAYS. {t("footer.rights")}
               </Typography>
 
               <Box sx={{ display: "flex", gap: 2 }}>
-                <Button component={RouterLink} to={`/${slugFromUrl}/terms`} size="small">Terms</Button>
-                <Button component={RouterLink} to={`/${slugFromUrl}/privacy`} size="small">Privacy</Button>
+                <Button component={RouterLink} to={`/${slugFromUrl}/terms`} size="small">
+                  {t("footer.terms")}
+                </Button>
+                <Button component={RouterLink} to={`/${slugFromUrl}/privacy`} size="small">
+                  {t("footer.privacy")}
+                </Button>
               </Box>
             </Container>
           </Box>

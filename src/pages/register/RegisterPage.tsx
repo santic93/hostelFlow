@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
-import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip } from "@mui/material";
+import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip, Paper } from "@mui/material";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 
@@ -189,24 +189,28 @@ export default function RegisterPage() {
       )}
       {/* STEP 2 (aparece solo cuando step=2) */}
       <Collapse in={step === 2 && !!auth.currentUser}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 4 }}>
-          <TextField
-            label="Nombre del hostel"
-            value={hostelName}
-            onChange={(e) => setHostelName(e.target.value)}
-          />
 
-          <TextField
-            label="Slug (URL)"
-            value={hostelSlug}
-            onChange={(e) => setHostelSlug(e.target.value)}
-            helperText={normalizedSlug ? `Tu URL: /${normalizedSlug}` : "Ej: selina-palermo"}
-          />
+        <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
 
-          <Button variant="contained" disabled={loading} onClick={handleCreateHostel}>
-            {loading ? "Creando hostel..." : "Crear hostel y entrar al panel"}
-          </Button>
-        </Box>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 4 }}>
+            <TextField
+              label="Nombre del hostel"
+              value={hostelName}
+              onChange={(e) => setHostelName(e.target.value)}
+            />
+
+            <TextField
+              label="Slug (URL)"
+              value={hostelSlug}
+              onChange={(e) => setHostelSlug(e.target.value)}
+              helperText={normalizedSlug ? `Tu URL: /${normalizedSlug}` : "Ej: selina-palermo"}
+            />
+
+            <Button variant="contained" disabled={loading} onClick={handleCreateHostel}>
+              {loading ? "Creando hostel..." : "Crear hostel y entrar al panel"}
+            </Button>
+          </Box>
+        </Paper>
       </Collapse>
     </Container>
   );

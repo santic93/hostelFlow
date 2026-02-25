@@ -3,6 +3,12 @@ import dayjs, { Dayjs } from "dayjs";
 import { useEffect, useState } from "react";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { useMemo } from "react";
+// locales dayjs
+import "dayjs/locale/es";
+import "dayjs/locale/pt-br";
+// MUI date pickers locales
+import { enUS, esES, ptBR } from "@mui/x-date-pickers/locales";
 import {
   Button,
   Stack,
@@ -31,7 +37,25 @@ import { db } from "../../services/firebase";
 export const BookingPage = () => {
   const navigate = useNavigate();
   const { hostelSlug, roomId } = useParams();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+
+  // idioma corto: es | en | pt
+  const lng = (i18n.language || "es").slice(0, 2);
+
+  // mapeo de dayjs locale
+  const dayjsLocale = lng === "pt" ? "pt-br" : lng === "en" ? "en" : "es";
+
+  // setear dayjs locale cuando cambie el idioma
+  useEffect(() => {
+    dayjs.locale(dayjsLocale);
+  }, [dayjsLocale]);
+
+  // localeText para DatePickers (botones, placeholders, etc.)
+  const localeText = useMemo(() => {
+    if (lng === "pt") return ptBR.components.MuiLocalizationProvider.defaultProps.localeText;
+    if (lng === "en") return enUS.components.MuiLocalizationProvider.defaultProps.localeText;
+    return esES.components.MuiLocalizationProvider.defaultProps.localeText;
+  }, [lng]);
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
@@ -172,7 +196,11 @@ export const BookingPage = () => {
         <Grid container spacing={8} sx={{ mt: 4 }}>
           {/* LEFT */}
           <Grid size={{ xs: 12, md: 7 }}>
-            <LocalizationProvider dateAdapter={AdapterDayjs}>
+           <LocalizationProvider
+  dateAdapter={AdapterDayjs}
+  adapterLocale={dayjsLocale}
+  localeText={localeText}
+>
               <Stack spacing={4}>
                 <DatePicker
                   label={t("booking.checkIn")}

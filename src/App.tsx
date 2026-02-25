@@ -3,12 +3,7 @@ import { ThemeProvider, CssBaseline } from "@mui/material";
 import { theme } from "./theme/theme";
 import { RoomDetailPage } from "./pages/rooms/RoomDetailPage";
 import { RoomsPage } from "./pages/rooms/RoomsPage";
-import AdminPage from "./pages/admin/AdminPage";
-import LoginPage from "./pages/login/LoginPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import AdminRedirect from "./pages/admin/AdminRedirect";
-import RootRedirect from "./routes/RootLanding";
-import RegisterPage from "./pages/register/RegisterPage";
 import { HomePage } from "./pages/home/HomePage";
 import { BookingPage } from "./pages/booking/BookingPage";
 import { MainLayout } from "./layouts/main/MainLayout";
@@ -19,6 +14,7 @@ import AdminDashboardPage from "./pages/admin/AdminBoardPage";
 import AdminReservationsPage from "./pages/admin/AdminReservationsPage";
 import AdminRoomsPage from "./pages/admin/AdminRoomPage";
 import TenantGuard from "./layouts/tenant/TenantGuard";
+import DateI18nProvider from "./providers/DateI18nProvider";
 
 const router = createBrowserRouter([
   {
@@ -57,7 +53,9 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <RouterProvider router={router} />
+      <DateI18nProvider>
+        <RouterProvider router={router} />
+      </DateI18nProvider>
     </ThemeProvider>
   );
 }

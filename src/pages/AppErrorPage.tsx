@@ -13,7 +13,7 @@ export default function AppErrorPage() {
       description = "El link no existe o fue movido.";
     } else {
       title = `Error ${error.status}`;
-      description = error.statusText || description;
+      description = error.data ? String(error.data) : error.statusText || description;
     }
   }
 

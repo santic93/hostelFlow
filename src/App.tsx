@@ -28,7 +28,7 @@ export const router = createBrowserRouter([
       { path: "register", element: <RegisterPage /> },
       { path: "admin", element: <AdminRedirect /> },
 
-      // ✅ TENANT (guard primero)
+      // ✅ TENANT
       {
         path: ":hostelSlug",
         element: <TenantGuard />,
@@ -56,7 +56,7 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // ✅ Catch-all (si querés explícito)
+      // ✅ 404 catch-all
       { path: "*", element: <AppErrorPage /> },
     ],
   },

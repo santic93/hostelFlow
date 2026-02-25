@@ -15,7 +15,6 @@ export default function TenantGuard() {
     );
   }
 
-  // si no existe el hostel => UX pro
   if (!hostel) {
     return (
       <Container sx={{ py: 12 }}>

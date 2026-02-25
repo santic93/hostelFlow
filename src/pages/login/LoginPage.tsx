@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
 import { Container, Typography, TextField, Button, Alert, Stack } from "@mui/material";
-import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../../services/firebase";
 import { Seo } from "../../components/Seo";
@@ -12,6 +12,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+useEffect(() => {
+  if (searchParams.get("forbidden") === "1") {
+    setMsg({ type: "error", text: "Tu usuario no tiene permisos de administrador." });
+  }
+}, [searchParams]);
 
 const handleLogin = async () => {
   setMsg(null);

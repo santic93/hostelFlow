@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
 import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
-import { Box, Button, Container, TextField, Typography, Collapse, Alert } from "@mui/material";
+import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip } from "@mui/material";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 
@@ -137,13 +137,24 @@ export default function RegisterPage() {
   }
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
-  <Button component={RouterLink} to="/login" variant="text">
-  Ya tengo cuenta (login)
-</Button>
+      <Button component={RouterLink} to="/login" variant="text">
+        Ya tengo cuenta (login)
+      </Button>
       <Typography variant="h4" gutterBottom>
-        Crear mi Hostel
+        {step === 1 ? "Crear cuenta de administrador" : "Configurar tu hostel"}
       </Typography>
-
+      <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
+        <Chip
+          label="1. Cuenta"
+          color={step === 1 ? "primary" : "default"}
+          variant={step === 1 ? "filled" : "outlined"}
+        />
+        <Chip
+          label="2. Hostel"
+          color={step === 2 ? "primary" : "default"}
+          variant={step === 2 ? "filled" : "outlined"}
+        />
+      </Box>
       {message && (
         <Alert sx={{ mt: 2 }} severity={message.type}>
           {message.text}
@@ -167,7 +178,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
           <Button variant="contained" disabled={loading} onClick={handleCreateAccount}>
-            {loading ? "Creando..." : "Crear cuenta"}
+            {loading ? "Creando cuenta..." : "Continuar"}
           </Button>
         </Box>
       </Collapse>
@@ -177,7 +188,7 @@ export default function RegisterPage() {
         </Alert>
       )}
       {/* STEP 2 (aparece solo cuando step=2) */}
-   <Collapse in={step === 2 && !!auth.currentUser}>
+      <Collapse in={step === 2 && !!auth.currentUser}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 4 }}>
           <TextField
             label="Nombre del hostel"
@@ -193,7 +204,7 @@ export default function RegisterPage() {
           />
 
           <Button variant="contained" disabled={loading} onClick={handleCreateHostel}>
-            {loading ? "Creando..." : "Crear hostel"}
+            {loading ? "Creando hostel..." : "Crear hostel y entrar al panel"}
           </Button>
         </Box>
       </Collapse>

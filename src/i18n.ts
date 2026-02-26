@@ -14,7 +14,7 @@ const resources = {
         back: "Volver",
         errorWithStatus: "Error {{status}}",
       },
-auth: {
+      auth: {
         entering: "Ingresando...",
         checkingSession: "Verificando sesión...",
       },
@@ -220,8 +220,8 @@ auth: {
         admin: "Admin",
       },
       home: {
-        heroLine1: "...",
-        heroLine2: "...",
+        heroLine1: "Más que una estadía, una experiencia.",
+        heroLine2: "Reservá fácil. Viví auténtico.",
         title1: "Hostel independiente",
         title2: "en el corazón de la ciudad",
         aboutTitle: "Sobre nuestro hostel",
@@ -300,14 +300,14 @@ auth: {
   en: {
     translation: {
       errors: {
-  genericTitle: "Something went wrong",
-  genericDesc: "An unexpected error occurred.",
-  notFoundTitle: "Page not found (404)",
-  notFoundDesc: "The link does not exist or has been moved.",
-  goHome: "Go to home",
-  back: "Go back",
-  errorWithStatus: "Error {{status}}",
-},
+        genericTitle: "Something went wrong",
+        genericDesc: "An unexpected error occurred.",
+        notFoundTitle: "Page not found (404)",
+        notFoundDesc: "The link does not exist or has been moved.",
+        goHome: "Go to home",
+        back: "Go back",
+        errorWithStatus: "Error {{status}}",
+      },
       auth: {
         entering: "Signing in...",
         checkingSession: "Checking session...",
@@ -529,8 +529,8 @@ auth: {
         admin: "Admin",
       },
       home: {
-        heroLine1: "...",
-        heroLine2: "...",
+        heroLine1: "More than a stay, an experience.",
+        heroLine2: "Book easy. Live authentic.",
         title1: "Independent hostel",
         title2: "in the heart of the city",
         aboutTitle: "About our hostel",
@@ -597,14 +597,14 @@ auth: {
   pt: {
     translation: {
       errors: {
-  genericTitle: "Algo deu errado",
-  genericDesc: "Ocorreu um erro inesperado.",
-  notFoundTitle: "Página não encontrada (404)",
-  notFoundDesc: "O link não existe ou foi movido.",
-  goHome: "Ir para o início",
-  back: "Voltar",
-  errorWithStatus: "Erro {{status}}",
-},
+        genericTitle: "Algo deu errado",
+        genericDesc: "Ocorreu um erro inesperado.",
+        notFoundTitle: "Página não encontrada (404)",
+        notFoundDesc: "O link não existe ou foi movido.",
+        goHome: "Ir para o início",
+        back: "Voltar",
+        errorWithStatus: "Erro {{status}}",
+      },
       auth: {
         entering: "Entrando...",
         checkingSession: "Verificando sessão...",
@@ -814,8 +814,8 @@ auth: {
         admin: "Admin",
       },
       home: {
-        heroLine1: "...",
-        heroLine2: "...",
+        heroLine1: "Mais que uma estadia, uma experiência.",
+        heroLine2: "Reserve fácil. Viva o autêntico.",
         title1: "Hostel independente",
         title2: "no coração da cidade",
         aboutTitle: "Sobre o nosso hostel",

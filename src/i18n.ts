@@ -5,6 +5,36 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      login: {
+  title: "Admin Login",
+  seoTitle: "Login — REDSTAYS",
+  seoDescription: "Admin login",
+  fields: {
+    email: "Email",
+    password: "Password",
+  },
+  actions: {
+    login: "Ingresar",
+    loggingIn: "Ingresando...",
+    forgotPassword: "Olvidé mi contraseña",
+    createHostel: "Crear mi hostel (registro)",
+  },
+  messages: {
+    resetSent: "Te enviamos un email para resetear tu contraseña ✅",
+  },
+  errors: {
+    noAdminPermissions: "Tu usuario no tiene permisos de administrador.",
+    emailRequired: "Ingresá tu email",
+    passwordMin: "Password mínimo 6 caracteres",
+    invalidCredentials: "Email o contraseña incorrectos.",
+    userNotFound: "No existe un usuario con ese email.",
+    wrongPassword: "Contraseña incorrecta.",
+    emailForReset: "Ingresá tu email para recuperar la contraseña",
+    resetFailed: "No se pudo enviar el email de recuperación",
+    generic: "Error al iniciar sesión",
+    genericWithCode: "Error: {{code}}",
+  },
+},
       register: {
   haveAccount: "Ya tengo cuenta (login)",
   title: {
@@ -193,6 +223,36 @@ const resources = {
   },
   en: {
     translation: {
+      login: {
+  title: "Admin Login",
+  seoTitle: "Login — REDSTAYS",
+  seoDescription: "Admin login",
+  fields: {
+    email: "Email",
+    password: "Password",
+  },
+  actions: {
+    login: "Login",
+    loggingIn: "Logging in...",
+    forgotPassword: "Forgot password",
+    createHostel: "Create my hostel (register)",
+  },
+  messages: {
+    resetSent: "We’ve sent you a password reset email ✅",
+  },
+  errors: {
+    noAdminPermissions: "Your user does not have administrator permissions.",
+    emailRequired: "Enter your email",
+    passwordMin: "Password must be at least 6 characters",
+    invalidCredentials: "Incorrect email or password.",
+    userNotFound: "No user found with that email.",
+    wrongPassword: "Incorrect password.",
+    emailForReset: "Enter your email to reset your password",
+    resetFailed: "Could not send reset email",
+    generic: "Error signing in",
+    genericWithCode: "Error: {{code}}",
+  },
+},
       register: {
   haveAccount: "I already have an account (login)",
   title: {
@@ -379,6 +439,36 @@ const resources = {
   },
   pt: {
     translation: {
+      login: {
+  title: "Admin Login",
+  seoTitle: "Login — REDSTAYS",
+  seoDescription: "Admin login",
+  fields: {
+    email: "Email",
+    password: "Senha",
+  },
+  actions: {
+    login: "Entrar",
+    loggingIn: "Entrando...",
+    forgotPassword: "Esqueci minha senha",
+    createHostel: "Criar meu hostel (registro)",
+  },
+  messages: {
+    resetSent: "Enviamos um email para redefinir sua senha ✅",
+  },
+  errors: {
+    noAdminPermissions: "Seu usuário não tem permissões de administrador.",
+    emailRequired: "Digite seu email",
+    passwordMin: "A senha deve ter no mínimo 6 caracteres",
+    invalidCredentials: "Email ou senha incorretos.",
+    userNotFound: "Nenhum usuário encontrado com esse email.",
+    wrongPassword: "Senha incorreta.",
+    emailForReset: "Digite seu email para redefinir sua senha",
+    resetFailed: "Não foi possível enviar o email de recuperação",
+    generic: "Erro ao entrar",
+    genericWithCode: "Erro: {{code}}",
+  },
+},
       register: {
   haveAccount: "Já tenho conta (login)",
   title: {

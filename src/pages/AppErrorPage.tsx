@@ -1,18 +1,20 @@
 import { isRouteErrorResponse, useRouteError, Link as RouterLink } from "react-router-dom";
 import { Container, Typography, Button, Stack } from "@mui/material";
+import { useTranslation } from "react-i18next";
 
 export default function AppErrorPage() {
+  const { t } = useTranslation();
   const error = useRouteError();
 
-  let title = "Algo salió mal";
-  let description = "Ocurrió un error inesperado.";
+  let title = t("errors.genericTitle");
+  let description = t("errors.genericDesc");
 
   if (isRouteErrorResponse(error)) {
     if (error.status === 404) {
-      title = "Página no encontrada (404)";
-      description = "El link no existe o fue movido.";
+      title = t("errors.notFoundTitle");
+      description = t("errors.notFoundDesc");
     } else {
-      title = `Error ${error.status}`;
+      title = t("errors.errorWithStatus", { status: error.status });
       description = error.data ? String(error.data) : error.statusText || description;
     }
   }
@@ -24,10 +26,10 @@ export default function AppErrorPage() {
 
       <Stack direction="row" spacing={2}>
         <Button variant="contained" component={RouterLink} to="/">
-          Ir al inicio
+          {t("errors.goHome")}
         </Button>
         <Button variant="outlined" onClick={() => window.history.back()}>
-          Volver
+          {t("errors.back")}
         </Button>
       </Stack>
     </Container>

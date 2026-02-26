@@ -5,10 +5,19 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      errors: {
+        genericTitle: "Algo salió mal",
+        genericDesc: "Ocurrió un error inesperado.",
+        notFoundTitle: "Página no encontrada (404)",
+        notFoundDesc: "El link no existe o fue movido.",
+        goHome: "Ir al inicio",
+        back: "Volver",
+        errorWithStatus: "Error {{status}}",
+      },
 auth: {
-  entering: "Ingresando...",
-  checkingSession: "Verificando sesión...",
-},
+        entering: "Ingresando...",
+        checkingSession: "Verificando sesión...",
+      },
       gallery: {
         title: "Galería",
       },
@@ -291,9 +300,9 @@ auth: {
   en: {
     translation: {
       auth: {
-  entering: "Signing in...",
-  checkingSession: "Checking session...",
-},
+        entering: "Signing in...",
+        checkingSession: "Checking session...",
+      },
       gallery: {
         title: "Gallery",
       },
@@ -579,9 +588,9 @@ auth: {
   pt: {
     translation: {
       auth: {
-  entering: "Entrando...",
-  checkingSession: "Verificando sessão...",
-},
+        entering: "Entrando...",
+        checkingSession: "Verificando sessão...",
+      },
       gallery: {
         title: "Galeria",
       },
@@ -666,33 +675,33 @@ auth: {
 
         rooms: {
 
-    modal: {
-      editTitle: "Editar quarto",
-      createTitle: "Criar quarto",
-    },
-    form: {
-      name: "Nome",
-      price: "Preço",
-      capacity: "Capacidade",
-      description: "Descrição",
-      imageUrl: "URL da imagem (opcional)",
-      imageUrlHelp: "Ex: https://.../foto.jpg",
-      selectedFile: "Selecionado: {{name}}",
-    },
-    errors: {
-      nameRequired: "O nome é obrigatório",
-      priceRequired: "Preço obrigatório",
-      priceMin: "Deve ser maior que 0",
-      capacityRequired: "Capacidade obrigatória",
-      capacityMin: "Mínimo 1 pessoa",
-      imageUrlInvalid: "Deve ser uma URL válida (http/https)",
-  
-},
-common: {
-  save: "Salvar",
-  saving: "Salvando...",
-  cancel: "Cancelar",
-},
+          modal: {
+            editTitle: "Editar quarto",
+            createTitle: "Criar quarto",
+          },
+          form: {
+            name: "Nome",
+            price: "Preço",
+            capacity: "Capacidade",
+            description: "Descrição",
+            imageUrl: "URL da imagem (opcional)",
+            imageUrlHelp: "Ex: https://.../foto.jpg",
+            selectedFile: "Selecionado: {{name}}",
+          },
+          errors: {
+            nameRequired: "O nome é obrigatório",
+            priceRequired: "Preço obrigatório",
+            priceMin: "Deve ser maior que 0",
+            capacityRequired: "Capacidade obrigatória",
+            capacityMin: "Mínimo 1 pessoa",
+            imageUrlInvalid: "Deve ser uma URL válida (http/https)",
+
+          },
+          common: {
+            save: "Salvar",
+            saving: "Salvando...",
+            cancel: "Cancelar",
+          },
 
           title: "Gestão de Quartos",
           columns: {

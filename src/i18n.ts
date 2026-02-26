@@ -5,6 +5,7 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+
       gallery: {
         title: "Galería",
       },
@@ -86,20 +87,21 @@ const resources = {
         },
       },
       admin: {
-   
-  rooms: {
-    title: "Gestión de Habitaciones",
-    columns: {
-      name: "Nombre",
-      price: "Precio",
-      capacity: "Capacidad",
-      actions: "Acciones",
-    },
-    actions: {
-      edit: "Editar",
-      delete: "Eliminar",
-    },
-  },
+
+
+        rooms: {
+          title: "Gestión de Habitaciones",
+          columns: {
+            name: "Nombre",
+            price: "Precio",
+            capacity: "Capacidad",
+            actions: "Acciones",
+          },
+          actions: {
+            edit: "Editar",
+            delete: "Eliminar",
+          },
+        },
 
         reservations: {
           title: "Reservas",
@@ -115,6 +117,23 @@ const resources = {
           confirmed: "Confirmada",
           cancelled: "Cancelada",
           empty: "Todavía no hay reservas.",
+          seoTitle: "Reservas — REDSTAYS",
+          seoDescription: "Admin reservas",
+          columns: {
+            guest: "Huésped",
+            room: "Habitación",
+            email: "Email",
+            checkIn: "Check In",
+            checkOut: "Check Out",
+            total: "Total",
+            status: "Estado",
+            actions: "Acciones",
+          },
+          statusValues: {
+            pending: "Pendiente",
+            confirmed: "Confirmada",
+            cancelled: "Cancelada",
+          },
         },
 
         shell: {
@@ -332,20 +351,20 @@ const resources = {
         },
       },
       admin: {
-       
-  rooms: {
-    title: "Room Management",
-    columns: {
-      name: "Name",
-      price: "Price",
-      capacity: "Capacity",
-      actions: "Actions",
-    },
-    actions: {
-      edit: "Edit",
-      delete: "Delete",
-    },
-  },
+
+        rooms: {
+          title: "Room Management",
+          columns: {
+            name: "Name",
+            price: "Price",
+            capacity: "Capacity",
+            actions: "Actions",
+          },
+          actions: {
+            edit: "Edit",
+            delete: "Delete",
+          },
+        },
 
         reservations: {
           title: "Reservations",
@@ -361,6 +380,25 @@ const resources = {
           confirmed: "Confirmed",
           cancelled: "Cancelled",
           empty: "No reservations yet.",
+          seoTitle: "Reservations — REDSTAYS",
+          seoDescription: "Admin reservations",
+          columns: {
+            guest: "Guest",
+            room: "Room",
+            email: "Email",
+            checkIn: "Check In",
+            checkOut: "Check Out",
+            total: "Total",
+            status: "Status",
+            actions: "Actions",
+          },
+          statusValues: {
+            pending: "Pending",
+            confirmed: "Confirmed",
+            cancelled: "Cancelled",
+          },
+
+
         },
 
         shell: {
@@ -556,20 +594,20 @@ const resources = {
         },
       },
       admin: {
-      
-  rooms: {
-    title: "Gestão de Quartos",
-    columns: {
-      name: "Nome",
-      price: "Preço",
-      capacity: "Capacidade",
-      actions: "Ações",
-    },
-    actions: {
-      edit: "Editar",
-      delete: "Excluir",
-    },
-  },
+
+        rooms: {
+          title: "Gestão de Quartos",
+          columns: {
+            name: "Nome",
+            price: "Preço",
+            capacity: "Capacidade",
+            actions: "Ações",
+          },
+          actions: {
+            edit: "Editar",
+            delete: "Excluir",
+          },
+        },
 
         reservations: {
           title: "Reservas",

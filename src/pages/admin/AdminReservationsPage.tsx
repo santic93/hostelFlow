@@ -1,11 +1,19 @@
-import { useEffect, useState } from "react";
-import { Box, Chip, MenuItem, Select, Typography } from "@mui/material";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+  Box,
+  Chip,
+  MenuItem,
+  Select,
+  Typography,
+} from "@mui/material";
+import type { GridColDef } from "@mui/x-data-grid";
+import { DataGrid } from "@mui/x-data-grid";
 import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 
-import { Seo } from "../../components/Seo";
 import { db } from "../../services/firebase";
+import { Seo } from "../../components/Seo";
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
@@ -21,6 +29,7 @@ type Reservation = {
 };
 
 export default function AdminReservationsPage() {
+  const { t } = useTranslation();
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const [reservations, setReservations] = useState<Reservation[]>([]);
 
@@ -33,7 +42,6 @@ export default function AdminReservationsPage() {
     );
 
     const snapshot = await getDocs(q);
-
     const data: Reservation[] = snapshot.docs.map((docu) => {
       const raw = docu.data() as any;
       return {
@@ -59,70 +67,105 @@ export default function AdminReservationsPage() {
   const updateStatus = async (id: string, newStatus: ReservationStatus) => {
     if (!hostelSlug) return;
 
-    await updateDoc(doc(db, "hostels", hostelSlug, "reservations", id), { status: newStatus });
+    await updateDoc(doc(db, "hostels", hostelSlug, "reservations", id), {
+      status: newStatus,
+    });
 
     setReservations((prev) =>
       prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res))
     );
   };
 
-  const columns: GridColDef<Reservation>[] = [
-    { field: "fullName", headerName: "Guest", flex: 1 },
-    { field: "roomName", headerName: "Room", flex: 1 },
-    { field: "email", headerName: "Email", flex: 1 },
+  const columns = useMemo<GridColDef<Reservation>[]>(() => [
+    { field: "fullName", headerName: t("admin.reservations.columns.guest"), flex: 1 },
+    { field: "roomName", headerName: t("admin.reservations.columns.room"), flex: 1 },
+    { field: "email", headerName: t("admin.reservations.columns.email"), flex: 1 },
     {
       field: "checkIn",
-      headerName: "Check In",
+      headerName: t("admin.reservations.columns.checkIn"),
       flex: 1,
-      renderCell: (params) => (params.row.checkIn ? params.row.checkIn.toLocaleDateString() : "-"),
+      renderCell: (params) =>
+        params.row.checkIn ? params.row.checkIn.toLocaleDateString() : "-",
     },
     {
       field: "checkOut",
-      headerName: "Check Out",
+      headerName: t("admin.reservations.columns.checkOut"),
       flex: 1,
-      renderCell: (params) => (params.row.checkOut ? params.row.checkOut.toLocaleDateString() : "-"),
+      renderCell: (params) =>
+        params.row.checkOut ? params.row.checkOut.toLocaleDateString() : "-",
     },
-    { field: "total", headerName: "Total", flex: 1, renderCell: (params) => `$${params.row.total}` },
+    {
+      field: "total",
+      headerName: t("admin.reservations.columns.total"),
+      flex: 1,
+      renderCell: (params) => `$${params.row.total}`,
+    },
     {
       field: "status",
-      headerName: "Estado",
+      headerName: t("admin.reservations.columns.status"),
       width: 150,
       renderCell: (params) => {
         const color =
-          params.value === "confirmed" ? "success" :
-          params.value === "cancelled" ? "error" : "warning";
-        return <Chip label={params.value} color={color} />;
+          params.value === "confirmed"
+            ? "success"
+            : params.value === "cancelled"
+            ? "error"
+            : "warning";
+
+        return (
+          <Chip
+            label={t(`admin.reservations.statusValues.${params.value}`)}
+            color={color as any}
+          />
+        );
       },
     },
     {
       field: "actions",
-      headerName: "Actions",
+      headerName: t("admin.reservations.columns.actions"),
       flex: 1.2,
       renderCell: (params) => (
         <Select
           size="small"
           value={params.row.status}
-          onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+          onChange={(e) =>
+            updateStatus(params.row.id, e.target.value as ReservationStatus)
+          }
         >
-          <MenuItem value="pending">Pending</MenuItem>
-          <MenuItem value="confirmed">Confirmed</MenuItem>
-          <MenuItem value="cancelled">Cancelled</MenuItem>
+          <MenuItem value="pending">
+            {t("admin.reservations.statusValues.pending")}
+          </MenuItem>
+          <MenuItem value="confirmed">
+            {t("admin.reservations.statusValues.confirmed")}
+          </MenuItem>
+          <MenuItem value="cancelled">
+            {t("admin.reservations.statusValues.cancelled")}
+          </MenuItem>
         </Select>
       ),
     },
-  ];
+  ], [t]);
 
   return (
     <>
-      <Seo title="Reservations — REDSTAYS" description="Admin reservations" noindex />
-      <Typography variant="h3" gutterBottom>Reservations</Typography>
+      <Seo
+        title={t("admin.reservations.seoTitle")}
+        description={t("admin.reservations.seoDescription")}
+        noindex
+      />
+
+      <Typography variant="h3" gutterBottom>
+        {t("admin.reservations.title")}
+      </Typography>
 
       <Box sx={{ height: 600, width: "100%" }}>
         <DataGrid
           rows={reservations}
           columns={columns}
           pageSizeOptions={[5, 10, 20]}
-          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
+          initialState={{
+            pagination: { paginationModel: { pageSize: 10, page: 0 } },
+          }}
           disableRowSelectionOnClick
         />
       </Box>

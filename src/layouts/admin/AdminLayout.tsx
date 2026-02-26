@@ -100,7 +100,7 @@ export const AdminLayout = () => {
           )}
 
           <Typography sx={{ fontWeight: 800, letterSpacing: 1 }}>
-            REDSTAYS
+            HOSTLY
           </Typography>
 
           <Box sx={{ flexGrow: 1 }} />

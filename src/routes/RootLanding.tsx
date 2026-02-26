@@ -105,7 +105,7 @@ export default function RootRedirect() {
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
       <Typography variant="h3" gutterBottom>
-        REDSTAYS
+        HOSTLY
       </Typography>
       <Typography sx={{ color: "text.secondary", mb: 3 }}>
         Ingresá el link del hostel (slug) para ver habitaciones y reservar.

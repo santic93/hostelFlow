@@ -23,7 +23,7 @@ const resources = {
       },
       login: {
         title: "Admin Login",
-        seoTitle: "Login — REDSTAYS",
+        seoTitle: "Login — HOSTLY",
         seoDescription: "Admin login",
         fields: {
           email: "Email",
@@ -156,7 +156,7 @@ const resources = {
           confirmed: "Confirmada",
           cancelled: "Cancelada",
           empty: "Todavía no hay reservas.",
-          seoTitle: "Reservas — REDSTAYS",
+          seoTitle: "Reservas — HOSTLY",
           seoDescription: "Admin reservas",
           columns: {
             guest: "Huésped",
@@ -176,7 +176,7 @@ const resources = {
         },
 
         shell: {
-          brand: "REDSTAYS",
+          brand: "HOSTLY",
           viewSite: "Ver sitio",
           logout: "Salir",
           menu: {
@@ -231,9 +231,9 @@ const resources = {
           "Desde habitaciones compartidas hasta suites privadas, cada detalle está pensado para inspirar.",
         learnMore: "VER MÁS",
       }, seo: {
-        homeTitle: "REDSTAYS — Reservá tu estadía",
+        homeTitle: "HOSTLY — Reservá tu estadía",
         homeTitleWithHostel: "{{hostel}} — Reservá tu estadía",
-        homeDesc: "Reservá habitaciones y gestioná tu hostel con REDSTAYS.",
+        homeDesc: "Reservá habitaciones y gestioná tu hostel con HOSTLY.",
         homeDescWithHostel: "Reservá habitaciones en {{hostel}}. Rápido y simple.",
       },
 
@@ -317,7 +317,7 @@ const resources = {
       },
       login: {
         title: "Admin Login",
-        seoTitle: "Login — REDSTAYS",
+        seoTitle: "Login — HOSTLY",
         seoDescription: "Admin login",
         fields: {
           email: "Email",
@@ -463,7 +463,7 @@ const resources = {
           confirmed: "Confirmed",
           cancelled: "Cancelled",
           empty: "No reservations yet.",
-          seoTitle: "Reservations — REDSTAYS",
+          seoTitle: "Reservations — HOSTLY",
           seoDescription: "Admin reservations",
           columns: {
             guest: "Guest",
@@ -485,7 +485,7 @@ const resources = {
         },
 
         shell: {
-          brand: "REDSTAYS",
+          brand: "HOSTLY",
           viewSite: "View site",
           logout: "Logout",
           menu: {
@@ -541,9 +541,9 @@ const resources = {
         learnMore: "LEARN MORE",
       },
       seo: {
-        homeTitle: "REDSTAYS — Book your stay",
+        homeTitle: "HOSTLY — Book your stay",
         homeTitleWithHostel: "{{hostel}} — Book your stay",
-        homeDesc: "Book rooms and manage your hostel with REDSTAYS.",
+        homeDesc: "Book rooms and manage your hostel with HOSTLY.",
         homeDescWithHostel: "Book rooms at {{hostel}}. Fast and simple.",
       },
       footer: {
@@ -614,7 +614,7 @@ const resources = {
       },
       login: {
         title: "Admin Login",
-        seoTitle: "Login — REDSTAYS",
+        seoTitle: "Login — HOSTLY",
         seoDescription: "Admin login",
         fields: {
           email: "Email",
@@ -750,7 +750,7 @@ const resources = {
           empty: "Ainda não há reservas.",
 
 
-          seoTitle: "Reservas — REDSTAYS",
+          seoTitle: "Reservas — HOSTLY",
           seoDescription: "Admin reservas",
           columns: {
             guest: "Hóspede",
@@ -771,7 +771,7 @@ const resources = {
         },
 
         shell: {
-          brand: "REDSTAYS",
+          brand: "HOSTLY",
           viewSite: "Ver site",
           logout: "Sair",
           menu: {
@@ -826,9 +826,9 @@ const resources = {
         learnMore: "SAIBA MAIS",
       },
       seo: {
-        homeTitle: "REDSTAYS — Reserve sua estadia",
+        homeTitle: "HOSTLY — Reserve sua estadia",
         homeTitleWithHostel: "{{hostel}} — Reserve sua estadia",
-        homeDesc: "Reserve quartos e gerencie seu hostel com a REDSTAYS.",
+        homeDesc: "Reserve quartos e gerencie seu hostel com a HOSTLY.",
         homeDescWithHostel: "Reserve quartos em {{hostel}}. Rápido e simples.",
       },
       footer: {

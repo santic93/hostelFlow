@@ -34,7 +34,7 @@ export const MainLayout = () => {
                 flexGrow: 1,
               }}
             >
-              REDSTAYS
+              HOSTLY
             </Typography>
 
             <Box sx={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -77,7 +77,7 @@ export const MainLayout = () => {
               sx={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}
             >
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                © {new Date().getFullYear()} REDSTAYS. {t("footer.rights")}
+                © {new Date().getFullYear()} HOSTLY. {t("footer.rights")}
               </Typography>
 
               <Box sx={{ display: "flex", gap: 2 }}>

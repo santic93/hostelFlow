@@ -10,7 +10,7 @@ export function TermsPage() {
 
   return (
     <Box>
-      <Seo title="Terms — REDSTAYS" description="Terms and conditions." canonical={canonical} noindex />
+      <Seo title="Terms — HOSTLY" description="Terms and conditions." canonical={canonical} noindex />
       <Typography variant="h3" gutterBottom>Terms & Conditions</Typography>
       <Typography sx={{ color: "text.secondary" }}>
         (MVP) Acá van tus términos. Te conviene tenerlo para vender B2B.

@@ -10,7 +10,7 @@ export function PrivacyPage() {
 
   return (
     <Box>
-      <Seo title="Privacy — REDSTAYS" description="Privacy policy." canonical={canonical} noindex />
+      <Seo title="Privacy — HOSTLY" description="Privacy policy." canonical={canonical} noindex />
       <Typography variant="h3" gutterBottom>Privacy Policy</Typography>
       <Typography sx={{ color: "text.secondary" }}>
         (MVP) Explicá qué guardás: nombre, email, fechas de reserva, roomId, etc.

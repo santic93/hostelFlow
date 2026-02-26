@@ -16,7 +16,11 @@ import RootRedirect from "./routes/RootLanding";
 import LoginPage from "./pages/login/LoginPage";
 import RegisterPage from "./pages/register/RegisterPage";
 import AdminRedirect from "./pages/admin/AdminRedirect";
-import AdminPage from "./pages/admin/AdminPage";
+
+import DashboardSection from "./pages/admin/sections/DashboardSection";
+import RoomsSection from "./pages/admin/sections/RoomsSection";
+import AdminShell from "./layouts/admin/AdminShell";
+import ReservationsSection from "./pages/admin/sections/ReservationSecition";
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -47,9 +51,14 @@ export const router = createBrowserRouter([
                 path: "admin",
                 element: (
                   <ProtectedRoute>
-                    <AdminPage />
+                    <AdminShell />
                   </ProtectedRoute>
                 ),
+                children: [
+                  { index: true, element: <DashboardSection /> },
+                  { path: "rooms", element: <RoomsSection /> },
+                  { path: "reservations", element: <ReservationsSection /> },
+                ],
               },
             ],
           },

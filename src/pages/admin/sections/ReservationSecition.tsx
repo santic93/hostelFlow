@@ -1,15 +1,26 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Box, Typography, Chip, Select, MenuItem } from "@mui/material";
-import { DataGrid, GridColDef } from "@mui/x-data-grid";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
+import { db } from "../../../services/firebase"; // ajustá si tu path es distinto
 
-import type { Reservation, ReservationStatus } from "../../types/reservation"; // ajustá path
-import { db } from "../../../services/firebase";
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
+
+type ReservationRow = {
+  id: string;
+  fullName: string;
+  roomName: string;
+  email: string;
+  total: number;
+  status: ReservationStatus;
+  checkIn: Date | null;
+  checkOut: Date | null;
+};
 
 export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [rows, setRows] = useState<ReservationRow[]>([]);
 
   const fetchReservations = async () => {
     if (!hostelSlug) return;
@@ -21,22 +32,21 @@ export default function ReservationsSection() {
 
     const snapshot = await getDocs(q);
 
-    const data: Reservation[] = snapshot.docs.map((docu) => {
+    const data: ReservationRow[] = snapshot.docs.map((docu) => {
       const raw = docu.data() as any;
-
       return {
         id: docu.id,
         fullName: raw.fullName ?? "",
         roomName: raw.roomName ?? "",
         email: raw.email ?? "",
         total: raw.total ?? 0,
-        status: raw.status ?? "pending",
+        status: (raw.status ?? "pending") as ReservationStatus,
         checkIn: raw.checkIn?.toDate?.() ?? null,
         checkOut: raw.checkOut?.toDate?.() ?? null,
       };
     });
 
-    setReservations(data);
+    setRows(data);
   };
 
   useEffect(() => {
@@ -50,12 +60,10 @@ export default function ReservationsSection() {
       status: newStatus,
     });
 
-    setReservations((prev) =>
-      prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res))
-    );
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
   };
 
-  const columns: GridColDef<Reservation>[] = [
+  const columns: GridColDef<ReservationRow>[] = [
     { field: "fullName", headerName: "Guest", flex: 1 },
     { field: "roomName", headerName: "Room", flex: 1 },
     { field: "email", headerName: "Email", flex: 1 },
@@ -63,29 +71,29 @@ export default function ReservationsSection() {
       field: "checkIn",
       headerName: "Check In",
       flex: 1,
-      renderCell: (params) => (params.row.checkIn ? params.row.checkIn.toLocaleDateString() : "-"),
+      valueGetter: (_, row) => (row.checkIn ? row.checkIn.toLocaleDateString() : "-"),
     },
     {
       field: "checkOut",
       headerName: "Check Out",
       flex: 1,
-      renderCell: (params) => (params.row.checkOut ? params.row.checkOut.toLocaleDateString() : "-"),
+      valueGetter: (_, row) => (row.checkOut ? row.checkOut.toLocaleDateString() : "-"),
     },
-    { field: "total", headerName: "Total", flex: 1, renderCell: (params) => `$${params.row.total}` },
+    { field: "total", headerName: "Total", flex: 1, valueGetter: (_, row) => `$${row.total}` },
     {
       field: "status",
       headerName: "Estado",
       width: 150,
       renderCell: (params) => {
-        const color =
-          params.value === "confirmed" ? "success" : params.value === "cancelled" ? "error" : "warning";
-        return <Chip label={params.value} color={color as any} />;
+        const v = params.value as ReservationStatus;
+        const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
+        return <Chip label={v} color={color as any} />;
       },
     },
     {
       field: "actions",
       headerName: "Actions",
-      flex: 1.5,
+      flex: 1.2,
       renderCell: (params) => (
         <Select
           size="small"
@@ -108,12 +116,10 @@ export default function ReservationsSection() {
 
       <Box sx={{ height: 600, width: "100%" }}>
         <DataGrid
-          rows={reservations}
+          rows={rows}
           columns={columns}
           pageSizeOptions={[5, 10, 20]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10, page: 0 } },
-          }}
+          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
           disableRowSelectionOnClick
         />
       </Box>

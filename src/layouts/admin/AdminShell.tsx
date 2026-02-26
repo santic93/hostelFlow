@@ -54,15 +54,10 @@ export default function AdminShell() {
           <ListItemButton
             key={item.label}
             component={RouterLink}
-            to={item.to} // ✅ rutas hijas relativas
+            to={item.to} // rutas hijas
             selected={selected}
             onClick={() => setMobileOpen(false)}
-            sx={{
-              mx: 1,
-              borderRadius: 2,
-              "&.Mui-selected": { backgroundColor: "rgba(115, 2, 2, 0.10)" },
-              "&.Mui-selected:hover": { backgroundColor: "rgba(115, 2, 2, 0.16)" },
-            }}
+            sx={{ mx: 1, borderRadius: 2 }}
           >
             <ListItemIcon sx={{ minWidth: 42 }}>{item.icon}</ListItemIcon>
             {(open || isMobile) && <ListItemText primary={item.label} />}
@@ -132,11 +127,9 @@ export default function AdminShell() {
           sx={{
             width: drawerWidth,
             flexShrink: 0,
-            transition: "width 0.25s",
             "& .MuiDrawer-paper": {
               width: drawerWidth,
               overflowX: "hidden",
-              transition: "width 0.25s",
               boxSizing: "border-box",
               borderRight: "1px solid #eee",
               pt: 8,

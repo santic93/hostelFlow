@@ -1,7 +1,7 @@
 export type Room = {
   id: string;
   name: string;
-  description: string;
+  description?: string;
   price: number;
   capacity: number;
   imageUrl?: string;

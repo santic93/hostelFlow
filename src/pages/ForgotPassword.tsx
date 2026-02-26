@@ -3,7 +3,7 @@ import { Alert, Box, Button, Container, TextField, Typography } from "@mui/mater
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
-const APP_URL = "https://hostly-eight.vercel.app"; // ✅ tu dominio publicado
+
 
 export default function ForgotPasswordPage() {
     const navigate = useNavigate();

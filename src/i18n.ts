@@ -86,6 +86,21 @@ const resources = {
         },
       },
       admin: {
+   
+  rooms: {
+    title: "Gestión de Habitaciones",
+    columns: {
+      name: "Nombre",
+      price: "Precio",
+      capacity: "Capacidad",
+      actions: "Acciones",
+    },
+    actions: {
+      edit: "Editar",
+      delete: "Eliminar",
+    },
+  },
+
         reservations: {
           title: "Reservas",
           guest: "Huésped",
@@ -317,6 +332,21 @@ const resources = {
         },
       },
       admin: {
+       
+  rooms: {
+    title: "Room Management",
+    columns: {
+      name: "Name",
+      price: "Price",
+      capacity: "Capacity",
+      actions: "Actions",
+    },
+    actions: {
+      edit: "Edit",
+      delete: "Delete",
+    },
+  },
+
         reservations: {
           title: "Reservations",
           guest: "Guest",
@@ -526,6 +556,21 @@ const resources = {
         },
       },
       admin: {
+      
+  rooms: {
+    title: "Gestão de Quartos",
+    columns: {
+      name: "Nome",
+      price: "Preço",
+      capacity: "Capacidade",
+      actions: "Ações",
+    },
+    actions: {
+      edit: "Editar",
+      delete: "Excluir",
+    },
+  },
+
         reservations: {
           title: "Reservas",
           guest: "Hóspede",

@@ -118,7 +118,7 @@ setError(null);
         HOSTLY
       </Typography>
       <Typography sx={{ color: "text.secondary", mb: 3 }}>
-        Ingresá el link del hostel (slug) para ver habitaciones y reservar.
+        Ingresá el nombre del hostel para ver habitaciones y reservar.
       </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -160,7 +160,7 @@ setError(null);
       <Box sx={{ display: "flex", gap: 2 }}>
         <TextField
           fullWidth
-          label="Hostel slug"
+          label="Hostel"
           placeholder="ej: selina-palermo"
           value={slug}
           onChange={(e) => setSlug(e.target.value)}

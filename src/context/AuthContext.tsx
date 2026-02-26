@@ -1,18 +1,16 @@
-// AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, onSnapshot, } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 
 import HotelLoading from "../components/HotelLoading";
 import { t } from "i18next";
 
-
 type Role = "admin" | "guest";
 
 type AuthContextType = {
   user: User | null;
-  hostelSlug: string | null;   // SOLO para admin
+  hostelSlug: string | null;
   role: Role;
   loading: boolean;
 };
@@ -29,20 +27,16 @@ export const AuthProvider = ({ children }: any) => {
   const [hostelSlug, setHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
   const [loading, setLoading] = useState(true);
-  // dentro del componente AuthProvider, justo después de tus estados existentes:
-  const [showLoading, setShowLoading] = useState(true);
-  // tiempo mínimo que quieres mostrar el loader (ms)
+
   const MIN_LOADING_MS = 1400;
+  const [showLoading, setShowLoading] = useState(true);
+
   useEffect(() => {
-    // si Firebase dice que está cargando -> mostrar loader inmediatamente
-    // si Firebase ya terminó -> esperar MIN_LOADING_MS antes de ocultarlo
     let timer: number | undefined;
 
     if (loading) {
-      // cuando entra loading, lo mostramos YA
       setShowLoading(true);
     } else {
-      // cuando loading pasa a false, esperar un poquito antes de ocultar
       timer = window.setTimeout(() => {
         setShowLoading(false);
       }, MIN_LOADING_MS);
@@ -57,7 +51,6 @@ export const AuthProvider = ({ children }: any) => {
     let unsubscribeUserDoc: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // cada vez que cambia auth, limpiamos listener anterior
       if (unsubscribeUserDoc) {
         unsubscribeUserDoc();
         unsubscribeUserDoc = null;
@@ -77,12 +70,10 @@ export const AuthProvider = ({ children }: any) => {
 
       const userRef = doc(db, "users", firebaseUser.uid);
 
-      // ✅ escucha en tiempo real el doc de perfil
       unsubscribeUserDoc = onSnapshot(
         userRef,
         (snap) => {
           if (!snap.exists()) {
-            // perfil todavía no está creado (o no llegó)
             setRole("guest");
             setHostelSlug(null);
             setLoading(false);
@@ -93,12 +84,11 @@ export const AuthProvider = ({ children }: any) => {
           const nextRole: Role = data?.role === "admin" ? "admin" : "guest";
 
           setRole(nextRole);
-          setHostelSlug(nextRole === "admin" ? (data?.hostelSlug ?? null) : null);
+          setHostelSlug(nextRole === "admin" ? data?.hostelSlug ?? null : null);
 
           setLoading(false);
         },
-        (err) => {
-          console.error("AuthProvider user doc error:", err);
+        () => {
           setRole("guest");
           setHostelSlug(null);
           setLoading(false);
@@ -111,11 +101,17 @@ export const AuthProvider = ({ children }: any) => {
       unsubscribeAuth();
     };
   }, []);
+
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
       {showLoading ? (
-        <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
-      ) : children}
+        <HotelLoading
+          text={t("auth.entering")}
+          subtitle={t("auth.checkingSession")}
+        />
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

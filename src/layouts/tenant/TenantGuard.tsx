@@ -5,30 +5,27 @@ import { useTranslation } from "react-i18next";
 import HotelLoading from "../../components/HotelLoading";
 import { useAuth } from "../../context/AuthContext";
 
-
 function safeSlug(input?: string) {
   return (input ?? "").toString().trim();
 }
 
 export default function TenantGuard() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const { loading: authLoading } = useAuth();
   const { hostel, loading } = useHostelPublic(hostelSlug);
+  const { loading: authLoading } = useAuth();
   const { t } = useTranslation();
 
   const slug = safeSlug(hostelSlug);
 
-  // ✅ Si el AuthProvider todavía está mostrando el loader global,
-  // no muestres un segundo loader acá.
+  // 🔥 Si Auth todavía está cargando, no hacemos nada (AuthProvider ya muestra loader)
   if (authLoading) return null;
 
-  // ✅ Ahora sí: loader propio del tenant solo si auth ya terminó
+  // 🔥 Si el tenant está cargando, mostramos el MISMO loader pero con texto distinto
   if (loading) {
     return (
       <HotelLoading
         text={t("tenant.loadingTitle")}
         subtitle={t("tenant.loadingSubtitle")}
-        //fullScreen={false}
       />
     );
   }

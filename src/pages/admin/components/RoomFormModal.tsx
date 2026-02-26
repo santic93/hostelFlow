@@ -60,8 +60,8 @@ export default function RoomFormModal({
     },
   });
 
-  const [file, setFile] = useState<File | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [file, ] = useState<File | null>(null);
+  const [saving, ] = useState(false);
 
   useEffect(() => {
     if (initialData) {

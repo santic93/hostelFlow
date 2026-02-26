@@ -1,9 +1,9 @@
 // AuthContext.tsx
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
-import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
-import { getOrCreateHostel } from "../services/hostelService";
+
 import HotelLoading from "../components/HotelLoading";
 import { t } from "i18next";
 
@@ -113,9 +113,9 @@ export const AuthProvider = ({ children }: any) => {
   }, []);
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
-     {showLoading ? (
-  <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
-) : children}
+      {showLoading ? (
+        <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
+      ) : children}
     </AuthContext.Provider>
   );
 };

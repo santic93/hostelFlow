@@ -3,6 +3,7 @@ import { Container, Typography, Button, Stack } from "@mui/material";
 import { useHostelPublic } from "../../hooks/useHostelPublic";
 import { useTranslation } from "react-i18next";
 import HotelLoading from "../../components/HotelLoading";
+import { useAuth } from "../../context/AuthContext";
 
 
 function safeSlug(input?: string) {
@@ -11,16 +12,23 @@ function safeSlug(input?: string) {
 
 export default function TenantGuard() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
+  const { loading: authLoading } = useAuth();
   const { hostel, loading } = useHostelPublic(hostelSlug);
   const { t } = useTranslation();
 
   const slug = safeSlug(hostelSlug);
 
+  // ✅ Si el AuthProvider todavía está mostrando el loader global,
+  // no muestres un segundo loader acá.
+  if (authLoading) return null;
+
+  // ✅ Ahora sí: loader propio del tenant solo si auth ya terminó
   if (loading) {
     return (
       <HotelLoading
         text={t("tenant.loadingTitle")}
         subtitle={t("tenant.loadingSubtitle")}
+        //fullScreen={false}
       />
     );
   }

@@ -1,7 +1,4 @@
-import { Box, Typography } from "@mui/material";
-import HotelIcon from "@mui/icons-material/Hotel";
-import LuggageIcon from "@mui/icons-material/Luggage";
-import CircularProgress from "@mui/material/CircularProgress";
+import { Box, Typography, CircularProgress } from "@mui/material";
 import { useTranslation } from "react-i18next";
 
 type Props = {
@@ -37,37 +34,96 @@ export default function HotelLoading({
           p: 4,
           textAlign: "center",
           background: "rgba(255,255,255,0.85)",
+          backdropFilter: "blur(6px)",
         }}
       >
-        <Box sx={{ position: "relative", height: 86, mb: 2 }}>
-          <HotelIcon
+        {/* 🔥 LOGO + ANIMACIÓN */}
+        <Box
+          sx={{
+            position: "relative",
+            height: 100,
+            mb: 3,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
+          {/* Logo */}
+          <Box
+            component="img"
+            src="/favicon.svg"
+            alt="HOSTLY"
             sx={{
-              fontSize: 64,
-              color: "#730202",
-              position: "absolute",
-              left: "50%",
-              top: 0,
-              transform: "translateX(-50%)",
+              width: 72,
+              height: 72,
+              borderRadius: 3,
+              filter: "drop-shadow(0px 12px 22px rgba(0,0,0,0.22))",
+              transformOrigin: "center",
+              animation: "logoPulse 1.8s ease-in-out infinite",
+              "@keyframes logoPulse": {
+                "0%, 100%": { transform: "scale(1)" },
+                "50%": { transform: "scale(1.05)" },
+              },
             }}
           />
 
-          <LuggageIcon
+          {/* Overlay tipo barra de carga */}
+          <Box
             sx={{
-              fontSize: 34,
-              color: "#ab003c",
               position: "absolute",
-              left: "50%",
-              bottom: 0,
-              animation: "suitcaseMove 1.2s ease-in-out infinite",
-              "@keyframes suitcaseMove": {
-                "0%": { transform: "translateX(-60px)" },
-                "50%": { transform: "translateX(20px)" },
-                "100%": { transform: "translateX(-60px)" },
+              width: 72,
+              height: 72,
+              borderRadius: 3,
+              overflow: "hidden",
+              pointerEvents: "none",
+
+              // Capa que se llena hacia arriba
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                bottom: 0,
+                width: "100%",
+                height: "0%",
+                background:
+                  "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.55) 100%)",
+                animation: "fillUp 2.2s ease-in-out infinite",
+              },
+
+              // Línea brillante que sube
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                bottom: 0,
+                width: "100%",
+                height: "3px",
+                background: "rgba(255,255,255,0.9)",
+                filter: "blur(0.4px)",
+                animation: "fillLine 2.2s ease-in-out infinite",
+              },
+
+              "@keyframes fillUp": {
+                "0%": { height: "0%", opacity: 0.0 },
+                "10%": { opacity: 0.55 },
+                "35%": { height: "35%", opacity: 0.55 },
+                "60%": { height: "70%", opacity: 0.55 },
+                "85%": { height: "100%", opacity: 0.55 },
+                "100%": { height: "100%", opacity: 0.0 },
+              },
+
+              "@keyframes fillLine": {
+                "0%": { transform: "translateY(0px)", opacity: 0.0 },
+                "10%": { opacity: 0.9 },
+                "35%": { transform: "translateY(-25px)", opacity: 0.9 },
+                "60%": { transform: "translateY(-50px)", opacity: 0.9 },
+                "85%": { transform: "translateY(-69px)", opacity: 0.9 },
+                "100%": { transform: "translateY(-69px)", opacity: 0.0 },
               },
             }}
           />
         </Box>
 
+        {/* Texto */}
         <Typography sx={{ fontWeight: 700, mb: 1 }}>{title}</Typography>
 
         <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>

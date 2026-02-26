@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: any) => {
   // dentro del componente AuthProvider, justo después de tus estados existentes:
   const [showLoading, setShowLoading] = useState(true);
   // tiempo mínimo que quieres mostrar el loader (ms)
-  const MIN_LOADING_MS = 700;
+  const MIN_LOADING_MS = 1400;
   useEffect(() => {
     // si Firebase dice que está cargando -> mostrar loader inmediatamente
     // si Firebase ya terminó -> esperar MIN_LOADING_MS antes de ocultarlo

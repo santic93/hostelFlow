@@ -1,8 +1,17 @@
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Box, Typography } from "@mui/material";
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
+  Box,
+  Typography,
+} from "@mui/material";
 import { useForm } from "react-hook-form";
 import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
-
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { db } from "../../../services/firebase";
 
 type RoomFormValues = {
@@ -10,8 +19,9 @@ type RoomFormValues = {
   price: number;
   capacity: number;
   description: string;
-  imageUrl?: string; // ✅ opcional
+  imageUrl?: string;
 };
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -22,7 +32,6 @@ type Props = {
     price: number;
     capacity: number;
     description: string;
-
   } | null;
   onSuccess: () => void;
 };
@@ -34,6 +43,7 @@ export default function RoomFormModal({
   onSuccess,
   hostelSlug,
 }: Props) {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -49,8 +59,10 @@ export default function RoomFormModal({
       imageUrl: "",
     },
   });
+
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+
   useEffect(() => {
     if (initialData) {
       reset(initialData);
@@ -61,7 +73,6 @@ export default function RoomFormModal({
         capacity: 1,
         description: "",
         imageUrl: "",
-
       });
     }
   }, [initialData, reset]);
@@ -74,7 +85,7 @@ export default function RoomFormModal({
       price: Number(data.price),
       capacity: Number(data.capacity),
       description: data.description ?? "",
-      imageUrl: data.imageUrl?.trim() ?? "", // ✅
+      imageUrl: data.imageUrl?.trim() ?? "",
     };
 
     if (initialData?.id) {
@@ -93,90 +104,76 @@ export default function RoomFormModal({
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>
-        {initialData ? "Editar Habitación" : "Crear Habitación"}
+        {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
       </DialogTitle>
 
       <DialogContent>
         <Box display="flex" flexDirection="column" gap={2} mt={1}>
           <TextField
-            label="Nombre"
-            {...register("name", { required: "El nombre es obligatorio" })}
+            label={t("admin.rooms.form.name")}
+            {...register("name", { required: t("admin.rooms.errors.nameRequired") })}
             error={!!errors.name}
-            helperText={errors.name?.message}
+            helperText={errors.name?.message as any}
           />
 
           <TextField
-            label="Precio"
+            label={t("admin.rooms.form.price")}
             type="number"
             {...register("price", {
-              required: "Precio obligatorio",
-              min: { value: 1, message: "Debe ser mayor a 0" },
+              required: t("admin.rooms.errors.priceRequired"),
+              min: { value: 1, message: t("admin.rooms.errors.priceMin") },
             })}
             error={!!errors.price}
-            helperText={errors.price?.message}
+            helperText={errors.price?.message as any}
           />
 
           <TextField
-            label="Capacidad"
+            label={t("admin.rooms.form.capacity")}
             type="number"
             {...register("capacity", {
-              required: "Capacidad obligatoria",
-              min: { value: 1, message: "Mínimo 1 persona" },
+              required: t("admin.rooms.errors.capacityRequired"),
+              min: { value: 1, message: t("admin.rooms.errors.capacityMin") },
             })}
             error={!!errors.capacity}
-            helperText={errors.capacity?.message}
+            helperText={errors.capacity?.message as any}
           />
 
           <TextField
-            label="Descripción"
+            label={t("admin.rooms.form.description")}
             multiline
             rows={3}
             {...register("description")}
           />
-          {/* 
-          ////esto por ahora reemplaza la imagen */}
+
           <TextField
-            label="Image URL (optional)"
+            label={t("admin.rooms.form.imageUrl")}
             {...register("imageUrl", {
               pattern: {
                 value: /^https?:\/\/.+/i,
-                message: "Debe ser una URL válida (http/https)",
+                message: t("admin.rooms.errors.imageUrlInvalid"),
               },
             })}
             error={!!errors.imageUrl}
-            helperText={errors.imageUrl?.message ?? "Ej: https://.../foto.jpg"}
+            helperText={(errors.imageUrl?.message as any) ?? t("admin.rooms.form.imageUrlHelp")}
           />
         </Box>
 
-        {/* ///SE IMPLEMENTA EL DIA DE MAÑANA CON IMAGEN Y STORAGE DE FIREBASE */}
-        {/* <Button variant="outlined" component="label">
-          Upload image
-          <input
-            type="file"
-            hidden
-            accept="image/*"
-            onChange={(e) => {
-              const f = e.target.files?.[0] ?? null;
-              setFile(f);
-            }}
-          />
-        </Button> */}
-
         {file && (
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Selected: {file.name}
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 2 }}>
+            {t("admin.rooms.form.selectedFile", { name: file.name })}
           </Typography>
         )}
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
+        <Button onClick={onClose}>{t("common.cancel")}</Button>
+
         <Button
           variant="contained"
           onClick={handleSubmit(onSubmit)}
           disabled={!isValid || saving}
         >
-          {saving ? "Saving..." : "Guardar"}
+          {saving ? t("common.saving") : t("common.save")}
         </Button>
       </DialogActions>
     </Dialog>

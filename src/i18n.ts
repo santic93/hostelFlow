@@ -90,6 +90,33 @@ const resources = {
 
 
         rooms: {
+
+          modal: {
+            editTitle: "Editar habitación",
+            createTitle: "Crear habitación",
+          },
+          form: {
+            name: "Nombre",
+            price: "Precio",
+            capacity: "Capacidad",
+            description: "Descripción",
+            imageUrl: "URL de imagen (opcional)",
+            imageUrlHelp: "Ej: https://.../foto.jpg",
+            selectedFile: "Seleccionado: {{name}}",
+          },
+          errors: {
+            nameRequired: "El nombre es obligatorio",
+            priceRequired: "Precio obligatorio",
+            priceMin: "Debe ser mayor a 0",
+            capacityRequired: "Capacidad obligatoria",
+            capacityMin: "Mínimo 1 persona",
+            imageUrlInvalid: "Debe ser una URL válida (http/https)",
+          },
+          common: {
+            save: "Guardar",
+            saving: "Guardando...",
+            cancel: "Cancelar",
+          },
           title: "Gestión de Habitaciones",
           columns: {
             name: "Nombre",
@@ -353,6 +380,37 @@ const resources = {
       admin: {
 
         rooms: {
+
+          modal: {
+            editTitle: "Edit room",
+            createTitle: "Create room",
+          },
+          form: {
+            name: "Name",
+            price: "Price",
+            capacity: "Capacity",
+            description: "Description",
+            imageUrl: "Image URL (optional)",
+            imageUrlHelp: "E.g. https://.../photo.jpg",
+            selectedFile: "Selected: {{name}}",
+          },
+          errors: {
+            nameRequired: "Name is required",
+            priceRequired: "Price is required",
+            priceMin: "Must be greater than 0",
+            capacityRequired: "Capacity is required",
+            capacityMin: "Minimum 1 person",
+            imageUrlInvalid: "Must be a valid URL (http/https)",
+
+          },
+          common: {
+            save: "Save",
+            saving: "Saving...",
+            cancel: "Cancel",
+          },
+
+
+
           title: "Room Management",
           columns: {
             name: "Name",
@@ -596,6 +654,35 @@ const resources = {
       admin: {
 
         rooms: {
+
+    modal: {
+      editTitle: "Editar quarto",
+      createTitle: "Criar quarto",
+    },
+    form: {
+      name: "Nome",
+      price: "Preço",
+      capacity: "Capacidade",
+      description: "Descrição",
+      imageUrl: "URL da imagem (opcional)",
+      imageUrlHelp: "Ex: https://.../foto.jpg",
+      selectedFile: "Selecionado: {{name}}",
+    },
+    errors: {
+      nameRequired: "O nome é obrigatório",
+      priceRequired: "Preço obrigatório",
+      priceMin: "Deve ser maior que 0",
+      capacityRequired: "Capacidade obrigatória",
+      capacityMin: "Mínimo 1 pessoa",
+      imageUrlInvalid: "Deve ser uma URL válida (http/https)",
+  
+},
+common: {
+  save: "Salvar",
+  saving: "Salvando...",
+  cancel: "Cancelar",
+},
+
           title: "Gestão de Quartos",
           columns: {
             name: "Nome",
@@ -623,26 +710,26 @@ const resources = {
           confirmed: "Confirmada",
           cancelled: "Cancelada",
           empty: "Ainda não há reservas.",
-      
 
-    seoTitle: "Reservas — REDSTAYS",
-    seoDescription: "Admin reservas",
-    columns: {
-      guest: "Hóspede",
-      room: "Quarto",
-      email: "Email",
-      checkIn: "Check In",
-      checkOut: "Check Out",
-      total: "Total",
-      status: "Status",
-      actions: "Ações",
-    },
-    statusValues: {
-      pending: "Pendente",
-      confirmed: "Confirmada",
-      cancelled: "Cancelada",
-    },
-  
+
+          seoTitle: "Reservas — REDSTAYS",
+          seoDescription: "Admin reservas",
+          columns: {
+            guest: "Hóspede",
+            room: "Quarto",
+            email: "Email",
+            checkIn: "Check In",
+            checkOut: "Check Out",
+            total: "Total",
+            status: "Status",
+            actions: "Ações",
+          },
+          statusValues: {
+            pending: "Pendente",
+            confirmed: "Confirmada",
+            cancelled: "Cancelada",
+          },
+
         },
 
         shell: {

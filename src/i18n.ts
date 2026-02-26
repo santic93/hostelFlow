@@ -33,6 +33,32 @@ const resources = {
     },
   
 },
+
+
+
+  dashboard: {
+    title: "Dashboard",
+    configTitle: "Configuración del sitio",
+    defaultLanguageLabel: "Idioma predeterminado",
+    save: "Guardar",
+    saving: "Guardando...",
+    help: "Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes).",
+    msgSaved: "Idioma predeterminado actualizado ✅",
+    msgSaveError: "No se pudo guardar el idioma. Revisá permisos/reglas.",
+    cards: {
+      revenue: "Ingresos totales",
+      reservations: "Reservas totales",
+      rooms: "Habitaciones activas",
+    },
+    languages: {
+      es: "Español (ES)",
+      en: "English (EN)",
+      pt: "Português (PT)",
+    },
+  },
+
+
+
 },
       nav: {
         rooms: "HABITACIONES",
@@ -134,6 +160,32 @@ const resources = {
     },
   
 },
+
+
+  dashboard: {
+    title: "Dashboard",
+    configTitle: "Site settings",
+    defaultLanguageLabel: "Default language",
+    save: "Save",
+    saving: "Saving...",
+    help: "This sets the initial language guests will see when they enter the hostel site (if they haven’t chosen another one before).",
+    msgSaved: "Default language updated ✅",
+    msgSaveError: "Could not save the language. Check permissions/rules.",
+    cards: {
+      revenue: "Total revenue",
+      reservations: "Total reservations",
+      rooms: "Active rooms",
+    },
+    languages: {
+      es: "Spanish (ES)",
+      en: "English (EN)",
+      pt: "Portuguese (PT)",
+    },
+  },
+
+
+
+
 },
       nav: {
         rooms: "ROOMS",
@@ -230,6 +282,27 @@ const resources = {
       dashboard: "Dashboard",
       reservations: "Reservas",
       rooms: "Quartos",
+    },
+  },
+
+  dashboard: {
+    title: "Dashboard",
+    configTitle: "Configurações do site",
+    defaultLanguageLabel: "Idioma padrão",
+    save: "Salvar",
+    saving: "Salvando...",
+    help: "Isso define o idioma inicial que os hóspedes verão ao entrar no site do hostel (se não tiverem escolhido outro antes).",
+    msgSaved: "Idioma padrão atualizado ✅",
+    msgSaveError: "Não foi possível salvar o idioma. Verifique permissões/regras.",
+    cards: {
+      revenue: "Receita total",
+      reservations: "Total de reservas",
+      rooms: "Quartos ativos",
+    },
+    languages: {
+      es: "Espanhol (ES)",
+      en: "Inglês (EN)",
+      pt: "Português (PT)",
     },
   },
 

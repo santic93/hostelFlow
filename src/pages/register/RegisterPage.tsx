@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
@@ -28,13 +28,23 @@ export default function RegisterPage() {
   const [hostelName, setHostelName] = useState("");
   const [hostelSlug, setHostelSlug] = useState("");
 
-  const [step, setStep] = useState<1 | 2>(1);
-  const [createdUser, setCreatedUser] = useState<null | any>(null);
+  const [createdUser, setCreatedUser] = useState<any>(null);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const normalizedSlug = useMemo(() => slugify(hostelSlug), [hostelSlug]);
+
+  // ✅ fuente de verdad del flujo
+  const effectiveUser = auth.currentUser ?? createdUser;
+  const step: 1 | 2 = effectiveUser ? 2 : 1;
+
+  // ✅ si Auth se actualiza después, sincronizamos createdUser
+  useEffect(() => {
+    if (auth.currentUser && !createdUser) {
+      setCreatedUser(auth.currentUser);
+    }
+  }, [createdUser]);
 
   const handleCreateAccount = async () => {
     if (loading) return;
@@ -51,8 +61,12 @@ export default function RegisterPage() {
 
       const cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
 
+      // ✅ guardamos user creado (y dejamos que step se derive)
       setCreatedUser(cred.user);
-      setStep(2); // ✅ recién cuando realmente se creó la cuenta
+
+      // ✅ fuerza a que auth quede consistente en el acto (evita “tarda un tick”)
+      await cred.user.getIdToken();
+
       setMessage({ type: "success", text: "Cuenta creada ✅ Ahora creá tu hostel." });
     } catch (err: any) {
       console.error("REGISTER ERROR =>", err);
@@ -70,11 +84,12 @@ export default function RegisterPage() {
   };
 
   const handleCreateHostel = async () => {
-
+    if (loading) return;
     setMessage(null);
 
-const current = auth.currentUser ?? createdUser;
-if (!current) return setMessage({ type: "error", text: "Sesión no disponible. Reintentá." });
+    const current = auth.currentUser ?? createdUser;
+    if (!current) return setMessage({ type: "error", text: "Sesión no disponible. Reintentá." });
+
     if (!hostelName.trim()) return setMessage({ type: "error", text: "Ingresá el nombre del hostel" });
     if (!normalizedSlug) return setMessage({ type: "error", text: "Ingresá un slug válido" });
 
@@ -109,20 +124,17 @@ if (!current) return setMessage({ type: "error", text: "Sesión no disponible. R
       });
 
       setMessage({ type: "success", text: "Hostel creado ✅ Redirigiendo al panel..." });
-
-      // IMPORTANTÍSIMO: no dependas de que el AuthContext ya haya “levantado” el role
-      // Mandalo a /admin global y AdminRedirect lo lleva al tenant correcto.
       navigate("/admin", { replace: true });
     } catch (err: any) {
       console.error(err);
 
-      // rollback: si falló firestore, borramos el usuario recién creado
+      // rollback (opcional): solo si vos querés borrar el user si falla firestore
+      // ojo: esto puede fallar por permisos y te deja el auth user creado igual
       try {
         if (auth.currentUser) await deleteUser(auth.currentUser);
-      } catch { }
+      } catch {}
 
       setCreatedUser(null);
-      setStep(1);
 
       if (err?.message === "SLUG_TAKEN") {
         setMessage({ type: "error", text: "Ese slug ya está en uso. Elegí otro." });
@@ -133,82 +145,57 @@ if (!current) return setMessage({ type: "error", text: "Sesión no disponible. R
       setLoading(false);
     }
   };
+
   if (loading) {
     return <HotelLoading text={step === 1 ? "Creando tu cuenta..." : "Creando tu hostel..."} />;
   }
+
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
       <Button component={RouterLink} to="/login" variant="text">
         Ya tengo cuenta (login)
       </Button>
+
       <Typography variant="h4" gutterBottom>
         {step === 1 ? "Crear cuenta de administrador" : "Configurar tu hostel"}
       </Typography>
+
+      {/* chips */}
       <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
-        <Chip
-          label="1. Cuenta"
-          color={step === 1 ? "primary" : "default"}
-          variant={step === 1 ? "filled" : "outlined"}
-        />
-        <Chip
-          label="2. Hostel"
-          color={step === 2 ? "primary" : "default"}
-          variant={step === 2 ? "filled" : "outlined"}
-        />
+        <Chip label="1. Cuenta" color={step === 1 ? "primary" : "default"} variant={step === 1 ? "filled" : "outlined"} />
+        <Chip label="2. Hostel" color={step === 2 ? "primary" : "default"} variant={step === 2 ? "filled" : "outlined"} />
       </Box>
-      {message && (
-        <Alert sx={{ mt: 2 }} severity={message.type}>
-          {message.text}
-        </Alert>
-      )}
+
+      {message && <Alert sx={{ mt: 2 }} severity={message.type}>{message.text}</Alert>}
 
       {/* STEP 1 */}
       <Collapse in={step === 1}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
-          <TextField
-            label="Email admin"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-          <Button variant="contained" disabled={loading} onClick={handleCreateAccount}>
-            {loading ? "Creando cuenta..." : "Continuar"}
+          <TextField label="Email admin" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          <Button variant="contained" onClick={handleCreateAccount}>
+            Continuar
           </Button>
         </Box>
       </Collapse>
-      {step === 2 && (
-        <Alert severity="success" sx={{ mt: 3 }}>
-          Cuenta creada: <b>{email.trim().toLowerCase()}</b> ✅
-        </Alert>
-      )}
-      {/* STEP 2 (aparece solo cuando step=2) */}
-  <Collapse in={step === 2 && !!createdUser}>
 
+      {/* STEP 2 */}
+      <Collapse in={step === 2}>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            Cuenta creada: <b>{email.trim().toLowerCase()}</b> ✅
+          </Alert>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 4 }}>
-            <TextField
-              label="Nombre del hostel"
-              value={hostelName}
-              onChange={(e) => setHostelName(e.target.value)}
-            />
-
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            <TextField label="Nombre del hostel" value={hostelName} onChange={(e) => setHostelName(e.target.value)} />
             <TextField
               label="Slug (URL)"
               value={hostelSlug}
               onChange={(e) => setHostelSlug(e.target.value)}
               helperText={normalizedSlug ? `Tu URL: /${normalizedSlug}` : "Ej: selina-palermo"}
             />
-
-            <Button variant="contained" disabled={loading} onClick={handleCreateHostel}>
-              {loading ? "Creando hostel..." : "Crear hostel y entrar al panel"}
+            <Button variant="contained" onClick={handleCreateHostel}>
+              Crear hostel y entrar al panel
             </Button>
           </Box>
         </Paper>

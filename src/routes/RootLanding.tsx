@@ -72,22 +72,32 @@ export default function RootRedirect() {
 
       // ...
 
-      if (!snap.exists()) {
-        // Traemos algunos slugs existentes para sugerir (modo demo)
-        const listSnap = await getDocs(query(collection(db, "hostels"), limit(20)));
-        const all = listSnap.docs.map(d => d.id);
+if (!snap.exists()) {
+  // Traemos algunos slugs existentes para sugerir (modo demo)
+  const listSnap = await getDocs(query(collection(db, "hostels"), limit(20)));
+  const all = listSnap.docs.map((d) => d.id);
 
-        // sugerencias: los más parecidos por "incluye" (simple y efectivo)
-        const c = cleaned.toLowerCase();
-        const close = all
-          .filter(s => s.toLowerCase().includes(c.slice(0, 3))) // usa primeras 3 letras
-          .slice(0, 5);
+  // sugerencias: los más parecidos por "incluye" (simple)
+  const c = cleaned.toLowerCase();
+  const close = all
+    .filter((s) => s.toLowerCase().includes(c.slice(0, 3)))
+    .slice(0, 5);
 
-        setSuggestions(close);
+  setSuggestions(close);
 
-        setError(`No encontramos el hostel "${cleaned}". ¿Quisiste decir alguno de estos?`);
-        return;
-      }
+  // ✅ si no hay sugerencias, mensaje corto sin “¿quisiste decir…?”
+  if (close.length === 0) {
+    setError(`No encontramos el hostel "${cleaned}".`);
+  } else {
+    setError(`No encontramos el hostel "${cleaned}". ¿Quisiste decir alguno de estos?`);
+  }
+
+  return;
+}
+
+// ✅ si existe, limpiamos sugerencias previas
+setSuggestions([]);
+setError(null);
 
       // guardar reciente
       const next = [cleaned, ...recent.filter((x) => x !== cleaned)].slice(0, 6);

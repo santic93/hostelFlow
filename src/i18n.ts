@@ -5,7 +5,10 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
-
+auth: {
+  entering: "Ingresando...",
+  checkingSession: "Verificando sesión...",
+},
       gallery: {
         title: "Galería",
       },
@@ -287,6 +290,10 @@ const resources = {
   },
   en: {
     translation: {
+      auth: {
+  entering: "Signing in...",
+  checkingSession: "Checking session...",
+},
       gallery: {
         title: "Gallery",
       },
@@ -571,6 +578,10 @@ const resources = {
   },
   pt: {
     translation: {
+      auth: {
+  entering: "Entrando...",
+  checkingSession: "Verificando sessão...",
+},
       gallery: {
         title: "Galeria",
       },

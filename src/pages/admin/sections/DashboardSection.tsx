@@ -1,59 +1,97 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
-import { useParams } from "react-router-dom";
-import { Box, Typography, Grid, Paper, Alert, Stack, FormControl, InputLabel, Select, MenuItem, Button } from "@mui/material";
-import { db } from "../../../services/firebase";
-
-
-import { useTranslation } from "react-i18next";
-
 type Reservation = {
   total?: number;
 };
 
 type Language = "es" | "en" | "pt";
+import {  useMemo } from "react";
+import { useParams } from "react-router-dom";
+import {
+  Alert,
+  Box,
+  Button,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
+import { useTranslation } from "react-i18next";
+
+import { db } from "../../../services/firebase"; // ajustá path
+
+
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalReservations, setTotalReservations] = useState(0);
   const [totalRooms, setTotalRooms] = useState(0);
 
-  // ✅ config hostel
   const [defaultLanguage, setDefaultLanguage] = useState<Language>("es");
-  const [savingLang, setSavingLang] = useState(false);  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [savingLang, setSavingLang] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const fetchData = async () => {
-    if (!hostelSlug) return;
-
-    // 1) stats
-    const roomsSnap = await getDocs(collection(db, "hostels", hostelSlug, "rooms"));
-    const reservationsSnap = await getDocs(collection(db, "hostels", hostelSlug, "reservations"));
-    const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
-    const revenue = reservations.reduce((acc, curr) => acc + (curr.total ?? 0), 0);
-
-    setTotalRevenue(revenue);
-    setTotalReservations(reservations.length);
-    setTotalRooms(roomsSnap.size);
-
-    // 2) hostel config (defaultLanguage)
-    const hostelSnap = await getDoc(doc(db, "hostels", hostelSlug));
-    if (hostelSnap.exists()) {
-      const data = hostelSnap.data() as any;
-      const lng = (data?.defaultLanguage ?? "es") as Language;
-      if (lng === "es" || lng === "en" || lng === "pt") {
-        setDefaultLanguage(lng);
-      } else {
-        setDefaultLanguage("es");
-      }
-    }
-  };
+  const currency = "USD"; // después lo hacemos configurable por hostel (AR$ / EUR / USD)
+  const money = useMemo(
+    () =>
+      new Intl.NumberFormat(i18n.language || "es", {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0,
+      }),
+    [i18n.language, currency]
+  );
 
   useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+
+    const run = async () => {
+      if (!hostelSlug) return;
+
+      setLoading(true);
+      setMsg(null);
+
+      try {
+        const [roomsSnap, reservationsSnap, hostelSnap] = await Promise.all([
+          getDocs(collection(db, "hostels", hostelSlug, "rooms")),
+          getDocs(collection(db, "hostels", hostelSlug, "reservations")),
+          getDoc(doc(db, "hostels", hostelSlug)),
+        ]);
+
+        if (!alive) return;
+
+        const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
+        const revenue = reservations.reduce((acc, curr) => acc + (curr.total ?? 0), 0);
+
+        setTotalRevenue(revenue);
+        setTotalReservations(reservations.length);
+        setTotalRooms(roomsSnap.size);
+
+        if (hostelSnap.exists()) {
+          const data = hostelSnap.data() as any;
+          const lng = (data?.defaultLanguage ?? "es") as Language;
+          if (lng === "es" || lng === "en" || lng === "pt") setDefaultLanguage(lng);
+          else setDefaultLanguage("es");
+        }
+      } catch (err) {
+        console.error("DashboardSection fetch error:", err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+
+    run();
+    return () => {
+      alive = false;
+    };
   }, [hostelSlug]);
 
   const handleSaveLanguage = async () => {
@@ -67,21 +105,23 @@ export default function DashboardSection() {
         defaultLanguage,
       });
 
-      // ✅ opcional pero recomendado: aplicar al instante en el panel
+      // aplica al toque en el panel (admin)
       i18n.changeLanguage(defaultLanguage);
 
-      setMsg({ type: "success", text: "Idioma predeterminado actualizado ✅" });
+      setMsg({ type: "success", text: t("admin.dashboard.msgSaved") });
     } catch (err) {
       console.error("SAVE defaultLanguage error:", err);
-      setMsg({ type: "error", text: "No se pudo guardar el idioma. Revisá permisos/reglas." });
+      setMsg({ type: "error", text: t("admin.dashboard.msgSaveError") });
     } finally {
       setSavingLang(false);
     }
   };
 
-  const Card = ({ title, value }: { title: string; value: any }) => (
+  const StatCard = ({ title, value }: { title: string; value: React.ReactNode }) => (
     <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
-      <Typography variant="h6">{title}</Typography>
+      <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
+        {title}
+      </Typography>
       <Typography variant="h4" mt={1}>
         {value}
       </Typography>
@@ -91,7 +131,7 @@ export default function DashboardSection() {
   return (
     <Box>
       <Typography variant="h4" mb={3}>
-        Dashboard
+        {t("admin.dashboard.title")}
       </Typography>
 
       {msg && (
@@ -100,48 +140,48 @@ export default function DashboardSection() {
         </Alert>
       )}
 
-      {/* ✅ BLOQUE CONFIG */}
+      {/* CONFIG */}
       <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 4 }}>
         <Typography variant="h6" gutterBottom>
-          Configuración del sitio
+          {t("admin.dashboard.configTitle")}
         </Typography>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 220 }}>
-            <InputLabel>Idioma predeterminado</InputLabel>
+          <FormControl size="small" sx={{ minWidth: 240 }} disabled={loading}>
+            <InputLabel>{t("admin.dashboard.defaultLanguageLabel")}</InputLabel>
             <Select
-              label="Idioma predeterminado"
+              label={t("admin.dashboard.defaultLanguageLabel")}
               value={defaultLanguage}
               onChange={(e) => setDefaultLanguage(e.target.value as Language)}
             >
-              <MenuItem value="es">Español (ES)</MenuItem>
-              <MenuItem value="en">English (EN)</MenuItem>
-              <MenuItem value="pt">Português (PT)</MenuItem>
+              <MenuItem value="es">{t("admin.dashboard.languages.es")}</MenuItem>
+              <MenuItem value="en">{t("admin.dashboard.languages.en")}</MenuItem>
+              <MenuItem value="pt">{t("admin.dashboard.languages.pt")}</MenuItem>
             </Select>
           </FormControl>
 
-          <Button variant="contained" onClick={handleSaveLanguage} disabled={savingLang}>
-            {savingLang ? "Guardando..." : "Guardar"}
+          <Button variant="contained" onClick={handleSaveLanguage} disabled={savingLang || loading}>
+            {savingLang ? t("admin.dashboard.saving") : t("admin.dashboard.save")}
           </Button>
         </Stack>
 
         <Typography variant="body2" sx={{ color: "text.secondary", mt: 1.5 }}>
-          Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes).
+          {t("admin.dashboard.help")}
         </Typography>
       </Paper>
 
-      {/* ✅ STATS */}
+      {/* STATS */}
       <Grid container spacing={3}>
         <Grid sx={{ xs: 12, md: 4 }}>
-          <Card title="Ingresos Totales" value={`$${totalRevenue}`} />
+          <StatCard title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
         </Grid>
 
         <Grid sx={{ xs: 12, md: 4 }}>
-          <Card title="Reservas Totales" value={totalReservations} />
+          <StatCard title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
         </Grid>
 
         <Grid sx={{ xs: 12, md: 4 }}>
-          <Card title="Habitaciones Activas" value={totalRooms} />
+          <StatCard title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
         </Grid>
       </Grid>
     </Box>

@@ -5,6 +5,53 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      register: {
+  haveAccount: "Ya tengo cuenta (login)",
+  title: {
+    step1: "Crear cuenta de administrador",
+    step2: "Configurar tu hostel",
+  },
+  steps: {
+    account: "1. Cuenta",
+    hostel: "2. Hostel",
+  },
+  fields: {
+    email: "Email admin",
+    password: "Password",
+    hostelName: "Nombre del hostel",
+    slug: "Slug (URL)",
+  },
+  helpers: {
+    yourUrl: "Tu URL: /{{slug}}",
+    slugExample: "Ej: selina-palermo",
+  },
+  actions: {
+    continue: "Continuar",
+    createHostel: "Crear hostel y entrar al panel",
+  },
+  loading: {
+    creatingAccount: "Creando tu cuenta...",
+    creatingHostel: "Creando tu hostel...",
+  },
+  messages: {
+    accountCreated: "Cuenta creada ✅ Ahora creá tu hostel.",
+    accountCreatedLabel: "Cuenta creada:",
+    hostelCreatedRedirecting: "Hostel creado ✅ Redirigiendo al panel...",
+  },
+  errors: {
+    emailRequired: "Ingresá un email",
+    passwordMin: "Password mínimo 6 caracteres",
+    emailInUse: "Ese email ya está en uso. Probá iniciar sesión en Admin Login.",
+    emailInvalid: "Email inválido.",
+    generic: "Error creando cuenta",
+    genericWithCode: "Error: {{code}}",
+    sessionUnavailable: "Sesión no disponible. Reintentá.",
+    hostelNameRequired: "Ingresá el nombre del hostel",
+    slugInvalid: "Ingresá un slug válido",
+    slugTaken: "Ese slug ya está en uso. Elegí otro.",
+    hostelCreateGeneric: "Error creando hostel (Firestore). Revisá reglas/permisos.",
+  },
+},
       admin: {
         reservations: {
           title: "Reservas",
@@ -146,6 +193,53 @@ const resources = {
   },
   en: {
     translation: {
+      register: {
+  haveAccount: "I already have an account (login)",
+  title: {
+    step1: "Create admin account",
+    step2: "Set up your hostel",
+  },
+  steps: {
+    account: "1. Account",
+    hostel: "2. Hostel",
+  },
+  fields: {
+    email: "Admin email",
+    password: "Password",
+    hostelName: "Hostel name",
+    slug: "Slug (URL)",
+  },
+  helpers: {
+    yourUrl: "Your URL: /{{slug}}",
+    slugExample: "Example: selina-palermo",
+  },
+  actions: {
+    continue: "Continue",
+    createHostel: "Create hostel and enter dashboard",
+  },
+  loading: {
+    creatingAccount: "Creating your account...",
+    creatingHostel: "Creating your hostel...",
+  },
+  messages: {
+    accountCreated: "Account created ✅ Now create your hostel.",
+    accountCreatedLabel: "Account created:",
+    hostelCreatedRedirecting: "Hostel created ✅ Redirecting to dashboard...",
+  },
+  errors: {
+    emailRequired: "Enter an email",
+    passwordMin: "Password must be at least 6 characters",
+    emailInUse: "That email is already in use. Try logging in on Admin Login.",
+    emailInvalid: "Invalid email.",
+    generic: "Error creating account",
+    genericWithCode: "Error: {{code}}",
+    sessionUnavailable: "Session unavailable. Please try again.",
+    hostelNameRequired: "Enter the hostel name",
+    slugInvalid: "Enter a valid slug",
+    slugTaken: "That slug is already taken. Choose another one.",
+    hostelCreateGeneric: "Error creating hostel (Firestore). Check rules/permissions.",
+  },
+},
       tenant: {
   loadingTitle: "Loading hostel…",
   loadingSubtitle: "Checking site availability…",
@@ -285,6 +379,53 @@ const resources = {
   },
   pt: {
     translation: {
+      register: {
+  haveAccount: "Já tenho conta (login)",
+  title: {
+    step1: "Criar conta de administrador",
+    step2: "Configurar seu hostel",
+  },
+  steps: {
+    account: "1. Conta",
+    hostel: "2. Hostel",
+  },
+  fields: {
+    email: "Email do admin",
+    password: "Senha",
+    hostelName: "Nome do hostel",
+    slug: "Slug (URL)",
+  },
+  helpers: {
+    yourUrl: "Sua URL: /{{slug}}",
+    slugExample: "Ex: selina-palermo",
+  },
+  actions: {
+    continue: "Continuar",
+    createHostel: "Criar hostel e entrar no painel",
+  },
+  loading: {
+    creatingAccount: "Criando sua conta...",
+    creatingHostel: "Criando seu hostel...",
+  },
+  messages: {
+    accountCreated: "Conta criada ✅ Agora crie seu hostel.",
+    accountCreatedLabel: "Conta criada:",
+    hostelCreatedRedirecting: "Hostel criado ✅ Redirecionando para o painel...",
+  },
+  errors: {
+    emailRequired: "Digite um email",
+    passwordMin: "A senha deve ter no mínimo 6 caracteres",
+    emailInUse: "Esse email já está em uso. Tente fazer login em Admin Login.",
+    emailInvalid: "Email inválido.",
+    generic: "Erro ao criar conta",
+    genericWithCode: "Erro: {{code}}",
+    sessionUnavailable: "Sessão indisponível. Tente novamente.",
+    hostelNameRequired: "Digite o nome do hostel",
+    slugInvalid: "Digite um slug válido",
+    slugTaken: "Esse slug já está em uso. Escolha outro.",
+    hostelCreateGeneric: "Erro ao criar hostel (Firestore). Verifique regras/permissões.",
+  },
+},
       admin: {
         reservations: {
           title: "Reservas",

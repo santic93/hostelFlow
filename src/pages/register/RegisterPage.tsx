@@ -6,7 +6,7 @@ import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip, Paper } from "@mui/material";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
-
+import { useTranslation } from "react-i18next";
 
 
 function slugify(input: string) {
@@ -18,6 +18,7 @@ function slugify(input: string) {
 }
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Step 1
@@ -53,30 +54,30 @@ export default function RegisterPage() {
     const cleanEmail = email.trim().toLowerCase();
     const cleanPass = password;
 
-    if (!cleanEmail) return setMessage({ type: "error", text: "Ingresá un email" });
-    if (cleanPass.length < 6) return setMessage({ type: "error", text: "Password mínimo 6 caracteres" });
+    if (!cleanEmail) return setMessage({ type: "error", text: t("register.errors.emailRequired") });
+    if (cleanPass.length < 6) return setMessage({ type: "error", text: t("register.errors.passwordMin") });
 
     try {
       setLoading(true);
 
       const cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
 
-      // ✅ guardamos user creado (y dejamos que step se derive)
       setCreatedUser(cred.user);
-
-      // ✅ fuerza a que auth quede consistente en el acto (evita “tarda un tick”)
       await cred.user.getIdToken();
 
-      setMessage({ type: "success", text: "Cuenta creada ✅ Ahora creá tu hostel." });
+      setMessage({ type: "success", text: t("register.messages.accountCreated") });
     } catch (err: any) {
       console.error("REGISTER ERROR =>", err);
 
       if (err?.code === "auth/email-already-in-use") {
-        setMessage({ type: "error", text: "Ese email ya está en uso. Probá iniciar sesión en Admin Login." });
+        setMessage({ type: "error", text: t("register.errors.emailInUse") });
       } else if (err?.code === "auth/invalid-email") {
-        setMessage({ type: "error", text: "Email inválido." });
+        setMessage({ type: "error", text: t("register.errors.emailInvalid") });
       } else {
-        setMessage({ type: "error", text: err?.code ? `Error: ${err.code}` : "Error creando cuenta" });
+        setMessage({
+          type: "error",
+          text: err?.code ? t("register.errors.genericWithCode", { code: err.code }) : t("register.errors.generic"),
+        });
       }
     } finally {
       setLoading(false);
@@ -88,10 +89,10 @@ export default function RegisterPage() {
     setMessage(null);
 
     const current = auth.currentUser ?? createdUser;
-    if (!current) return setMessage({ type: "error", text: "Sesión no disponible. Reintentá." });
+    if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
 
-    if (!hostelName.trim()) return setMessage({ type: "error", text: "Ingresá el nombre del hostel" });
-    if (!normalizedSlug) return setMessage({ type: "error", text: "Ingresá un slug válido" });
+    if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
+    if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
 
     try {
       setLoading(true);
@@ -123,13 +124,11 @@ export default function RegisterPage() {
         );
       });
 
-      setMessage({ type: "success", text: "Hostel creado ✅ Redirigiendo al panel..." });
+      setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
       navigate("/admin", { replace: true });
     } catch (err: any) {
       console.error(err);
 
-      // rollback (opcional): solo si vos querés borrar el user si falla firestore
-      // ojo: esto puede fallar por permisos y te deja el auth user creado igual
       try {
         if (auth.currentUser) await deleteUser(auth.currentUser);
       } catch {}
@@ -137,9 +136,9 @@ export default function RegisterPage() {
       setCreatedUser(null);
 
       if (err?.message === "SLUG_TAKEN") {
-        setMessage({ type: "error", text: "Ese slug ya está en uso. Elegí otro." });
+        setMessage({ type: "error", text: t("register.errors.slugTaken") });
       } else {
-        setMessage({ type: "error", text: "Error creando hostel (Firestore). Revisá reglas/permisos." });
+        setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
       }
     } finally {
       setLoading(false);
@@ -147,55 +146,87 @@ export default function RegisterPage() {
   };
 
   if (loading) {
-    return <HotelLoading text={step === 1 ? "Creando tu cuenta..." : "Creando tu hostel..."} />;
+    return (
+      <HotelLoading
+        text={step === 1 ? t("register.loading.creatingAccount") : t("register.loading.creatingHostel")}
+      />
+    );
   }
 
   return (
     <Container sx={{ py: 12, maxWidth: 520 }}>
       <Button component={RouterLink} to="/login" variant="text">
-        Ya tengo cuenta (login)
+        {t("register.haveAccount")}
       </Button>
 
       <Typography variant="h4" gutterBottom>
-        {step === 1 ? "Crear cuenta de administrador" : "Configurar tu hostel"}
+        {step === 1 ? t("register.title.step1") : t("register.title.step2")}
       </Typography>
 
-      {/* chips */}
       <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
-        <Chip label="1. Cuenta" color={step === 1 ? "primary" : "default"} variant={step === 1 ? "filled" : "outlined"} />
-        <Chip label="2. Hostel" color={step === 2 ? "primary" : "default"} variant={step === 2 ? "filled" : "outlined"} />
+        <Chip
+          label={t("register.steps.account")}
+          color={step === 1 ? "primary" : "default"}
+          variant={step === 1 ? "filled" : "outlined"}
+        />
+        <Chip
+          label={t("register.steps.hostel")}
+          color={step === 2 ? "primary" : "default"}
+          variant={step === 2 ? "filled" : "outlined"}
+        />
       </Box>
 
-      {message && <Alert sx={{ mt: 2 }} severity={message.type}>{message.text}</Alert>}
+      {message && (
+        <Alert sx={{ mt: 2 }} severity={message.type}>
+          {message.text}
+        </Alert>
+      )}
 
-      {/* STEP 1 */}
       <Collapse in={step === 1}>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
-          <TextField label="Email admin" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-          <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
+          <TextField
+            label={t("register.fields.email")}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          <TextField
+            label={t("register.fields.password")}
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+          />
           <Button variant="contained" onClick={handleCreateAccount}>
-            Continuar
+            {t("register.actions.continue")}
           </Button>
         </Box>
       </Collapse>
 
-      {/* STEP 2 */}
       <Collapse in={step === 2}>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            Cuenta creada: <b>{email.trim().toLowerCase()}</b> ✅
+            {t("register.messages.accountCreatedLabel")} <b>{email.trim().toLowerCase()}</b> ✅
           </Alert>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-            <TextField label="Nombre del hostel" value={hostelName} onChange={(e) => setHostelName(e.target.value)} />
             <TextField
-              label="Slug (URL)"
+              label={t("register.fields.hostelName")}
+              value={hostelName}
+              onChange={(e) => setHostelName(e.target.value)}
+            />
+            <TextField
+              label={t("register.fields.slug")}
               value={hostelSlug}
               onChange={(e) => setHostelSlug(e.target.value)}
-              helperText={normalizedSlug ? `Tu URL: /${normalizedSlug}` : "Ej: selina-palermo"}
+              helperText={
+                normalizedSlug
+                  ? t("register.helpers.yourUrl", { slug: normalizedSlug })
+                  : t("register.helpers.slugExample")
+              }
             />
             <Button variant="contained" onClick={handleCreateHostel}>
-              Crear hostel y entrar al panel
+              {t("register.actions.createHostel")}
             </Button>
           </Box>
         </Paper>

@@ -49,7 +49,7 @@ export default function AdminShell() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    navigate("/login", { replace: true });
+    navigate("/", { replace: true });
   };
 
   const handleViewSite = () => {

@@ -206,7 +206,7 @@ export default function RegisterPage() {
       <Collapse in={step === 2}>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            {t("register.messages.accountCreatedLabel")} <b>{email.trim().toLowerCase()}</b> ✅
+            {t("register.messages.accountCreatedLabel")} <b>{(auth.currentUser?.email ?? email).trim().toLowerCase()}</b>
           </Alert>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>

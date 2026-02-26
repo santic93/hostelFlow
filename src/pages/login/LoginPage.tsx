@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
 import { Container, Typography, TextField, Button, Alert, Stack } from "@mui/material";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, } from "firebase/auth";
 import { auth } from "../../services/firebase";
 import { Seo } from "../../components/Seo";
 import { useTranslation } from "react-i18next";
@@ -54,12 +54,12 @@ export default function LoginPage() {
         code === "auth/invalid-credential"
           ? t("login.errors.invalidCredentials")
           : code === "auth/user-not-found"
-          ? t("login.errors.userNotFound")
-          : code === "auth/wrong-password"
-          ? t("login.errors.wrongPassword")
-          : code
-          ? t("login.errors.genericWithCode", { code })
-          : t("login.errors.generic");
+            ? t("login.errors.userNotFound")
+            : code === "auth/wrong-password"
+              ? t("login.errors.wrongPassword")
+              : code
+                ? t("login.errors.genericWithCode", { code })
+                : t("login.errors.generic");
 
       setMsg({ type: "error", text });
     } finally {
@@ -67,24 +67,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleReset = async () => {
-    setMsg(null);
-
-    if (!email.trim()) {
-      return setMsg({ type: "error", text: t("login.errors.emailForReset") });
-    }
-
-    try {
-      setLoading(true);
-      await sendPasswordResetEmail(auth, email.trim());
-
-      setMsg({ type: "success", text: t("login.messages.resetSent") });
-    } catch {
-      setMsg({ type: "error", text: t("login.errors.resetFailed") });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <>
@@ -123,7 +105,7 @@ export default function LoginPage() {
             {loading ? t("login.actions.loggingIn") : t("login.actions.login")}
           </Button>
 
-          <Button variant="text" onClick={handleReset} disabled={loading}>
+          <Button component={RouterLink} to="/forgot-password" variant="text" disabled={loading}>
             {t("login.actions.forgotPassword")}
           </Button>
 

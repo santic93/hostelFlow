@@ -21,6 +21,8 @@ import DashboardSection from "./pages/admin/sections/DashboardSection";
 import RoomsSection from "./pages/admin/sections/RoomsSection";
 import AdminShell from "./layouts/admin/AdminShell";
 import ReservationsSection from "./pages/admin/sections/ReservationSecition";
+import ForgotPasswordPage from "./pages/ForgotPassword";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -31,6 +33,10 @@ export const router = createBrowserRouter([
       { path: "login", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "admin", element: <AdminRedirect /> },
+
+      // ✅ PASSWORD RESET (GLOBAL)
+      { path: "forgot-password", element: <ForgotPasswordPage /> },
+      { path: "reset-password", element: <ResetPasswordPage /> },
 
       // ✅ TENANT
       {

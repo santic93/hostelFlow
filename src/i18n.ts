@@ -623,6 +623,26 @@ const resources = {
           confirmed: "Confirmada",
           cancelled: "Cancelada",
           empty: "Ainda não há reservas.",
+      
+
+    seoTitle: "Reservas — REDSTAYS",
+    seoDescription: "Admin reservas",
+    columns: {
+      guest: "Hóspede",
+      room: "Quarto",
+      email: "Email",
+      checkIn: "Check In",
+      checkOut: "Check Out",
+      total: "Total",
+      status: "Status",
+      actions: "Ações",
+    },
+    statusValues: {
+      pending: "Pendente",
+      confirmed: "Confirmada",
+      cancelled: "Cancelada",
+    },
+  
         },
 
         shell: {

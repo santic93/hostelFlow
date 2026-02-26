@@ -13,8 +13,14 @@ import PublicIcon from "@mui/icons-material/Public";
 import { signOut } from "firebase/auth";
 import { auth } from "../../services/firebase";
 import { useAuth } from "../../context/AuthContext";
+import { useTranslation } from "react-i18next";
+
+
+type MenuKey = "dashboard" | "reservations" | "rooms";
 
 export default function AdminShell() {
+  const { t } = useTranslation();
+
   const [open, setOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width:900px)");
@@ -26,13 +32,20 @@ export default function AdminShell() {
   const location = useLocation();
 
   const menu = useMemo(
-    () => [
-      { label: "Dashboard", icon: <DashboardIcon />, to: "" },
-      { label: "Reservations", icon: <BookIcon />, to: "reservations" },
-      { label: "Rooms", icon: <MeetingRoomIcon />, to: "rooms" },
-    ],
+    () =>
+      [
+        { key: "dashboard" as const, icon: <DashboardIcon />, to: "" },
+        { key: "reservations" as const, icon: <BookIcon />, to: "reservations" },
+        { key: "rooms" as const, icon: <MeetingRoomIcon />, to: "rooms" },
+      ] as const,
     []
   );
+
+  const labelFor = (key: MenuKey) => {
+    if (key === "dashboard") return t("admin.shell.menu.dashboard");
+    if (key === "reservations") return t("admin.shell.menu.reservations");
+    return t("admin.shell.menu.rooms");
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -52,15 +65,20 @@ export default function AdminShell() {
 
         return (
           <ListItemButton
-            key={item.label}
+            key={item.key}
             component={RouterLink}
-            to={item.to} // rutas hijas
+            to={item.to} // rutas hijas: "", "rooms", "reservations"
             selected={selected}
             onClick={() => setMobileOpen(false)}
-            sx={{ mx: 1, borderRadius: 2 }}
+            sx={{
+              mx: 1,
+              borderRadius: 2,
+              "&.Mui-selected": { backgroundColor: "rgba(115, 2, 2, 0.10)" },
+              "&.Mui-selected:hover": { backgroundColor: "rgba(115, 2, 2, 0.16)" },
+            }}
           >
             <ListItemIcon sx={{ minWidth: 42 }}>{item.icon}</ListItemIcon>
-            {(open || isMobile) && <ListItemText primary={item.label} />}
+            {(open || isMobile) && <ListItemText primary={labelFor(item.key)} />}
           </ListItemButton>
         );
       })}
@@ -86,7 +104,10 @@ export default function AdminShell() {
             </IconButton>
           )}
 
-          <Typography sx={{ fontWeight: 800, letterSpacing: 1 }}>REDSTAYS</Typography>
+          <Typography sx={{ fontWeight: 800, letterSpacing: 1 }}>
+            {t("admin.shell.brand")}
+          </Typography>
+
           <Box sx={{ flexGrow: 1 }} />
 
           <Button
@@ -96,7 +117,7 @@ export default function AdminShell() {
             sx={{ mr: 2 }}
             disabled={!hostelSlug}
           >
-            Ver sitio
+            {t("admin.shell.viewSite")}
           </Button>
 
           <Typography sx={{ color: "text.secondary", mr: 2, display: { xs: "none", md: "block" } }}>
@@ -104,7 +125,7 @@ export default function AdminShell() {
           </Typography>
 
           <Button onClick={handleLogout} startIcon={<LogoutIcon />} variant="contained">
-            Salir
+            {t("admin.shell.logout")}
           </Button>
         </Toolbar>
       </AppBar>
@@ -133,7 +154,9 @@ export default function AdminShell() {
               boxSizing: "border-box",
               borderRight: "1px solid #eee",
               pt: 8,
+              transition: "width 0.25s",
             },
+            transition: "width 0.25s",
           }}
         >
           {DrawerContent}

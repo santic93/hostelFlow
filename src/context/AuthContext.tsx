@@ -5,6 +5,7 @@ import { doc, getDoc, onSnapshot, setDoc } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
 import { getOrCreateHostel } from "../services/hostelService";
 import HotelLoading from "../components/HotelLoading";
+import { t } from "i18next";
 
 
 type Role = "admin" | "guest";
@@ -112,7 +113,9 @@ export const AuthProvider = ({ children }: any) => {
   }, []);
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
-      {showLoading ? <HotelLoading text="Entrando al sistema..." /> : children}
+     {showLoading ? (
+  <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
+) : children}
     </AuthContext.Provider>
   );
 };

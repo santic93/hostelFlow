@@ -2,17 +2,26 @@ import { Box, Typography } from "@mui/material";
 import HotelIcon from "@mui/icons-material/Hotel";
 import LuggageIcon from "@mui/icons-material/Luggage";
 import CircularProgress from "@mui/material/CircularProgress";
+import { useTranslation } from "react-i18next";
 
 type Props = {
   text?: string;
+  subtitle?: string;
   fullScreen?: boolean;
 };
 
-export default function HotelLoading({ text = "Cargando...", fullScreen = true }: Props) {
-  const Wrapper = fullScreen ? Box : Box;
+export default function HotelLoading({
+  text,
+  subtitle,
+  fullScreen = true,
+}: Props) {
+  const { t } = useTranslation();
+
+  const title = text ?? t("loading.title");
+  const sub = subtitle ?? t("loading.subtitle");
 
   return (
-    <Wrapper
+    <Box
       sx={{
         minHeight: fullScreen ? "100vh" : "auto",
         display: "grid",
@@ -31,7 +40,6 @@ export default function HotelLoading({ text = "Cargando...", fullScreen = true }
         }}
       >
         <Box sx={{ position: "relative", height: 86, mb: 2 }}>
-          {/* Hotel */}
           <HotelIcon
             sx={{
               fontSize: 64,
@@ -43,7 +51,6 @@ export default function HotelLoading({ text = "Cargando...", fullScreen = true }
             }}
           />
 
-          {/* Valija “moviéndose” */}
           <LuggageIcon
             sx={{
               fontSize: 34,
@@ -51,7 +58,6 @@ export default function HotelLoading({ text = "Cargando...", fullScreen = true }
               position: "absolute",
               left: "50%",
               bottom: 0,
-              transform: "translateX(-50%)",
               animation: "suitcaseMove 1.2s ease-in-out infinite",
               "@keyframes suitcaseMove": {
                 "0%": { transform: "translateX(-60px)" },
@@ -62,16 +68,18 @@ export default function HotelLoading({ text = "Cargando...", fullScreen = true }
           />
         </Box>
 
-        <Typography sx={{ fontWeight: 600, mb: 1 }}>{text}</Typography>
+        <Typography sx={{ fontWeight: 700, mb: 1 }}>{title}</Typography>
 
         <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
           <CircularProgress size={22} />
         </Box>
 
-        <Typography variant="body2" sx={{ color: "text.secondary", mt: 2 }}>
-          Preparando tu panel de reservas…
-        </Typography>
+        {!!sub && (
+          <Typography variant="body2" sx={{ color: "text.secondary", mt: 2 }}>
+            {sub}
+          </Typography>
+        )}
       </Box>
-    </Wrapper>
+    </Box>
   );
 }

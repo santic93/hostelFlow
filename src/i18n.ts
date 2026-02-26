@@ -6,60 +6,60 @@ const resources = {
   es: {
     translation: {
       admin: {
-  reservations: {
-    title: "Reservas",
-    guest: "Huésped",
-    room: "Habitación",
-    email: "Email",
-    checkIn: "Check-in",
-    checkOut: "Check-out",
-    total: "Total",
-    status: "Estado",
-    actions: "Acciones",
-    pending: "Pendiente",
-    confirmed: "Confirmada",
-    cancelled: "Cancelada",
-    empty: "Todavía no hay reservas.",
-  },
- 
-  shell: {
-    brand: "REDSTAYS",
-    viewSite: "Ver sitio",
-    logout: "Salir",
-    menu: {
-      dashboard: "Dashboard",
-      reservations: "Reservas",
-      rooms: "Habitaciones",
-    },
-  
-},
+        reservations: {
+          title: "Reservas",
+          guest: "Huésped",
+          room: "Habitación",
+          email: "Email",
+          checkIn: "Check-in",
+          checkOut: "Check-out",
+          total: "Total",
+          status: "Estado",
+          actions: "Acciones",
+          pending: "Pendiente",
+          confirmed: "Confirmada",
+          cancelled: "Cancelada",
+          empty: "Todavía no hay reservas.",
+        },
+
+        shell: {
+          brand: "REDSTAYS",
+          viewSite: "Ver sitio",
+          logout: "Salir",
+          menu: {
+            dashboard: "Dashboard",
+            reservations: "Reservas",
+            rooms: "Habitaciones",
+          },
+
+        },
 
 
 
-  dashboard: {
-    title: "Dashboard",
-    configTitle: "Configuración del sitio",
-    defaultLanguageLabel: "Idioma predeterminado",
-    save: "Guardar",
-    saving: "Guardando...",
-    help: "Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes).",
-    msgSaved: "Idioma predeterminado actualizado ✅",
-    msgSaveError: "No se pudo guardar el idioma. Revisá permisos/reglas.",
-    cards: {
-      revenue: "Ingresos totales",
-      reservations: "Reservas totales",
-      rooms: "Habitaciones activas",
-    },
-    languages: {
-      es: "Español (ES)",
-      en: "English (EN)",
-      pt: "Português (PT)",
-    },
-  },
+        dashboard: {
+          title: "Dashboard",
+          configTitle: "Configuración del sitio",
+          defaultLanguageLabel: "Idioma predeterminado",
+          save: "Guardar",
+          saving: "Guardando...",
+          help: "Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes).",
+          msgSaved: "Idioma predeterminado actualizado ✅",
+          msgSaveError: "No se pudo guardar el idioma. Revisá permisos/reglas.",
+          cards: {
+            revenue: "Ingresos totales",
+            reservations: "Reservas totales",
+            rooms: "Habitaciones activas",
+          },
+          languages: {
+            es: "Español (ES)",
+            en: "English (EN)",
+            pt: "Português (PT)",
+          },
+        },
 
 
 
-},
+      },
       nav: {
         rooms: "HABITACIONES",
         contact: "CONTACTO",
@@ -128,65 +128,68 @@ const resources = {
         language: "Idioma",
       },
     },
-
+    loading: {
+      title: "Cargando...",
+      subtitle: "Preparando todo para vos…",
+    },
   },
   en: {
     translation: {
       admin: {
-  reservations: {
-    title: "Reservations",
-    guest: "Guest",
-    room: "Room",
-    email: "Email",
-    checkIn: "Check-in",
-    checkOut: "Check-out",
-    total: "Total",
-    status: "Status",
-    actions: "Actions",
-    pending: "Pending",
-    confirmed: "Confirmed",
-    cancelled: "Cancelled",
-    empty: "No reservations yet.",
-  },
+        reservations: {
+          title: "Reservations",
+          guest: "Guest",
+          room: "Room",
+          email: "Email",
+          checkIn: "Check-in",
+          checkOut: "Check-out",
+          total: "Total",
+          status: "Status",
+          actions: "Actions",
+          pending: "Pending",
+          confirmed: "Confirmed",
+          cancelled: "Cancelled",
+          empty: "No reservations yet.",
+        },
 
-  shell: {
-    brand: "REDSTAYS",
-    viewSite: "View site",
-    logout: "Logout",
-    menu: {
-      dashboard: "Dashboard",
-      reservations: "Reservations",
-      rooms: "Rooms",
-    },
-  
-},
+        shell: {
+          brand: "REDSTAYS",
+          viewSite: "View site",
+          logout: "Logout",
+          menu: {
+            dashboard: "Dashboard",
+            reservations: "Reservations",
+            rooms: "Rooms",
+          },
 
-
-  dashboard: {
-    title: "Dashboard",
-    configTitle: "Site settings",
-    defaultLanguageLabel: "Default language",
-    save: "Save",
-    saving: "Saving...",
-    help: "This sets the initial language guests will see when they enter the hostel site (if they haven’t chosen another one before).",
-    msgSaved: "Default language updated ✅",
-    msgSaveError: "Could not save the language. Check permissions/rules.",
-    cards: {
-      revenue: "Total revenue",
-      reservations: "Total reservations",
-      rooms: "Active rooms",
-    },
-    languages: {
-      es: "Spanish (ES)",
-      en: "English (EN)",
-      pt: "Portuguese (PT)",
-    },
-  },
+        },
 
 
+        dashboard: {
+          title: "Dashboard",
+          configTitle: "Site settings",
+          defaultLanguageLabel: "Default language",
+          save: "Save",
+          saving: "Saving...",
+          help: "This sets the initial language guests will see when they enter the hostel site (if they haven’t chosen another one before).",
+          msgSaved: "Default language updated ✅",
+          msgSaveError: "Could not save the language. Check permissions/rules.",
+          cards: {
+            revenue: "Total revenue",
+            reservations: "Total reservations",
+            rooms: "Active rooms",
+          },
+          languages: {
+            es: "Spanish (ES)",
+            en: "English (EN)",
+            pt: "Portuguese (PT)",
+          },
+        },
 
 
-},
+
+
+      },
       nav: {
         rooms: "ROOMS",
         contact: "CONTACT",
@@ -253,60 +256,68 @@ const resources = {
       common: {
         language: "Language",
       },
+      loading: {
+        title: "Loading...",
+        subtitle: "Getting everything ready…",
+      },
     },
   },
   pt: {
     translation: {
       admin: {
-  reservations: {
-    title: "Reservas",
-    guest: "Hóspede",
-    room: "Quarto",
-    email: "Email",
-    checkIn: "Check-in",
-    checkOut: "Check-out",
-    total: "Total",
-    status: "Status",
-    actions: "Ações",
-    pending: "Pendente",
-    confirmed: "Confirmada",
-    cancelled: "Cancelada",
-    empty: "Ainda não há reservas.",
-  },
+        reservations: {
+          title: "Reservas",
+          guest: "Hóspede",
+          room: "Quarto",
+          email: "Email",
+          checkIn: "Check-in",
+          checkOut: "Check-out",
+          total: "Total",
+          status: "Status",
+          actions: "Ações",
+          pending: "Pendente",
+          confirmed: "Confirmada",
+          cancelled: "Cancelada",
+          empty: "Ainda não há reservas.",
+        },
 
-  shell: {
-    brand: "REDSTAYS",
-    viewSite: "Ver site",
-    logout: "Sair",
-    menu: {
-      dashboard: "Dashboard",
-      reservations: "Reservas",
-      rooms: "Quartos",
-    },
-  },
+        shell: {
+          brand: "REDSTAYS",
+          viewSite: "Ver site",
+          logout: "Sair",
+          menu: {
+            dashboard: "Dashboard",
+            reservations: "Reservas",
+            rooms: "Quartos",
+          },
+        },
 
-  dashboard: {
-    title: "Dashboard",
-    configTitle: "Configurações do site",
-    defaultLanguageLabel: "Idioma padrão",
-    save: "Salvar",
-    saving: "Salvando...",
-    help: "Isso define o idioma inicial que os hóspedes verão ao entrar no site do hostel (se não tiverem escolhido outro antes).",
-    msgSaved: "Idioma padrão atualizado ✅",
-    msgSaveError: "Não foi possível salvar o idioma. Verifique permissões/regras.",
-    cards: {
-      revenue: "Receita total",
-      reservations: "Total de reservas",
-      rooms: "Quartos ativos",
-    },
-    languages: {
-      es: "Espanhol (ES)",
-      en: "Inglês (EN)",
-      pt: "Português (PT)",
-    },
-  },
+        dashboard: {
+          title: "Dashboard",
+          configTitle: "Configurações do site",
+          defaultLanguageLabel: "Idioma padrão",
+          save: "Salvar",
+          saving: "Salvando...",
+          help: "Isso define o idioma inicial que os hóspedes verão ao entrar no site do hostel (se não tiverem escolhido outro antes).",
+          msgSaved: "Idioma padrão atualizado ✅",
+          msgSaveError: "Não foi possível salvar o idioma. Verifique permissões/regras.",
+          cards: {
+            revenue: "Receita total",
+            reservations: "Total de reservas",
+            rooms: "Quartos ativos",
+          },
+          languages: {
+            es: "Espanhol (ES)",
+            en: "Inglês (EN)",
+            pt: "Português (PT)",
+          },
+        },
 
-},
+      },
+      loading: {
+        title: "Carregando...",
+        subtitle: "Preparando tudo para você…",
+      },
       nav: {
         rooms: "QUARTOS",
         contact: "CONTATO",

@@ -31,6 +31,7 @@ import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { useTranslation } from "react-i18next";
 
 import { db } from "../../services/firebase";
+import HotelLoading from "../../components/HotelLoading";
 
 export const BookingPage = () => {
   const navigate = useNavigate();
@@ -167,7 +168,7 @@ export const BookingPage = () => {
   }
 
   if (!hostelSlug) return null;
-
+if (loading) return <HotelLoading fullScreen={false} text={t("booking.processing")} subtitle="" />;
   return (
     <>
       <Button onClick={() => navigate(-1)} startIcon={<ArrowBackIosNewIcon />}>

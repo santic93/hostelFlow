@@ -127,14 +127,35 @@ const resources = {
       common: {
         language: "Idioma",
       },
-    },
+      tenant: {
+  loadingTitle: "Cargando hostel…",
+  loadingSubtitle: "Verificando disponibilidad del sitio…",
+  notFoundTitle: "Hostel no encontrado",
+  notFoundDesc: 'El link "{{slug}}" no existe. Revisá el slug o probá otro.',
+  actions: {
+    search: "Buscar hostel",
+    adminLogin: "Admin login",
+  },
+   },
     loading: {
       title: "Cargando...",
       subtitle: "Preparando todo para vos…",
     },
+},
+   
   },
   en: {
     translation: {
+      tenant: {
+  loadingTitle: "Loading hostel…",
+  loadingSubtitle: "Checking site availability…",
+  notFoundTitle: "Hostel not found",
+  notFoundDesc: 'The link "{{slug}}" does not exist. Check the slug or try another one.',
+  actions: {
+    search: "Find hostel",
+    adminLogin: "Admin login",
+  },
+},
       admin: {
         reservations: {
           title: "Reservations",
@@ -386,6 +407,16 @@ const resources = {
       common: {
         language: "Idioma",
       },
+      tenant: {
+  loadingTitle: "Carregando hostel…",
+  loadingSubtitle: "Verificando disponibilidade do site…",
+  notFoundTitle: "Hostel não encontrado",
+  notFoundDesc: 'O link "{{slug}}" não existe. Verifique o slug ou tente outro.',
+  actions: {
+    search: "Buscar hostel",
+    adminLogin: "Admin login",
+  },
+},
     },
   },
 };

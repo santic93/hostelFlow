@@ -284,7 +284,7 @@ const resources = {
         loadingTitle: "Cargando hostel…",
         loadingSubtitle: "Verificando disponibilidad del sitio…",
         notFoundTitle: "Hostel no encontrado",
-        notFoundDesc: 'El link "{{slug}}" no existe. Revisá el slug o probá otro.',
+        notFoundDesc: 'El link "{{slug}}" no existe. Revisá el nombre o probá otro.',
         actions: {
           search: "Buscar hostel",
           adminLogin: "Admin login",

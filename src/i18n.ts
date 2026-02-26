@@ -21,6 +21,18 @@ const resources = {
     cancelled: "Cancelada",
     empty: "Todavía no hay reservas.",
   },
+ 
+  shell: {
+    brand: "REDSTAYS",
+    viewSite: "Ver sitio",
+    logout: "Salir",
+    menu: {
+      dashboard: "Dashboard",
+      reservations: "Reservas",
+      rooms: "Habitaciones",
+    },
+  
+},
 },
       nav: {
         rooms: "HABITACIONES",
@@ -110,6 +122,18 @@ const resources = {
     cancelled: "Cancelled",
     empty: "No reservations yet.",
   },
+
+  shell: {
+    brand: "REDSTAYS",
+    viewSite: "View site",
+    logout: "Logout",
+    menu: {
+      dashboard: "Dashboard",
+      reservations: "Reservations",
+      rooms: "Rooms",
+    },
+  
+},
 },
       nav: {
         rooms: "ROOMS",
@@ -197,6 +221,18 @@ const resources = {
     cancelled: "Cancelada",
     empty: "Ainda não há reservas.",
   },
+
+  shell: {
+    brand: "REDSTAYS",
+    viewSite: "Ver site",
+    logout: "Sair",
+    menu: {
+      dashboard: "Dashboard",
+      reservations: "Reservas",
+      rooms: "Quartos",
+    },
+  },
+
 },
       nav: {
         rooms: "QUARTOS",

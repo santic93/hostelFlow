@@ -299,6 +299,15 @@ auth: {
   },
   en: {
     translation: {
+      errors: {
+  genericTitle: "Something went wrong",
+  genericDesc: "An unexpected error occurred.",
+  notFoundTitle: "Page not found (404)",
+  notFoundDesc: "The link does not exist or has been moved.",
+  goHome: "Go to home",
+  back: "Go back",
+  errorWithStatus: "Error {{status}}",
+},
       auth: {
         entering: "Signing in...",
         checkingSession: "Checking session...",
@@ -587,6 +596,15 @@ auth: {
   },
   pt: {
     translation: {
+      errors: {
+  genericTitle: "Algo deu errado",
+  genericDesc: "Ocorreu um erro inesperado.",
+  notFoundTitle: "Página não encontrada (404)",
+  notFoundDesc: "O link não existe ou foi movido.",
+  goHome: "Ir para o início",
+  back: "Voltar",
+  errorWithStatus: "Erro {{status}}",
+},
       auth: {
         entering: "Entrando...",
         checkingSession: "Verificando sessão...",

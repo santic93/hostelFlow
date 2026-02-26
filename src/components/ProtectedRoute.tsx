@@ -1,7 +1,6 @@
 import { Navigate, useParams } from "react-router-dom";
 import HotelLoading from "../components/HotelLoading";
 import { useAuth } from "../context/AuthContext";
-import type { JSX } from "react";
 
 export default function ProtectedRoute({ children }: { children: JSX.Element }) {
   const { user, role, hostelSlug: adminHostelSlug, loading } = useAuth();

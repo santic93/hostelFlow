@@ -37,6 +37,7 @@ export default function RegisterPage() {
   const normalizedSlug = useMemo(() => slugify(hostelSlug), [hostelSlug]);
 
   const handleCreateAccount = async () => {
+    if (loading) return;
     setMessage(null);
 
     const cleanEmail = email.trim().toLowerCase();
@@ -72,8 +73,8 @@ export default function RegisterPage() {
 
     setMessage(null);
 
-    const current = auth.currentUser;
-    if (!current) return setMessage({ type: "error", text: "Sesión no disponible. Reintentá." });
+const current = auth.currentUser ?? createdUser;
+if (!current) return setMessage({ type: "error", text: "Sesión no disponible. Reintentá." });
     if (!hostelName.trim()) return setMessage({ type: "error", text: "Ingresá el nombre del hostel" });
     if (!normalizedSlug) return setMessage({ type: "error", text: "Ingresá un slug válido" });
 
@@ -188,7 +189,7 @@ export default function RegisterPage() {
         </Alert>
       )}
       {/* STEP 2 (aparece solo cuando step=2) */}
-      <Collapse in={step === 2 && !!auth.currentUser}>
+  <Collapse in={step === 2 && !!createdUser}>
 
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
 

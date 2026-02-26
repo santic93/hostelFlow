@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Box, Typography, Chip, Select, MenuItem } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
-import { db } from "../../../services/firebase"; // ajustá si tu path es distinto
+import { useTranslation } from "react-i18next";
+import { db } from "../../../services/firebase";
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
@@ -20,6 +21,7 @@ type ReservationRow = {
 
 export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
+  const { t } = useTranslation();
   const [rows, setRows] = useState<ReservationRow[]>([]);
 
   const fetchReservations = async () => {
@@ -63,55 +65,68 @@ export default function ReservationsSection() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
   };
 
-  const columns: GridColDef<ReservationRow>[] = [
-    { field: "fullName", headerName: "Guest", flex: 1 },
-    { field: "roomName", headerName: "Room", flex: 1 },
-    { field: "email", headerName: "Email", flex: 1 },
-    {
-      field: "checkIn",
-      headerName: "Check In",
-      flex: 1,
-      valueGetter: (_, row) => (row.checkIn ? row.checkIn.toLocaleDateString() : "-"),
-    },
-    {
-      field: "checkOut",
-      headerName: "Check Out",
-      flex: 1,
-      valueGetter: (_, row) => (row.checkOut ? row.checkOut.toLocaleDateString() : "-"),
-    },
-    { field: "total", headerName: "Total", flex: 1, valueGetter: (_, row) => `$${row.total}` },
-    {
-      field: "status",
-      headerName: "Estado",
-      width: 150,
-      renderCell: (params) => {
-        const v = params.value as ReservationStatus;
-        const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
-        return <Chip label={v} color={color as any} />;
+  const statusLabel = (s: ReservationStatus) => {
+    if (s === "confirmed") return t("admin.reservations.confirmed");
+    if (s === "cancelled") return t("admin.reservations.cancelled");
+    return t("admin.reservations.pending");
+  };
+
+  const columns = useMemo<GridColDef<ReservationRow>[]>(() => {
+    return [
+      { field: "fullName", headerName: t("admin.reservations.guest"), flex: 1 },
+      { field: "roomName", headerName: t("admin.reservations.room"), flex: 1 },
+      { field: "email", headerName: t("admin.reservations.email"), flex: 1 },
+      {
+        field: "checkIn",
+        headerName: t("admin.reservations.checkIn"),
+        flex: 1,
+        valueGetter: (_, row) => (row.checkIn ? row.checkIn.toLocaleDateString() : "-"),
       },
-    },
-    {
-      field: "actions",
-      headerName: "Actions",
-      flex: 1.2,
-      renderCell: (params) => (
-        <Select
-          size="small"
-          value={params.row.status}
-          onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
-        >
-          <MenuItem value="pending">Pending</MenuItem>
-          <MenuItem value="confirmed">Confirmed</MenuItem>
-          <MenuItem value="cancelled">Cancelled</MenuItem>
-        </Select>
-      ),
-    },
-  ];
+      {
+        field: "checkOut",
+        headerName: t("admin.reservations.checkOut"),
+        flex: 1,
+        valueGetter: (_, row) => (row.checkOut ? row.checkOut.toLocaleDateString() : "-"),
+      },
+      {
+        field: "total",
+        headerName: t("admin.reservations.total"),
+        flex: 1,
+        valueGetter: (_, row) => `$${row.total}`,
+      },
+      {
+        field: "status",
+        headerName: t("admin.reservations.status"),
+        width: 160,
+        renderCell: (params) => {
+          const v = params.value as ReservationStatus;
+          const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
+          return <Chip label={statusLabel(v)} color={color as any} />;
+        },
+      },
+      {
+        field: "actions",
+        headerName: t("admin.reservations.actions"),
+        flex: 1.2,
+        renderCell: (params) => (
+          <Select
+            size="small"
+            value={params.row.status}
+            onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+          >
+            <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
+            <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
+            <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
+          </Select>
+        ),
+      },
+    ];
+  }, [t]);
 
   return (
     <>
       <Typography variant="h3" gutterBottom>
-        Reservations
+        {t("admin.reservations.title")}
       </Typography>
 
       <Box sx={{ height: 600, width: "100%" }}>
@@ -121,6 +136,9 @@ export default function ReservationsSection() {
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
           disableRowSelectionOnClick
+          localeText={{
+            noRowsLabel: t("admin.reservations.empty"),
+          }}
         />
       </Box>
     </>

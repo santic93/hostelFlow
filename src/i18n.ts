@@ -5,6 +5,23 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      admin: {
+  reservations: {
+    title: "Reservas",
+    guest: "Huésped",
+    room: "Habitación",
+    email: "Email",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    total: "Total",
+    status: "Estado",
+    actions: "Acciones",
+    pending: "Pendiente",
+    confirmed: "Confirmada",
+    cancelled: "Cancelada",
+    empty: "Todavía no hay reservas.",
+  },
+},
       nav: {
         rooms: "HABITACIONES",
         contact: "CONTACTO",
@@ -77,6 +94,23 @@ const resources = {
   },
   en: {
     translation: {
+      admin: {
+  reservations: {
+    title: "Reservations",
+    guest: "Guest",
+    room: "Room",
+    email: "Email",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    total: "Total",
+    status: "Status",
+    actions: "Actions",
+    pending: "Pending",
+    confirmed: "Confirmed",
+    cancelled: "Cancelled",
+    empty: "No reservations yet.",
+  },
+},
       nav: {
         rooms: "ROOMS",
         contact: "CONTACT",
@@ -147,6 +181,23 @@ const resources = {
   },
   pt: {
     translation: {
+      admin: {
+  reservations: {
+    title: "Reservas",
+    guest: "Hóspede",
+    room: "Quarto",
+    email: "Email",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    total: "Total",
+    status: "Status",
+    actions: "Ações",
+    pending: "Pendente",
+    confirmed: "Confirmada",
+    cancelled: "Cancelada",
+    empty: "Ainda não há reservas.",
+  },
+},
       nav: {
         rooms: "QUARTOS",
         contact: "CONTATO",

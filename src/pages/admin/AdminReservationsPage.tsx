@@ -1,19 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import {
-  Box,
-  Chip,
-  MenuItem,
-  Select,
-  Typography,
-} from "@mui/material";
-import type { GridColDef } from "@mui/x-data-grid";
-import { DataGrid } from "@mui/x-data-grid";
-import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
-
-import { db } from "../../services/firebase";
+import { Box, Chip, MenuItem, Select, Typography } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Seo } from "../../components/Seo";
+import { cancelReservation, setReservationStatus } from "../../services/reservations";
+import { db } from "../../firebase";
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
@@ -32,8 +25,9 @@ export default function AdminReservationsPage() {
   const { t } = useTranslation();
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const fetchReservations = async () => {
+  useEffect(() => {
     if (!hostelSlug) return;
 
     const q = query(
@@ -41,39 +35,41 @@ export default function AdminReservationsPage() {
       orderBy("createdAt", "desc")
     );
 
-    const snapshot = await getDocs(q);
-    const data: Reservation[] = snapshot.docs.map((docu) => {
-      const raw = docu.data() as any;
-      return {
-        id: docu.id,
-        fullName: raw.fullName ?? "",
-        roomName: raw.roomName ?? "",
-        email: raw.email ?? "",
-        total: raw.total ?? 0,
-        status: raw.status ?? "pending",
-        checkIn: raw.checkIn?.toDate?.() ?? null,
-        checkOut: raw.checkOut?.toDate?.() ?? null,
-      };
+    const unsub = onSnapshot(q, (snapshot) => {
+      const data: Reservation[] = snapshot.docs.map((docu) => {
+        const raw = docu.data() as any;
+        return {
+          id: docu.id,
+          fullName: raw.fullName ?? "",
+          roomName: raw.roomName ?? "",
+          email: raw.email ?? "",
+          total: raw.total ?? 0,
+          status: (raw.status ?? "pending") as ReservationStatus,
+          checkIn: raw.checkIn?.toDate?.() ?? null,
+          checkOut: raw.checkOut?.toDate?.() ?? null,
+        };
+      });
+
+      setReservations(data);
     });
 
-    setReservations(data);
-  };
-
-  useEffect(() => {
-    fetchReservations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsub();
   }, [hostelSlug]);
 
   const updateStatus = async (id: string, newStatus: ReservationStatus) => {
     if (!hostelSlug) return;
 
-    await updateDoc(doc(db, "hostels", hostelSlug, "reservations", id), {
-      status: newStatus,
-    });
+    try {
+      setBusyId(id);
 
-    setReservations((prev) =>
-      prev.map((res) => (res.id === id ? { ...res, status: newStatus } : res))
-    );
+      if (newStatus === "cancelled") {
+        await cancelReservation({ hostelSlug, reservationId: id });
+      } else {
+        await setReservationStatus({ hostelSlug, reservationId: id, newStatus });
+      }
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const columns = useMemo<GridColDef<Reservation>[]>(() => [
@@ -105,19 +101,9 @@ export default function AdminReservationsPage() {
       headerName: t("admin.reservations.columns.status"),
       width: 150,
       renderCell: (params) => {
-        const color =
-          params.value === "confirmed"
-            ? "success"
-            : params.value === "cancelled"
-            ? "error"
-            : "warning";
-
-        return (
-          <Chip
-            label={t(`admin.reservations.statusValues.${params.value}`)}
-            color={color as any}
-          />
-        );
+        const v = params.value as ReservationStatus;
+        const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
+        return <Chip label={t(`admin.reservations.statusValues.${v}`)} color={color as any} />;
       },
     },
     {
@@ -128,23 +114,16 @@ export default function AdminReservationsPage() {
         <Select
           size="small"
           value={params.row.status}
-          onChange={(e) =>
-            updateStatus(params.row.id, e.target.value as ReservationStatus)
-          }
+          disabled={busyId === params.row.id}
+          onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
         >
-          <MenuItem value="pending">
-            {t("admin.reservations.statusValues.pending")}
-          </MenuItem>
-          <MenuItem value="confirmed">
-            {t("admin.reservations.statusValues.confirmed")}
-          </MenuItem>
-          <MenuItem value="cancelled">
-            {t("admin.reservations.statusValues.cancelled")}
-          </MenuItem>
+          <MenuItem value="pending">{t("admin.reservations.statusValues.pending")}</MenuItem>
+          <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed")}</MenuItem>
+          <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled")}</MenuItem>
         </Select>
       ),
     },
-  ], [t]);
+  ], [t, busyId]);
 
   return (
     <>
@@ -163,9 +142,7 @@ export default function AdminReservationsPage() {
           rows={reservations}
           columns={columns}
           pageSizeOptions={[5, 10, 20]}
-          initialState={{
-            pagination: { paginationModel: { pageSize: 10, page: 0 } },
-          }}
+          initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
           disableRowSelectionOnClick
         />
       </Box>

@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================
+    // HELPERS (AUTH / ROLE)
+    // =========================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(userPath());
+    }
+
+    function userDoc() {
+      return get(userPath());
+    }
+
+    function isAdmin() {
+      return hasUserDoc() && userDoc().data.role == "admin";
+    }
+
+    function adminHostelSlug() {
+      return userDoc().data.hostelSlug;
+    }
+
+    function isAdminOfHostel(hostelSlug) {
+      return isAdmin() && adminHostelSlug() == hostelSlug;
+    }
+
+    // Evita acceso si el user doc está mal formado (defensa extra)
+    function userDocWellFormed() {
+      return hasUserDoc()
+        && (userDoc().data.role in ["admin", "guest"])
+        && (userDoc().data.hostelSlug is string || userDoc().data.hostelSlug == null);
+    }
+
+    // Validación simple de strings
+    function isNonEmptyString(v, minLen) {
+      return v is string && v.size() >= minLen;
+    }
+
+    // =========================
+    // USERS
+    // =========================
+    match /users/{uid} {
+
+      // Solo cada uno lee su documento
+      allow read: if isSignedIn() && request.auth.uid == uid;
+
+      // Creación inicial del user doc (desde tu Register o bootstrap)
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasAny(["role"]) // permite createdAt/email etc
+        && request.resource.data.role in ["admin", "guest"]
+        // hostelSlug solo si es admin (o null/vacío si guest)
+        && (
+          (request.resource.data.role == "admin" && isNonEmptyString(request.resource.data.hostelSlug, 2))
+          || (request.resource.data.role == "guest" && (request.resource.data.hostelSlug == null || request.resource.data.hostelSlug == ""))
+        );
+
+      // ✅ Anti auto-escalation + anti cambio de hostel
+      // El usuario NO puede cambiar role ni hostelSlug desde el cliente.
+      allow update: if isSignedIn()
+        && request.auth.uid == uid
+        && userDocWellFormed()
+        // No cambiar role ni hostelSlug
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.hostelSlug == resource.data.hostelSlug;
+
+      allow delete: if false;
+    }
+
+    // =========================
+    // HOSTELS
+    // =========================
+    match /hostels/{hostelSlug} {
+
+      // Público: leer datos del hostel para landing/catálogo
+      allow read: if true;
+
+      // Crear hostel: solo autenticado; ownerUid debe ser el que crea
+      // y slug debe coincidir con el docId
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasAll(["name", "slug", "ownerUid", "createdAt"])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.slug == hostelSlug
+        && isNonEmptyString(request.resource.data.name, 2)
+        && isNonEmptyString(request.resource.data.slug, 2);
+
+      // Update hostel: SOLO admin del mismo hostel
+      // y NO puede cambiar ownerUid ni slug
+      allow update: if isAdminOfHostel(hostelSlug)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.slug == resource.data.slug;
+
+      // En un SaaS vendible, borrar hostels desde cliente suele ser mala idea.
+      // Si lo querés habilitar, hacelo por backend/soporte.
+      allow delete: if false;
+
+      // =========================
+      // ROOMS
+      // =========================
+      match /rooms/{roomId} {
+
+        function validRoom() {
+          return request.resource.data.keys().hasAll(["name", "price", "capacity"])
+            && isNonEmptyString(request.resource.data.name, 2)
+            // price puede venir int/number
+            && (request.resource.data.price is int || request.resource.data.price is number)
+            && request.resource.data.price > 0
+            && (request.resource.data.capacity is int || request.resource.data.capacity is number)
+            && request.resource.data.capacity >= 1
+            // campos opcionales típicos
+            && (
+              !("description" in request.resource.data) || request.resource.data.description is string
+            )
+            && (
+              !("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list
+            )
+            && (
+              !("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list
+            );
+        }
+
+        // Público: leer habitaciones
+        allow read: if true;
+
+        // Admin del hostel: CRUD rooms
+        allow create: if isAdminOfHostel(hostelSlug) && validRoom();
+        allow update: if isAdminOfHostel(hostelSlug) && validRoom();
+        allow delete: if isAdminOfHostel(hostelSlug);
+      }
+
+      // =========================
+      // RESERVATIONS (SOURCE OF TRUTH)
+      // =========================
+      match /reservations/{reservationId} {
+
+        // ✅ SOLO admin del hostel puede leer
+        allow read: if isAdminOfHostel(hostelSlug);
+
+        // 🔒 NADIE escribe desde el cliente (anti-spam/anti-fraude)
+        // Solo Cloud Functions (Admin SDK) crea/edita/cancela.
+        allow create, update, delete: if false;
+      }
+
+      // =========================
+      // ROOM_NIGHTS (LOCKS anti solapamiento)
+      // =========================
+      match /room_nights/{lockId} {
+
+        // Mantener privado (no hace falta en cliente)
+        allow read: if false;
+
+        // 🔒 Solo backend (Admin SDK)
+        allow create, update, delete: if false;
+      }
+
+      // =========================
+      // (Opcional) Cualquier otra subcolección NO listada => denegar
+      // Esto evita "cosas raras" si alguien intenta inventar subcolecciones.
+      // =========================
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // =========================
+    // DENY BY DEFAULT fuera de /users y /hostels
+    // =========================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,54 +1,39 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import dayjs, { Dayjs } from "dayjs";
-import { useEffect, useState } from "react";
-import { DatePicker } from "@mui/x-date-pickers";
-// locales dayjs
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import "dayjs/locale/es";
+import "dayjs/locale/en";
 import "dayjs/locale/pt-br";
-// MUI date pickers locales
-
 import {
-  Button,
-  Stack,
+  Alert,
   Box,
-  Typography,
+  Button,
   Container,
   Grid,
+  Stack,
   TextField,
-  Alert,
+  Typography,
 } from "@mui/material";
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  serverTimestamp,
-  query,
-  where,
-  getDocs,
-} from "firebase/firestore";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
-import { useTranslation } from "react-i18next";
-
-import { db } from "../../services/firebase";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { doc, getDoc } from "firebase/firestore";
 import HotelLoading from "../../components/HotelLoading";
-
+import { createReservation } from "../../services/reservations";
+import { db } from "../../firebase";
+dayjs.extend(isSameOrBefore);
 export const BookingPage = () => {
   const navigate = useNavigate();
   const { hostelSlug, roomId } = useParams();
   const { t, i18n } = useTranslation();
 
-  // idioma corto: es | en | pt
   const lng = (i18n.language || "es").slice(0, 2);
-
-  // mapeo de dayjs locale
   const dayjsLocale = lng === "pt" ? "pt-br" : lng === "en" ? "en" : "es";
 
-  // setear dayjs locale cuando cambie el idioma
   useEffect(() => {
     dayjs.locale(dayjsLocale);
   }, [dayjsLocale]);
-
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
@@ -62,10 +47,9 @@ export const BookingPage = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // mensajes UX
   const [formError, setFormError] = useState<string | null>(null);
 
-  const isEmailValid = /^\S+@\S+\.\S+$/.test(email);
+  const isEmailValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
 
   useEffect(() => {
@@ -73,7 +57,6 @@ export const BookingPage = () => {
       if (!hostelSlug || !roomId) return;
 
       const docSnap = await getDoc(doc(db, "hostels", hostelSlug, "rooms", roomId));
-
       if (docSnap.exists()) {
         setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
       } else {
@@ -84,77 +67,66 @@ export const BookingPage = () => {
     fetchRoom();
   }, [hostelSlug, roomId]);
 
-  const nights = checkIn && checkOut ? Math.max(0, checkOut.diff(checkIn, "day")) : 0;
-  const total = selectedRoom && nights > 0 ? nights * selectedRoom.price : 0;
+  const nights = useMemo(() => {
+    if (!checkIn || !checkOut) return 0;
+    return Math.max(0, checkOut.diff(checkIn, "day"));
+  }, [checkIn, checkOut]);
+
+  const total = useMemo(() => {
+    if (!selectedRoom || nights <= 0) return 0;
+    return nights * Number(selectedRoom.price || 0);
+  }, [selectedRoom, nights]);
 
   const isFormValid =
-    !!selectedRoom && nights > 0 && fullName.trim().length > 2 && isEmailValid;
-
-  const checkAvailability = async () => {
-    if (!hostelSlug || !selectedRoom || !checkIn || !checkOut) return false;
-
-    const q = query(
-      collection(db, "hostels", hostelSlug, "reservations"),
-      where("roomId", "==", selectedRoom.id)
-    );
-
-    const snapshot = await getDocs(q);
-
-    const newCheckIn = checkIn.toDate();
-    const newCheckOut = checkOut.toDate();
-
-    for (const docSnap of snapshot.docs) {
-      const data = docSnap.data() as any;
-
-      if (data.status === "cancelled") continue;
-      if (!data.checkIn || !data.checkOut) continue;
-
-      const existingCheckIn = data.checkIn.toDate();
-      const existingCheckOut = data.checkOut.toDate();
-
-      const isOverlapping = newCheckIn < existingCheckOut && newCheckOut > existingCheckIn;
-      if (isOverlapping) return false;
-    }
-
-    return true;
-  };
+    !!hostelSlug &&
+    !!selectedRoom &&
+    nights > 0 &&
+    fullName.trim().length > 2 &&
+    isEmailValid;
 
   const handleConfirm = async () => {
     setFormError(null);
-
-    if (!isFormValid || !hostelSlug || !selectedRoom) return;
+    if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
     try {
       setLoading(true);
 
-      const available = await checkAvailability();
-      if (!available) {
-        setFormError(t("booking.unavailable"));
-        return;
-      }
-
-      await addDoc(collection(db, "hostels", hostelSlug, "reservations"), {
+      await createReservation({
+        hostelSlug,
         roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
-        pricePerNight: selectedRoom.price,
-        checkIn: checkIn?.toDate(),
-        checkOut: checkOut?.toDate(),
-        nights,
-        total,
-        fullName,
-        email,
-        status: "pending",
-        createdAt: serverTimestamp(),
+        checkInISO: checkIn.startOf("day").toDate().toISOString(),
+        checkOutISO: checkOut.startOf("day").toDate().toISOString(),
+        fullName: fullName.trim(),
+        email: email.trim().toLowerCase(),
       });
 
       setSuccess(true);
-    } catch (error) {
-      console.error("Error saving reservation:", error);
-      setFormError(t("booking.errorSaving"));
+    } catch (err: any) {
+      console.error("confirmReservation error:", err);
+
+      // Errores más comunes (function)
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("fechas no disponibles") || err?.code === "already-exists") {
+        setFormError(t("booking.unavailable"));
+      } else {
+        setFormError(t("booking.errorSaving"));
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (!hostelSlug) return null;
+
+  if (loading) {
+    return (
+      <HotelLoading
+        fullScreen={false}
+        text={t("booking.processing")}
+        subtitle=""
+      />
+    );
+  }
 
   if (success) {
     return (
@@ -167,8 +139,6 @@ export const BookingPage = () => {
     );
   }
 
-  if (!hostelSlug) return null;
-if (loading) return <HotelLoading fullScreen={false} text={t("booking.processing")} subtitle="" />;
   return (
     <>
       <Button onClick={() => navigate(-1)} startIcon={<ArrowBackIosNewIcon />}>
@@ -188,23 +158,28 @@ if (loading) return <HotelLoading fullScreen={false} text={t("booking.processing
 
         <Grid container spacing={8} sx={{ mt: 4 }}>
           {/* LEFT */}
-          <Grid size={{ xs: 12, md: 7 }}>
-              <Stack spacing={4}>
-                <DatePicker
-                  label={t("booking.checkIn")}
-                  value={checkIn}
-                  minDate={dayjs()}
-                  onChange={(newValue) => setCheckIn(newValue)}
-                />
+          <Grid sx={{xs: 12, md: 7}}>
+            <Stack spacing={4}>
+              <DatePicker
+                label={t("booking.checkIn")}
+                value={checkIn}
+                minDate={dayjs()}
+                onChange={(newValue) => {
+                  setCheckIn(newValue);
+                  // si el usuario cambia check-in y el check-out queda inválido, lo reseteo
+                  if (checkOut && newValue && checkOut.isSameOrBefore(newValue, "day")) {
+                    setCheckOut(null);
+                  }
+                }}
+              />
 
-                <DatePicker
-                  label={t("booking.checkOut")}
-                  value={checkOut}
-                  minDate={checkIn || dayjs()}
-                  onChange={(newValue) => setCheckOut(newValue)}
-                />
-              </Stack>
-       
+              <DatePicker
+                label={t("booking.checkOut")}
+                value={checkOut}
+                minDate={checkIn || dayjs()}
+                onChange={(newValue) => setCheckOut(newValue)}
+              />
+            </Stack>
 
             <Stack spacing={4} sx={{ mt: 6 }}>
               <TextField
@@ -229,15 +204,15 @@ if (loading) return <HotelLoading fullScreen={false} text={t("booking.processing
               variant="contained"
               fullWidth
               sx={{ mt: 6, py: 2 }}
-              disabled={!isFormValid || loading}
+              disabled={!isFormValid}
               onClick={handleConfirm}
             >
-              {loading ? t("booking.processing") : t("booking.confirm")}
+              {t("booking.confirm")}
             </Button>
           </Grid>
 
           {/* RIGHT */}
-          <Grid size={{ xs: 12, md: 5 }}>
+          <Grid sx={{ xs: 12, md: 5 }}>
             <Box
               sx={{
                 border: "1px solid #E0E0E0",
@@ -260,7 +235,9 @@ if (loading) return <HotelLoading fullScreen={false} text={t("booking.processing
                   <Box sx={{ borderTop: "1px solid #eee", my: 3 }} />
 
                   <Typography>
-                    {nights > 0 ? t("booking.summaryNights", { n: nights }) : t("booking.summarySelectDates")}
+                    {nights > 0
+                      ? t("booking.summaryNights", { n: nights })
+                      : t("booking.summarySelectDates")}
                   </Typography>
 
                   <Typography variant="h6" sx={{ mt: 2 }}>

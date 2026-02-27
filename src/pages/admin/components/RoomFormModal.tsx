@@ -8,6 +8,7 @@ import {
   Box,
   Typography,
   Alert,
+  Snackbar,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
@@ -26,7 +27,7 @@ type RoomFormValues = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  hostelSlug?: string; // puede venir de props, pero no confiamos 100%
+  hostelSlug?: string;
   initialData?: {
     id: string;
     name: string;
@@ -39,6 +40,12 @@ type Props = {
   onSuccess: () => void;
 };
 
+type ToastState = {
+  open: boolean;
+  message: string;
+  severity: "success" | "error" | "info";
+};
+
 export default function RoomFormModal({
   open,
   onClose,
@@ -49,7 +56,6 @@ export default function RoomFormModal({
   const { t } = useTranslation();
   const { hostelSlug: hostelSlugCtx, role, loading: authLoading } = useAuth();
 
-  // ✅ Fuente única real: si prop viene, ok; si no, uso contexto
   const resolvedHostelSlug = hostelSlugProp ?? hostelSlugCtx ?? null;
 
   const {
@@ -81,6 +87,12 @@ export default function RoomFormModal({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const [toast, setToast] = useState<ToastState>({
+    open: false,
+    message: "",
+    severity: "info",
+  });
+
   const totalCount = existingUrls.length + files.length;
 
   useEffect(() => {
@@ -106,8 +118,11 @@ export default function RoomFormModal({
       setPathsToDelete([]);
     }
 
+    // limpiar selección local
+    previews.forEach((p) => URL.revokeObjectURL(p));
     setFiles([]);
     setPreviews([]);
+
     setFormError(null);
   }, [initialData, reset, open]);
 
@@ -117,13 +132,17 @@ export default function RoomFormModal({
     };
   }, [previews]);
 
+  function openToast(severity: ToastState["severity"], message: string) {
+    setToast({ open: true, severity, message });
+  }
+
   function validateFileBasics(file: File) {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      throw new Error("Formato inválido. Usá JPG, PNG o WebP.");
+      throw new Error(t("admin.rooms.messages.invalidFormat"));
     }
     const mb = file.size / (1024 * 1024);
     if (mb > MAX_MB * 3) {
-      throw new Error(`La imagen es muy pesada (${mb.toFixed(2)}MB). Probá otra.`);
+      throw new Error(t("admin.rooms.messages.tooLargePre", { mb: mb.toFixed(2) }));
     }
   }
 
@@ -134,7 +153,7 @@ export default function RoomFormModal({
     try {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Imagen inválida"));
+        img.onerror = () => reject(new Error(t("admin.rooms.messages.invalidImage")));
         img.src = url;
       });
 
@@ -154,7 +173,7 @@ export default function RoomFormModal({
 
       const blob: Blob = await new Promise((resolve, reject) => {
         canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error("Error comprimiendo imagen"))),
+          (b) => (b ? resolve(b) : reject(new Error(t("admin.rooms.messages.compressFailed")))),
           "image/jpeg",
           0.82
         );
@@ -174,7 +193,7 @@ export default function RoomFormModal({
 
       const sizeMb = blob.size / (1024 * 1024);
       if (sizeMb > MAX_MB) {
-        throw new Error(`Una imagen quedó muy pesada (${sizeMb.toFixed(2)}MB). Probá otra.`);
+        throw new Error(t("admin.rooms.messages.tooLargeAfter", { mb: sizeMb.toFixed(2) }));
       }
 
       const safeName = `${Date.now()}_${file.name}`.replace(/\s+/g, "_");
@@ -197,9 +216,9 @@ export default function RoomFormModal({
   const readyForWrite = !authLoading && role === "admin" && Boolean(resolvedHostelSlug);
 
   const onSubmit = async (data: RoomFormValues) => {
-    // ✅ guard definitivo anti “slug null / race”
     if (!readyForWrite || !resolvedHostelSlug) {
-      setFormError("Cargando tu hostel... probá de nuevo en 1 segundo.");
+      setFormError(t("admin.rooms.messages.waitHostel"));
+      openToast("info", t("admin.rooms.messages.waitHostelToast"));
       return;
     }
 
@@ -254,196 +273,247 @@ export default function RoomFormModal({
         updatedAt: new Date(),
       });
 
+      // limpiar selección local
       previews.forEach((p) => URL.revokeObjectURL(p));
       setFiles([]);
       setPreviews([]);
       setPathsToDelete([]);
 
+      openToast("success", t("admin.rooms.messages.savedOk"));
+
       onSuccess();
       onClose();
     } catch (e: any) {
-      setFormError(e?.message || "Error guardando la habitación");
+      const msg = e?.message || t("admin.rooms.messages.saveError");
+      setFormError(msg);
+      openToast("error", msg);
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>
-        {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
-      </DialogTitle>
+    <>
+      <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
+        <DialogTitle>
+          {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
+        </DialogTitle>
 
-      <DialogContent>
-        <Box display="flex" flexDirection="column" gap={2} mt={1}>
-          {!readyForWrite && (
-            <Alert severity="info">
-              Cargando permisos/hostel… (esto evita errores 403 al subir imágenes)
-            </Alert>
-          )}
+        <DialogContent>
+          <Box display="flex" flexDirection="column" gap={2} mt={1}>
+            {!readyForWrite && (
+              <Alert severity="info">{t("admin.rooms.messages.loadingPermissions")}</Alert>
+            )}
 
-          <TextField
-            label={t("admin.rooms.form.name")}
-            {...register("name", { required: t("admin.rooms.errors.nameRequired") })}
-            error={!!errors.name}
-            helperText={errors.name?.message as any}
-          />
+            <TextField
+              label={t("admin.rooms.form.name")}
+              {...register("name", { required: t("admin.rooms.errors.nameRequired") })}
+              error={!!errors.name}
+              helperText={errors.name?.message as any}
+              disabled={saving}
+            />
 
-          <TextField
-            label={t("admin.rooms.form.price")}
-            type="number"
-            {...register("price", {
-              required: t("admin.rooms.errors.priceRequired"),
-              min: { value: 1, message: t("admin.rooms.errors.priceMin") },
-            })}
-            error={!!errors.price}
-            helperText={errors.price?.message as any}
-          />
+            <TextField
+              label={t("admin.rooms.form.price")}
+              type="number"
+              {...register("price", {
+                required: t("admin.rooms.errors.priceRequired"),
+                min: { value: 1, message: t("admin.rooms.errors.priceMin") },
+              })}
+              error={!!errors.price}
+              helperText={errors.price?.message as any}
+              disabled={saving}
+            />
 
-          <TextField
-            label={t("admin.rooms.form.capacity")}
-            type="number"
-            {...register("capacity", {
-              required: t("admin.rooms.errors.capacityRequired"),
-              min: { value: 1, message: t("admin.rooms.errors.capacityMin") },
-            })}
-            error={!!errors.capacity}
-            helperText={errors.capacity?.message as any}
-          />
+            <TextField
+              label={t("admin.rooms.form.capacity")}
+              type="number"
+              {...register("capacity", {
+                required: t("admin.rooms.errors.capacityRequired"),
+                min: { value: 1, message: t("admin.rooms.errors.capacityMin") },
+              })}
+              error={!!errors.capacity}
+              helperText={errors.capacity?.message as any}
+              disabled={saving}
+            />
 
-          <TextField
-            label={t("admin.rooms.form.description")}
-            multiline
-            rows={3}
-            {...register("description")}
-          />
+            <TextField
+              label={t("admin.rooms.form.description")}
+              multiline
+              rows={3}
+              {...register("description")}
+              disabled={saving}
+            />
 
-          {formError && (
-            <Alert severity="error" sx={{ mb: 1 }}>
-              {formError}
-            </Alert>
-          )}
+            {formError && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {formError}
+              </Alert>
+            )}
 
-          {existingUrls.length > 0 && (
+            {/* EXISTENTES */}
+            {existingUrls.length > 0 && (
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  {t("admin.rooms.messages.currentImages")}
+                </Typography>
+
+                <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                  {existingUrls.map((url, idx) => (
+                    <Box key={`${url}-${idx}`} sx={{ position: "relative" }}>
+                      <Box
+                        component="img"
+                        src={url}
+                        alt={`existing-${idx}`}
+                        sx={{
+                          width: 92,
+                          height: 72,
+                          objectFit: "cover",
+                          borderRadius: 2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          display: "block",
+                        }}
+                      />
+
+                      <Button
+                        size="small"
+                        color="error"
+                        disabled={saving}
+                        onClick={() => {
+                          const path = existingPaths[idx];
+                          if (path) setPathsToDelete((prev) => [...prev, path]);
+
+                          setExistingUrls((prev) => prev.filter((_, i) => i !== idx));
+                          setExistingPaths((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        sx={{ mt: 0.5 }}
+                      >
+                        {t("admin.rooms.actions.delete")}
+                      </Button>
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {/* SUBIR NUEVAS */}
             <Box>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Imágenes actuales
+              <Button
+                variant="outlined"
+                component="label"
+                disabled={!readyForWrite || totalCount >= MAX_IMAGES || saving}
+                sx={{ borderRadius: 999, textTransform: "none" }}
+              >
+                {t("admin.rooms.form.uploadImages")}
+                <input
+                  hidden
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const selected = Array.from(e.target.files ?? []);
+                    if (!selected.length) return;
+
+                    try {
+                      const remaining = Math.max(0, MAX_IMAGES - existingUrls.length - files.length);
+                      const limited = selected.slice(0, remaining);
+
+                      limited.forEach(validateFileBasics);
+
+                      const nextPreviews = limited.map((f) => URL.createObjectURL(f));
+                      setFiles((prev) => [...prev, ...limited]);
+                      setPreviews((prev) => [...prev, ...nextPreviews]);
+
+                      openToast("info", t("admin.rooms.messages.imagesSelected", { n: limited.length }));
+                    } catch (err: any) {
+                      const msg = err?.message ?? t("admin.rooms.messages.invalidFile");
+                      setFormError(msg);
+                      openToast("error", msg);
+                    } finally {
+                      e.currentTarget.value = "";
+                    }
+                  }}
+                />
+              </Button>
+
+              <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+                {t("admin.rooms.messages.imagesHelp", { max: MAX_IMAGES, mb: MAX_MB })}
               </Typography>
 
-              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-                {existingUrls.map((url, idx) => (
-                  <Box key={`${url}-${idx}`} sx={{ position: "relative" }}>
-                    <img
-                      src={url}
-                      alt={`existing-${idx}`}
-                      style={{
-                        width: 90,
-                        height: 70,
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
+                {previews.map((p, idx) => (
+                  <Box key={p} sx={{ position: "relative" }}>
+                    <Box
+                      component="img"
+                      src={p}
+                      alt={`preview-${idx}`}
+                      sx={{
+                        width: 92,
+                        height: 72,
                         objectFit: "cover",
-                        borderRadius: 8,
-                        border: "1px solid #eee",
+                        borderRadius: 2,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        display: "block",
                       }}
                     />
                     <Button
                       size="small"
                       color="error"
+                      disabled={saving}
                       onClick={() => {
-                        const path = existingPaths[idx];
-                        if (path) setPathsToDelete((prev) => [...prev, path]);
-
-                        setExistingUrls((prev) => prev.filter((_, i) => i !== idx));
-                        setExistingPaths((prev) => prev.filter((_, i) => i !== idx));
+                        URL.revokeObjectURL(p);
+                        setPreviews((prev) => prev.filter((x) => x !== p));
+                        setFiles((prev) => prev.filter((_, i) => i !== idx));
                       }}
+                      sx={{ mt: 0.5 }}
                     >
-                      Borrar
+                      {t("admin.rooms.form.remove")}
                     </Button>
                   </Box>
                 ))}
               </Box>
             </Box>
-          )}
-
-          <Box>
-            <Button
-              variant="outlined"
-              component="label"
-              disabled={!readyForWrite || totalCount >= MAX_IMAGES}
-            >
-              {t("uploadImages")}
-              <input
-                hidden
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  const selected = Array.from(e.target.files ?? []);
-                  if (!selected.length) return;
-
-                  try {
-                    const remaining = Math.max(0, MAX_IMAGES - existingUrls.length - files.length);
-                    const limited = selected.slice(0, remaining);
-
-                    limited.forEach(validateFileBasics);
-
-                    const nextPreviews = limited.map((f) => URL.createObjectURL(f));
-                    setFiles((prev) => [...prev, ...limited]);
-                    setPreviews((prev) => [...prev, ...nextPreviews]);
-                  } catch (err: any) {
-                    setFormError(err?.message ?? "Archivo inválido");
-                  } finally {
-                    e.currentTarget.value = "";
-                  }
-                }}
-              />
-            </Button>
-
-            <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
-              Máximo {MAX_IMAGES} imágenes. JPG/PNG/WebP. Final &lt;= {MAX_MB}MB (se comprimen).
-            </Typography>
-
-            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
-              {previews.map((p, idx) => (
-                <Box key={p} sx={{ position: "relative" }}>
-                  <img
-                    src={p}
-                    alt={`preview-${idx}`}
-                    style={{
-                      width: 90,
-                      height: 70,
-                      objectFit: "cover",
-                      borderRadius: 8,
-                      border: "1px solid #eee",
-                    }}
-                  />
-                  <Button
-                    size="small"
-                    color="error"
-                    onClick={() => {
-                      URL.revokeObjectURL(p);
-                      setPreviews((prev) => prev.filter((x) => x !== p));
-                      setFiles((prev) => prev.filter((_, i) => i !== idx));
-                    }}
-                  >
-                    {t("remove")}
-                  </Button>
-                </Box>
-              ))}
-            </Box>
           </Box>
-        </Box>
-      </DialogContent>
+        </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose}>{t("admin.rooms.common.cancel")}</Button>
+        <DialogActions>
+          <Button onClick={onClose} disabled={saving}>
+            {t("admin.rooms.common.cancel")}
+          </Button>
 
-        <Button
-          variant="contained"
-          onClick={handleSubmit(onSubmit)}
-          disabled={!isValid || saving || !readyForWrite}
+          <Button
+            variant="contained"
+            onClick={handleSubmit(onSubmit)}
+            disabled={!isValid || saving || !readyForWrite}
+            sx={{ borderRadius: 999 }}
+          >
+            {saving ? t("admin.rooms.common.saving") : t("admin.rooms.common.save")}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Toast moderno minimalista */}
+      <Snackbar
+        open={toast.open}
+        autoHideDuration={3200}
+        onClose={() => setToast((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setToast((p) => ({ ...p, open: false }))}
+          severity={toast.severity}
+          variant="filled"
+          sx={{
+            borderRadius: 3,
+            boxShadow: "0 16px 40px rgba(0,0,0,0.20)",
+            alignItems: "center",
+          }}
         >
-          {saving ? t("admin.rooms.common.saving") : t("admin.rooms.common.save")}
-        </Button>
-      </DialogActions>
-    </Dialog>
+          {toast.message}
+        </Alert>
+      </Snackbar>
+    </>
   );
 }

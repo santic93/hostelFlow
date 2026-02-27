@@ -111,12 +111,29 @@ const resources = {
 
 
         rooms: {
-
+          messages: {
+            loadingPermissions: "Cargando permisos/hostel… (evita errores al subir imágenes)",
+            waitHostel: "Cargando tu hostel... probá de nuevo en 1 segundo.",
+            waitHostelToast: "Cargando permisos… intentá de nuevo en un momento.",
+            savedOk: "Guardado ✅",
+            saveError: "Error guardando la habitación",
+            currentImages: "Imágenes actuales",
+            imagesSelected: "{{n}} imagen(es) seleccionada(s)",
+            imagesHelp: "Máximo {{max}} imágenes. JPG/PNG/WebP. Final <= {{mb}}MB (se comprimen).",
+            invalidFile: "Archivo inválido",
+            invalidFormat: "Formato inválido. Usá JPG, PNG o WebP.",
+            tooLargePre: "La imagen es muy pesada ({{mb}}MB). Probá otra.",
+            tooLargeAfter: "Una imagen quedó muy pesada luego de comprimir ({{mb}}MB). Probá otra.",
+            invalidImage: "Imagen inválida",
+            compressFailed: "Error comprimiendo imagen",
+          },
           modal: {
             editTitle: "Editar habitación",
             createTitle: "Crear habitación",
           },
           form: {
+            uploadImages: "Subir imágenes (hasta 6)",
+            remove: "Quitar",
             name: "Nombre",
             price: "Precio",
             capacity: "Capacidad",

@@ -111,6 +111,12 @@ const resources = {
 
 
         rooms: {
+
+          subtitle: "Elegí tu habitación y reservá en minutos.",
+          defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
+          noImageTitle: "Sin imagen",
+          noImageSubtitle: "Esta habitación todavía no tiene fotos.",
+
           messages: {
             loadingPermissions: "Cargando permisos/hostel… (evita errores al subir imágenes)",
             waitHostel: "Cargando tu hostel... probá de nuevo en 1 segundo.",

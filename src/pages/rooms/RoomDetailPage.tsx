@@ -3,17 +3,25 @@ import { useParams, Link as RouterLink } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { Container, Typography, Button, MobileStepper, Box } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
-import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
+
 import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
 import { useTranslation } from "react-i18next";
-import { GridKeyboardArrowRight } from "@mui/x-data-grid";
+import KeyboardArrowLeft from "@mui/icons-material/KeyboardArrowLeft";
+import KeyboardArrowRight from "@mui/icons-material/KeyboardArrowRight";
 
 function RoomCarousel({ urls, alt }: { urls: string[]; alt: string }) {
+  const { t } = useTranslation();
   const [active, setActive] = useState(0);
   const max = urls?.length ?? 0;
 
-  if (!max) return null;
+  if (!max) {
+    return (
+      <Box sx={{ mb: 3, p: 2, border: "1px solid #eee", borderRadius: 3, color: "text.secondary" }}>
+        {t("carousel.empty")}
+      </Box>
+    );
+  }
 
   const canBack = active > 0;
   const canNext = active < max - 1;
@@ -46,16 +54,20 @@ function RoomCarousel({ urls, alt }: { urls: string[]; alt: string }) {
           activeStep={active}
           nextButton={
             <Button size="small" onClick={() => setActive((p) => p + 1)} disabled={!canNext}>
-              Next <GridKeyboardArrowRight />
+              {t("carousel.next")} <KeyboardArrowRight />
             </Button>
           }
           backButton={
             <Button size="small" onClick={() => setActive((p) => p - 1)} disabled={!canBack}>
-              <KeyboardArrowLeftIcon/> Back
+              <KeyboardArrowLeft /> {t("carousel.back")}
             </Button>
           }
         />
       )}
+
+      <Box sx={{ mt: 0.5, fontSize: 12, color: "text.secondary", textAlign: "right" }}>
+        {t("carousel.of", { current: active + 1, total: max })}
+      </Box>
     </Box>
   );
 }
@@ -132,7 +144,7 @@ export const RoomDetailPage = () => {
       </Button>
 
       <Container sx={{ py: 10 }}>
-       <RoomCarousel urls={room.imageUrls ?? []} alt={room.name} />
+        <RoomCarousel urls={room.imageUrls ?? []} alt={room.name} />
 
         <Typography variant="h2" gutterBottom>
           {room.name}

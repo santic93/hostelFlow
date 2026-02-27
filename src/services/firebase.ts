@@ -4,13 +4,13 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { setPersistence, browserSessionPersistence } from "firebase/auth";
 const firebaseConfig = {
-    apiKey: "AIzaSyAj3dLovAcgdddUAxIxOCMmont0PIOjXXU",
-    authDomain: "hostelflow-dev.firebaseapp.com",
-    projectId: "hostelflow-dev",
-    storageBucket: "hostelflow-dev.firebasestorage.app",
-    messagingSenderId: "8613051030",
-    appId: "1:8613051030:web:fb6c6217e2c08d7c76e0b7",
-    measurementId: "G-68ZZ9J03HS"
+    apiKey:  import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket:import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);

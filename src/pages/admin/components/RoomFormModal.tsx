@@ -14,14 +14,12 @@ import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { db, storage } from "../../../services/firebase";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 type RoomFormValues = {
   name: string;
   price: number;
   capacity: number;
   description: string;
-  imageUrls?: string[]; // ✅ se guarda como array
 };
 
 type Props = {
@@ -35,6 +33,7 @@ type Props = {
     capacity: number;
     description: string;
     imageUrls?: string[];
+    imagePaths?: string[];
   } | null;
   onSuccess: () => void;
 };
@@ -47,6 +46,7 @@ export default function RoomFormModal({
   hostelSlug,
 }: Props) {
   const { t } = useTranslation();
+
   const {
     register,
     handleSubmit,
@@ -59,14 +59,24 @@ export default function RoomFormModal({
       price: 0,
       capacity: 1,
       description: "",
-      imageUrls: [],
     },
   });
 
+  const MAX_IMAGES = 6;
+  const MAX_MB = 2;
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+
+  const [existingUrls, setExistingUrls] = useState<string[]>([]);
+  const [existingPaths, setExistingPaths] = useState<string[]>([]);
+  const [pathsToDelete, setPathsToDelete] = useState<string[]>([]);
+
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const totalCount = existingUrls.length + files.length;
 
   useEffect(() => {
     if (initialData) {
@@ -75,26 +85,43 @@ export default function RoomFormModal({
         price: initialData.price,
         capacity: initialData.capacity,
         description: initialData.description,
-        imageUrls: initialData.imageUrls ?? [],
       });
+      setExistingUrls(initialData.imageUrls ?? []);
+      setExistingPaths(initialData.imagePaths ?? []);
+      setPathsToDelete([]);
     } else {
       reset({
         name: "",
         price: 0,
         capacity: 1,
         description: "",
-        imageUrls: [],
       });
+      setExistingUrls([]);
+      setExistingPaths([]);
+      setPathsToDelete([]);
     }
-  }, [initialData, reset]);
+
+    setFiles([]);
+    setPreviews([]);
+    setFormError(null);
+  }, [initialData, reset, open]);
+
   useEffect(() => {
     return () => {
       previews.forEach((p) => URL.revokeObjectURL(p));
     };
   }, [previews]);
 
-  const MAX_IMAGES = 6;
-  const MAX_MB = 2;
+  function validateFileBasics(file: File) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      throw new Error("Formato inválido. Usá JPG, PNG o WebP.");
+    }
+    // chequeo suave antes de comprimir (después exigimos <=2MB)
+    const mb = file.size / (1024 * 1024);
+    if (mb > MAX_MB * 3) {
+      throw new Error(`La imagen es muy pesada (${mb.toFixed(2)}MB). Probá otra.`);
+    }
+  }
 
   async function compressToJpeg(file: File): Promise<Blob> {
     const img = new Image();
@@ -118,6 +145,7 @@ export default function RoomFormModal({
 
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("No canvas");
+
       ctx.drawImage(img, 0, 0, w, h);
 
       const blob: Blob = await new Promise((resolve, reject) => {
@@ -134,10 +162,13 @@ export default function RoomFormModal({
     }
   }
 
-  async function uploadImages(hostelSlug: string, roomId: string, files: File[]) {
-    const urls: string[] = [];
+  // ✅ DEVUELVE url+path (no strings)
+  async function uploadImages(hostelId: string, roomId: string, filesToUpload: File[]) {
+    const uploaded: { url: string; path: string }[] = [];
 
-    for (const file of files) {
+    for (const file of filesToUpload) {
+      validateFileBasics(file);
+
       const blob = await compressToJpeg(file);
 
       const sizeMb = blob.size / (1024 * 1024);
@@ -146,15 +177,20 @@ export default function RoomFormModal({
       }
 
       const safeName = `${Date.now()}_${file.name}`.replace(/\s+/g, "_");
-      const path = `hostels/${hostelSlug}/rooms/${roomId}/${safeName}`;
+      const path = `hostels/${hostelId}/rooms/${roomId}/${safeName}`;
       const fileRef = ref(storage, path);
 
       await uploadBytes(fileRef, blob, { contentType: "image/jpeg" });
+
       const url = await getDownloadURL(fileRef);
-      urls.push(url);
+      uploaded.push({ url, path });
     }
 
-    return urls;
+    return uploaded;
+  }
+
+  async function deleteStorageByPath(path: string) {
+    await deleteObject(ref(storage, path));
   }
 
   const onSubmit = async (data: RoomFormValues) => {
@@ -164,6 +200,8 @@ export default function RoomFormModal({
     setSaving(true);
 
     try {
+      const hostelId = hostelSlug;
+
       const payloadBase = {
         name: data.name,
         price: Number(data.price),
@@ -171,40 +209,49 @@ export default function RoomFormModal({
         description: data.description ?? "",
       };
 
-      // ✅ 1) crear o usar roomId
       let roomId = initialData?.id;
 
+      // 1) crear o actualizar room base
       if (!roomId) {
-        const newRef = await addDoc(collection(db, "hostels", hostelSlug, "rooms"), {
+        const newRef = await addDoc(collection(db, "hostels", hostelId, "rooms"), {
           ...payloadBase,
           imageUrls: [],
+          imagePaths: [],
           createdAt: new Date(),
         });
         roomId = newRef.id;
       } else {
-        await updateDoc(doc(db, "hostels", hostelSlug, "rooms", roomId), {
+        await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
           ...payloadBase,
           updatedAt: new Date(),
         });
       }
 
-      // ✅ 2) subir nuevas imágenes
-      const newUrls = files.length ? await uploadImages(hostelSlug, roomId, files) : [];
+      // 2) borrar imágenes marcadas
+      if (pathsToDelete.length) {
+        await Promise.allSettled(pathsToDelete.map((p) => deleteStorageByPath(p)));
+      }
 
-      // ✅ 3) merge con existentes (las del doc actual)
-      const existing = (initialData?.imageUrls ?? []);
-      const finalUrls = [...existing, ...newUrls].slice(0, MAX_IMAGES);
+      // 3) subir nuevas imágenes
+      const uploaded = files.length ? await uploadImages(hostelId, roomId, files) : [];
+      const newUrls = uploaded.map((u) => u.url);
+      const newPaths = uploaded.map((u) => u.path);
 
-      // ✅ 4) guardar urls finales
-      await updateDoc(doc(db, "hostels", hostelSlug, "rooms", roomId), {
+      // 4) guardar arrays finales
+      const finalUrls = [...existingUrls, ...newUrls].slice(0, MAX_IMAGES);
+      const finalPaths = [...existingPaths, ...newPaths].slice(0, MAX_IMAGES);
+
+      await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
         imageUrls: finalUrls,
+        imagePaths: finalPaths,
         updatedAt: new Date(),
       });
 
-      // ✅ limpiar
+      // limpiar previews
       previews.forEach((p) => URL.revokeObjectURL(p));
       setFiles([]);
       setPreviews([]);
+      setPathsToDelete([]);
 
       onSuccess();
       onClose();
@@ -258,9 +305,56 @@ export default function RoomFormModal({
             rows={3}
             {...register("description")}
           />
-          {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
+
+          {formError && (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {formError}
+            </Alert>
+          )}
+
+          {/* ✅ EXISTENTES */}
+          {existingUrls.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Imágenes actuales
+              </Typography>
+
+              <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                {existingUrls.map((url, idx) => (
+                  <Box key={`${url}-${idx}`} sx={{ position: "relative" }}>
+                    <img
+                      src={url}
+                      alt={`existing-${idx}`}
+                      style={{
+                        width: 90,
+                        height: 70,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: "1px solid #eee",
+                      }}
+                    />
+                    <Button
+                      size="small"
+                      color="error"
+                      onClick={() => {
+                        const path = existingPaths[idx];
+                        if (path) setPathsToDelete((prev) => [...prev, path]);
+
+                        setExistingUrls((prev) => prev.filter((_, i) => i !== idx));
+                        setExistingPaths((prev) => prev.filter((_, i) => i !== idx));
+                      }}
+                    >
+                      Borrar
+                    </Button>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* ✅ SUBIR NUEVAS */}
           <Box>
-            <Button variant="outlined" component="label">
+            <Button variant="outlined" component="label" disabled={totalCount >= MAX_IMAGES}>
               {t("admin.rooms.form.uploadImages") ?? "Subir imágenes (hasta 6)"}
               <input
                 hidden
@@ -271,24 +365,26 @@ export default function RoomFormModal({
                   const selected = Array.from(e.target.files ?? []);
                   if (!selected.length) return;
 
-                  const max = 6;
-                  const roomImgsCount = (initialData?.imageUrls?.length ?? 0);
+                  try {
+                    const remaining = Math.max(0, MAX_IMAGES - existingUrls.length - files.length);
+                    const limited = selected.slice(0, remaining);
 
-                  // total permitido (existentes + nuevas)
-                  const remaining = Math.max(0, max - roomImgsCount - files.length);
-                  const limited = selected.slice(0, remaining);
+                    limited.forEach(validateFileBasics);
 
-                  const nextPreviews = limited.map((f) => URL.createObjectURL(f));
-                  setFiles((prev) => [...prev, ...limited]);
-                  setPreviews((prev) => [...prev, ...nextPreviews]);
-
-                  e.currentTarget.value = "";
+                    const nextPreviews = limited.map((f) => URL.createObjectURL(f));
+                    setFiles((prev) => [...prev, ...limited]);
+                    setPreviews((prev) => [...prev, ...nextPreviews]);
+                  } catch (err: any) {
+                    setFormError(err?.message ?? "Archivo inválido");
+                  } finally {
+                    e.currentTarget.value = "";
+                  }
                 }}
               />
             </Button>
 
             <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
-              Máximo 6 imágenes. Recomendado: JPG/PNG, hasta ~2MB.
+              Máximo {MAX_IMAGES} imágenes. JPG/PNG/WebP. Final &lt;= {MAX_MB}MB (se comprimen).
             </Typography>
 
             <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
@@ -297,7 +393,13 @@ export default function RoomFormModal({
                   <img
                     src={p}
                     alt={`preview-${idx}`}
-                    style={{ width: 90, height: 70, objectFit: "cover", borderRadius: 8, border: "1px solid #eee" }}
+                    style={{
+                      width: 90,
+                      height: 70,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                      border: "1px solid #eee",
+                    }}
                   />
                   <Button
                     size="small"
@@ -315,18 +417,12 @@ export default function RoomFormModal({
             </Box>
           </Box>
         </Box>
-
-
       </DialogContent>
 
       <DialogActions>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
 
-        <Button
-          variant="contained"
-          onClick={handleSubmit(onSubmit)}
-          disabled={!isValid || saving}
-        >
+        <Button variant="contained" onClick={handleSubmit(onSubmit)} disabled={!isValid || saving}>
           {saving ? t("common.saving") : t("common.save")}
         </Button>
       </DialogActions>

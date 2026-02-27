@@ -1,10 +1,9 @@
 export type Room = {
-  imageUrls: string[];
+  imageUrls?: string[];
   id: string;
   name: string;
   description?: string;
   price: number;
   capacity: number;
-  imageUrl?: string;
   createdAt?: Date;
 };

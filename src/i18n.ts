@@ -5,12 +5,15 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      uploadImages: "Subir imágenes (hasta 6)",
+      remove: "Quitar",
+      maxImagesHelp: "Máximo 6 imágenes. Recomendado: JPG/PNG, hasta ~2MB.",
       carousel: {
-  next: "Siguiente",
-  back: "Anterior",
-  of: "{{current}} de {{total}}",
-  empty: "Sin imágenes",
-},
+        next: "Siguiente",
+        back: "Anterior",
+        of: "{{current}} de {{total}}",
+        empty: "Sin imágenes",
+      },
       errors: {
         genericTitle: "Algo salió mal",
         genericDesc: "Ocurrió un error inesperado.",
@@ -305,12 +308,15 @@ const resources = {
   },
   en: {
     translation: {
+      uploadImages: "Upload images (up to 6)",
+      remove: "Remove",
+      maxImagesHelp: "Up to 6 images. Recommended: JPG/PNG, up to ~2MB.",
       carousel: {
-  next: "Next",
-  back: "Back",
-  of: "{{current}} of {{total}}",
-  empty: "No images",
-},
+        next: "Next",
+        back: "Back",
+        of: "{{current}} of {{total}}",
+        empty: "No images",
+      },
       errors: {
         genericTitle: "Something went wrong",
         genericDesc: "An unexpected error occurred.",
@@ -608,12 +614,15 @@ const resources = {
   },
   pt: {
     translation: {
+      uploadImages: "Enviar imagens (até 6)",
+      remove: "Remover",
+      maxImagesHelp: "Até 6 imagens. Recomendado: JPG/PNG, até ~2MB.",
       carousel: {
-  next: "Próxima",
-  back: "Anterior",
-  of: "{{current}} de {{total}}",
-  empty: "Sem imagens",
-},
+        next: "Próxima",
+        back: "Anterior",
+        of: "{{current}} de {{total}}",
+        empty: "Sem imagens",
+      },
       errors: {
         genericTitle: "Algo deu errado",
         genericDesc: "Ocorreu um erro inesperado.",

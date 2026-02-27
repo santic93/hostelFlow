@@ -5,6 +5,12 @@ import LanguageDetector from "i18next-browser-languagedetector";
 const resources = {
   es: {
     translation: {
+      carousel: {
+  next: "Siguiente",
+  back: "Anterior",
+  of: "{{current}} de {{total}}",
+  empty: "Sin imágenes",
+},
       errors: {
         genericTitle: "Algo salió mal",
         genericDesc: "Ocurrió un error inesperado.",
@@ -299,6 +305,12 @@ const resources = {
   },
   en: {
     translation: {
+      carousel: {
+  next: "Next",
+  back: "Back",
+  of: "{{current}} of {{total}}",
+  empty: "No images",
+},
       errors: {
         genericTitle: "Something went wrong",
         genericDesc: "An unexpected error occurred.",
@@ -596,6 +608,12 @@ const resources = {
   },
   pt: {
     translation: {
+      carousel: {
+  next: "Próxima",
+  back: "Anterior",
+  of: "{{current}} de {{total}}",
+  empty: "Sem imagens",
+},
       errors: {
         genericTitle: "Algo deu errado",
         genericDesc: "Ocorreu um erro inesperado.",

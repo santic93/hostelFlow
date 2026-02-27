@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { db, storage } from "../../../services/firebase";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { useAuth } from "../../../context/AuthContext";
 type RoomFormValues = {
   name: string;
   price: number;
@@ -25,7 +26,7 @@ type RoomFormValues = {
 type Props = {
   open: boolean;
   onClose: () => void;
-  hostelSlug?: string;
+  hostelSlug?: string; // puede venir de props, pero no confiamos 100%
   initialData?: {
     id: string;
     name: string;
@@ -43,9 +44,13 @@ export default function RoomFormModal({
   onClose,
   initialData,
   onSuccess,
-  hostelSlug,
+  hostelSlug: hostelSlugProp,
 }: Props) {
   const { t } = useTranslation();
+  const { hostelSlug: hostelSlugCtx, role, loading: authLoading } = useAuth();
+
+  // ✅ Fuente única real: si prop viene, ok; si no, uso contexto
+  const resolvedHostelSlug = hostelSlugProp ?? hostelSlugCtx ?? null;
 
   const {
     register,
@@ -116,7 +121,6 @@ export default function RoomFormModal({
     if (!ALLOWED_TYPES.includes(file.type)) {
       throw new Error("Formato inválido. Usá JPG, PNG o WebP.");
     }
-    // chequeo suave antes de comprimir (después exigimos <=2MB)
     const mb = file.size / (1024 * 1024);
     if (mb > MAX_MB * 3) {
       throw new Error(`La imagen es muy pesada (${mb.toFixed(2)}MB). Probá otra.`);
@@ -162,13 +166,10 @@ export default function RoomFormModal({
     }
   }
 
-  // ✅ DEVUELVE url+path (no strings)
   async function uploadImages(hostelId: string, roomId: string, filesToUpload: File[]) {
     const uploaded: { url: string; path: string }[] = [];
 
     for (const file of filesToUpload) {
-      validateFileBasics(file);
-
       const blob = await compressToJpeg(file);
 
       const sizeMb = blob.size / (1024 * 1024);
@@ -193,14 +194,20 @@ export default function RoomFormModal({
     await deleteObject(ref(storage, path));
   }
 
+  const readyForWrite = !authLoading && role === "admin" && Boolean(resolvedHostelSlug);
+
   const onSubmit = async (data: RoomFormValues) => {
-    if (!hostelSlug) return;
+    // ✅ guard definitivo anti “slug null / race”
+    if (!readyForWrite || !resolvedHostelSlug) {
+      setFormError("Cargando tu hostel... probá de nuevo en 1 segundo.");
+      return;
+    }
 
     setFormError(null);
     setSaving(true);
 
     try {
-      const hostelId = hostelSlug;
+      const hostelId = resolvedHostelSlug;
 
       const payloadBase = {
         name: data.name,
@@ -211,7 +218,7 @@ export default function RoomFormModal({
 
       let roomId = initialData?.id;
 
-      // 1) crear o actualizar room base
+      // 1) crear o actualizar base
       if (!roomId) {
         const newRef = await addDoc(collection(db, "hostels", hostelId, "rooms"), {
           ...payloadBase,
@@ -227,17 +234,17 @@ export default function RoomFormModal({
         });
       }
 
-      // 2) borrar imágenes marcadas
+      // 2) borrar marcadas
       if (pathsToDelete.length) {
         await Promise.allSettled(pathsToDelete.map((p) => deleteStorageByPath(p)));
       }
 
-      // 3) subir nuevas imágenes
+      // 3) subir nuevas
       const uploaded = files.length ? await uploadImages(hostelId, roomId, files) : [];
       const newUrls = uploaded.map((u) => u.url);
       const newPaths = uploaded.map((u) => u.path);
 
-      // 4) guardar arrays finales
+      // 4) finales
       const finalUrls = [...existingUrls, ...newUrls].slice(0, MAX_IMAGES);
       const finalPaths = [...existingPaths, ...newPaths].slice(0, MAX_IMAGES);
 
@@ -247,7 +254,6 @@ export default function RoomFormModal({
         updatedAt: new Date(),
       });
 
-      // limpiar previews
       previews.forEach((p) => URL.revokeObjectURL(p));
       setFiles([]);
       setPreviews([]);
@@ -270,6 +276,12 @@ export default function RoomFormModal({
 
       <DialogContent>
         <Box display="flex" flexDirection="column" gap={2} mt={1}>
+          {!readyForWrite && (
+            <Alert severity="info">
+              Cargando permisos/hostel… (esto evita errores 403 al subir imágenes)
+            </Alert>
+          )}
+
           <TextField
             label={t("admin.rooms.form.name")}
             {...register("name", { required: t("admin.rooms.errors.nameRequired") })}
@@ -312,7 +324,6 @@ export default function RoomFormModal({
             </Alert>
           )}
 
-          {/* ✅ EXISTENTES */}
           {existingUrls.length > 0 && (
             <Box>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
@@ -352,10 +363,13 @@ export default function RoomFormModal({
             </Box>
           )}
 
-          {/* ✅ SUBIR NUEVAS */}
           <Box>
-            <Button variant="outlined" component="label" disabled={totalCount >= MAX_IMAGES}>
-              {t("admin.rooms.form.uploadImages") ?? "Subir imágenes (hasta 6)"}
+            <Button
+              variant="outlined"
+              component="label"
+              disabled={!readyForWrite || totalCount >= MAX_IMAGES}
+            >
+              {t("uploadImages")}
               <input
                 hidden
                 type="file"
@@ -410,7 +424,7 @@ export default function RoomFormModal({
                       setFiles((prev) => prev.filter((_, i) => i !== idx));
                     }}
                   >
-                    Quitar
+                    {t("remove")}
                   </Button>
                 </Box>
               ))}
@@ -420,10 +434,14 @@ export default function RoomFormModal({
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onClose}>{t("common.cancel")}</Button>
+        <Button onClick={onClose}>{t("admin.rooms.common.cancel")}</Button>
 
-        <Button variant="contained" onClick={handleSubmit(onSubmit)} disabled={!isValid || saving}>
-          {saving ? t("common.saving") : t("common.save")}
+        <Button
+          variant="contained"
+          onClick={handleSubmit(onSubmit)}
+          disabled={!isValid || saving || !readyForWrite}
+        >
+          {saving ? t("admin.rooms.common.saving") : t("admin.rooms.common.save")}
         </Button>
       </DialogActions>
     </Dialog>

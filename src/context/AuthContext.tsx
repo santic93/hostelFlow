@@ -2,9 +2,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../services/firebase";
-
 import HotelLoading from "../components/HotelLoading";
-import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 
 type Role = "admin" | "guest";
 
@@ -23,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: any) => {
+  const { t } = useTranslation();
+
   const [user, setUser] = useState<User | null>(null);
   const [hostelSlug, setHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
@@ -31,15 +32,14 @@ export const AuthProvider = ({ children }: any) => {
   const MIN_LOADING_MS = 1400;
   const [showLoading, setShowLoading] = useState(true);
 
+  // Loader “mínimo” para que no parpadee
   useEffect(() => {
     let timer: number | undefined;
 
     if (loading) {
       setShowLoading(true);
     } else {
-      timer = window.setTimeout(() => {
-        setShowLoading(false);
-      }, MIN_LOADING_MS);
+      timer = window.setTimeout(() => setShowLoading(false), MIN_LOADING_MS);
     }
 
     return () => {
@@ -51,6 +51,7 @@ export const AuthProvider = ({ children }: any) => {
     let unsubscribeUserDoc: (() => void) | null = null;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // limpio sub anterior si existía
       if (unsubscribeUserDoc) {
         unsubscribeUserDoc();
         unsubscribeUserDoc = null;
@@ -82,10 +83,10 @@ export const AuthProvider = ({ children }: any) => {
 
           const data = snap.data() as any;
           const nextRole: Role = data?.role === "admin" ? "admin" : "guest";
+          const nextSlug = nextRole === "admin" ? (data?.hostelSlug ?? null) : null;
 
           setRole(nextRole);
-          setHostelSlug(nextRole === "admin" ? data?.hostelSlug ?? null : null);
-
+          setHostelSlug(nextSlug);
           setLoading(false);
         },
         () => {
@@ -105,10 +106,7 @@ export const AuthProvider = ({ children }: any) => {
   return (
     <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
       {showLoading ? (
-        <HotelLoading
-          text={t("auth.entering")}
-          subtitle={t("auth.checkingSession")}
-        />
+        <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
       ) : (
         children
       )}

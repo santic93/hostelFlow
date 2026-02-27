@@ -34,7 +34,7 @@ export const RoomsPage = () => {
                     price: raw.price ?? 0,
                     capacity: raw.capacity ?? 1,
                     description: raw.description ?? "",
-                    imageUrl: raw.imageUrl ?? "",
+                    imageUrls: raw.imageUrls ?? (raw.imageUrl ? [raw.imageUrl] : []),
                 };
             });
 
@@ -68,7 +68,7 @@ export const RoomsPage = () => {
                     {rooms.map((room) => (
                         <Grid key={room.id} sx={{ xs: 12, md: 4 }}>
                             <SafeImage
-                                src={room.imageUrl}
+                              src={room.imageUrls?.[0] || ""}
                                 alt={room.name}
                                 sx={{ mb: 3 }}
                             />

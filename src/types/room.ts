@@ -1,4 +1,5 @@
 export type Room = {
+  imageUrls: string[];
   id: string;
   name: string;
   description?: string;

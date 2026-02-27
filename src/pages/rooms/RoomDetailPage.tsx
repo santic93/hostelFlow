@@ -1,14 +1,64 @@
 import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
-import { Container, Typography, Button } from "@mui/material";
+import { Container, Typography, Button, MobileStepper, Box } from "@mui/material";
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
+import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
-import SafeImage from "../../components/SafeImage";
 import { useTranslation } from "react-i18next";
+import { GridKeyboardArrowRight } from "@mui/x-data-grid";
 
+function RoomCarousel({ urls, alt }: { urls: string[]; alt: string }) {
+  const [active, setActive] = useState(0);
+  const max = urls?.length ?? 0;
 
+  if (!max) return null;
+
+  const canBack = active > 0;
+  const canNext = active < max - 1;
+
+  return (
+    <Box sx={{ mb: 3 }}>
+      <Box
+        sx={{
+          width: "100%",
+          height: { xs: 240, sm: 320 },
+          borderRadius: 3,
+          overflow: "hidden",
+          border: "1px solid #eee",
+          mb: 1,
+          backgroundColor: "#fafafa",
+        }}
+      >
+        <img
+          src={urls[active]}
+          alt={alt}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      </Box>
+
+      {max > 1 && (
+        <MobileStepper
+          variant="dots"
+          steps={max}
+          position="static"
+          activeStep={active}
+          nextButton={
+            <Button size="small" onClick={() => setActive((p) => p + 1)} disabled={!canNext}>
+              Next <GridKeyboardArrowRight />
+            </Button>
+          }
+          backButton={
+            <Button size="small" onClick={() => setActive((p) => p - 1)} disabled={!canBack}>
+              <KeyboardArrowLeftIcon/> Back
+            </Button>
+          }
+        />
+      )}
+    </Box>
+  );
+}
 
 export const RoomDetailPage = () => {
   const { hostelSlug, id } = useParams<{ hostelSlug: string; id: string }>();
@@ -37,7 +87,7 @@ export const RoomDetailPage = () => {
         price: raw.price ?? 0,
         capacity: raw.capacity ?? 1,
         description: raw.description ?? "",
-        imageUrl: raw.imageUrl ?? "",
+        imageUrls: raw.imageUrls ?? (raw.imageUrl ? [raw.imageUrl] : []),
       });
       setLoading(false);
     };
@@ -82,7 +132,7 @@ export const RoomDetailPage = () => {
       </Button>
 
       <Container sx={{ py: 10 }}>
-        <SafeImage src={room.imageUrl} alt={room.name} sx={{ mb: 3 }} />
+       <RoomCarousel urls={room.imageUrls ?? []} alt={room.name} />
 
         <Typography variant="h2" gutterBottom>
           {room.name}

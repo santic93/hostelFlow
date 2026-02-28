@@ -543,29 +543,24 @@ export const cancelReservation = onCall(
     return { ok: true };
   }
 );
-/**
- * createHostel (AUTH REQUIRED)
- * data: { name, slug }
- * Crea:
- * - hostels/{slug}
- * - hostels/{slug}/members/{uid} role=owner
- * - users/{uid}.activeHostelSlug = slug
- */
 export const createHostel = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (req) => {
-    assert(req.auth, "unauthenticated", "Requiere login");
 
-    const uid = req.auth!.uid;
+    if (!req.auth) {
+      throw new HttpsError("unauthenticated", "Requiere login");
+    }
+
+    const uid = req.auth.uid;
+
     const name = String(req.data?.name || "").trim();
     const slug = String(req.data?.slug || "").trim();
 
-    // ✅ validaciones
     assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
     assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
     assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
 
-    // ✅ sacamos esto de la transaction
+    // ⚠️ Esto puede ir afuera de la tx sin problema
     const userRecord = await admin.auth().getUser(uid);
     const email = String(userRecord.email || "").toLowerCase();
 
@@ -574,9 +569,15 @@ export const createHostel = onCall(
     const userRef = db.doc(`users/${uid}`);
 
     await db.runTransaction(async (tx) => {
-      const existingHostel = await tx.get(hostelRef);
-      assert(!existingHostel.exists, "already-exists", "Ese slug ya existe");
+      // ✅ 1) READS PRIMERO (todos)
+      const [hostelSnap, userSnap] = await Promise.all([
+        tx.get(hostelRef),
+        tx.get(userRef),
+      ]);
 
+      assert(!hostelSnap.exists, "already-exists", "Ese slug ya existe");
+
+      // ✅ 2) WRITES DESPUÉS (todos)
       tx.set(hostelRef, {
         name,
         slug,
@@ -591,7 +592,6 @@ export const createHostel = onCall(
         createdBy: uid,
       });
 
-      const userSnap = await tx.get(userRef);
       if (!userSnap.exists) {
         tx.set(userRef, {
           email,
@@ -607,6 +607,10 @@ export const createHostel = onCall(
   }
 );
 
+// Si ya existe en tu archivo, NO dupliques esta función:
+function isNonEmptyString(v: any, minLen: number) {
+  return typeof v === "string" && v.trim().length >= minLen;
+}
 
 /**
  * removeMember (MANAGER+)
@@ -635,6 +639,3 @@ export const removeMember = onCall(
     return { ok: true };
   }
 );
-function isNonEmptyString(v: any, minLen: number) {
-  return typeof v === "string" && v.trim().length >= minLen;
-}

@@ -27,8 +27,8 @@ import { signOut } from "firebase/auth";
 import { auth } from "../../../services/firebase";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../providers/AuthContext";
-
-type MenuKey = "dashboard" | "reservations" | "rooms" | "members";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
+type MenuKey = "dashboard" | "reservations" | "rooms" | "members" | "emails";
 
 export default function AdminShell() {
   const { t } = useTranslation();
@@ -49,6 +49,7 @@ export default function AdminShell() {
       { key: "reservations" as const, icon: <BookIcon />, to: "reservations" },
       { key: "rooms" as const, icon: <MeetingRoomIcon />, to: "rooms" },
       { key: "members" as const, icon: <GroupIcon />, to: "members" }, // ✅ NEW
+      { key: "emails" as const, icon: <MailOutlineIcon />, to: "emails" },
     ],
     []
   );
@@ -57,6 +58,7 @@ export default function AdminShell() {
     if (key === "dashboard") return t("admin.shell.menu.dashboard");
     if (key === "reservations") return t("admin.shell.menu.reservations");
     if (key === "rooms") return t("admin.shell.menu.rooms");
+    if (key === "emails") return "Email Logs";
     return t("admin.shell.menu.members", "Members");
   };
 

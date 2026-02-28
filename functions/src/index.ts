@@ -623,7 +623,6 @@ export const removeMember = onCall(
 
     await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
 
-    // no permitir que se borre a sí mismo si es owner (opcional, para evitar romper el hostel)
     if (uid === targetUid) {
       throw new HttpsError("failed-precondition", "No podés eliminarte a vos mismo");
     }
@@ -633,9 +632,6 @@ export const removeMember = onCall(
     return { ok: true };
   }
 );
-
-
-
 function isNonEmptyString(v: any, minLen: number) {
   return typeof v === "string" && v.trim().length >= minLen;
 }

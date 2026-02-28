@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
 import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
-import { doc, runTransaction, serverTimestamp } from "firebase/firestore";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip, Paper } from "@mui/material";
-import { auth, db } from "../../services/firebase";
+import { auth, functions } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 import { useTranslation } from "react-i18next";
+import { httpsCallable } from "firebase/functions";
 
 
 function slugify(input: string) {
@@ -83,68 +83,48 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+const handleCreateHostel = async () => {
+  if (loading) return;
+  setMessage(null);
 
-  const handleCreateHostel = async () => {
-    if (loading) return;
-    setMessage(null);
+  const current = auth.currentUser ?? createdUser;
+  if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
 
-    const current = auth.currentUser ?? createdUser;
-    if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
+  if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
+  if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
 
-    if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
-    if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
+  try {
+    setLoading(true);
 
+    const createHostel = httpsCallable(functions, "createHostel");
+
+    await createHostel({
+      name: hostelName.trim(),
+      slug: normalizedSlug,
+    });
+
+    setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
+    navigate("/admin", { replace: true });
+  } catch (err: any) {
+    console.error(err);
+
+    // si el usuario se creó recién y falla el alta del hostel, borrarlo (tu lógica)
     try {
-      setLoading(true);
+      if (auth.currentUser) await deleteUser(auth.currentUser);
+    } catch {}
 
-      const uid = current.uid;
+    setCreatedUser(null);
 
-      await runTransaction(db, async (tx) => {
-        const hostelRef = doc(db, "hostels", normalizedSlug);
-        const hostelSnap = await tx.get(hostelRef);
-        if (hostelSnap.exists()) throw new Error("SLUG_TAKEN");
-
-        tx.set(hostelRef, {
-          name: hostelName.trim(),
-          slug: normalizedSlug,
-          ownerUid: uid,
-          createdAt: serverTimestamp(),
-        });
-
-        const userRef = doc(db, "users", uid);
-        tx.set(
-          userRef,
-          {
-            role: "admin",
-            hostelSlug: normalizedSlug,
-            email: email.trim().toLowerCase(),
-            createdAt: serverTimestamp(),
-          },
-          { merge: true }
-        );
-      });
-
-      setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
-      navigate("/admin", { replace: true });
-    } catch (err: any) {
-      console.error(err);
-
-      try {
-        if (auth.currentUser) await deleteUser(auth.currentUser);
-      } catch {}
-
-      setCreatedUser(null);
-
-      if (err?.message === "SLUG_TAKEN") {
-        setMessage({ type: "error", text: t("register.errors.slugTaken") });
-      } else {
-        setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
-      }
-    } finally {
-      setLoading(false);
+    // Firebase functions errors suelen venir como err.code
+    if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
+      setMessage({ type: "error", text: t("register.errors.slugTaken") });
+    } else {
+      setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
     }
-  };
-
+  } finally {
+    setLoading(false);
+  }
+};
   if (loading) {
     return (
       <HotelLoading

@@ -543,3 +543,67 @@ export const cancelReservation = onCall(
     return { ok: true };
   }
 );
+/**
+ * createHostel (AUTH REQUIRED)
+ * data: { name, slug }
+ * Crea:
+ *  - hostels/{slug}
+ *  - hostels/{slug}/members/{uid} role=owner
+ *  - users/{uid}.activeHostelSlug = slug
+ */
+export const createHostel = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (req) => {
+    assert(req.auth, "unauthenticated", "Requiere login");
+    const uid = req.auth!.uid;
+
+    const name = String(req.data?.name || "").trim();
+    const slug = String(req.data?.slug || "").trim();
+
+    assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
+    assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
+    assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
+
+    const hostelRef = db.doc(`hostels/${slug}`);
+    const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
+    const userRef = db.doc(`users/${uid}`);
+
+    await db.runTransaction(async (tx) => {
+      const existingHostel = await tx.get(hostelRef);
+      assert(!existingHostel.exists, "already-exists", "Ese slug ya existe");
+
+      tx.set(hostelRef, {
+        name,
+        slug,
+        ownerUid: uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      const userRecord = await admin.auth().getUser(uid);
+      const email = String(userRecord.email || "").toLowerCase();
+
+      tx.set(memberRef, {
+        role: "owner",
+        email,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: uid,
+      });
+
+      const userSnap = await tx.get(userRef);
+      if (!userSnap.exists) {
+        tx.set(userRef, {
+          email,
+          activeHostelSlug: slug,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        tx.set(userRef, { activeHostelSlug: slug }, { merge: true });
+      }
+    });
+
+    return { ok: true, slug };
+  }
+);
+function isNonEmptyString(v: any, minLen: number) {
+  return typeof v === "string" && v.trim().length >= minLen;
+}

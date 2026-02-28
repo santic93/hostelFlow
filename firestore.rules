@@ -85,13 +85,8 @@ service cloud.firestore {
       // público
       allow read: if true;
 
-      // Crear hostel: autenticado, ownerUid = el que crea
-      allow create: if isSignedIn()
-        && request.resource.data.keys().hasAll(["name", "slug", "ownerUid", "createdAt"])
-        && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.slug == hostelSlug
-        && isNonEmptyString(request.resource.data.name, 2)
-        && isNonEmptyString(request.resource.data.slug, 2);
+     // Crear hostel: SOLO backend (Functions/Admin SDK)
+allow create: if false;
 
       // Actualizar hostel: manager+
       allow update: if isManagerPlus(hostelSlug)

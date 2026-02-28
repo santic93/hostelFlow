@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "hostelflow-dev"
-  }
+    "default": "hostelflow-dev",
+    "hostel": "hostelflow-dev"
+  },
+  "targets": {},
+  "etags": {}
 }

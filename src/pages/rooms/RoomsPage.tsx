@@ -2,10 +2,18 @@ import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { Container, Typography, Grid, Button, Box, Chip, Card, CardContent } from "@mui/material";
-import type { Room } from "../../types/room"; // ajustá path
 import { db } from "../../services/firebase";
 import { useTranslation } from "react-i18next";
 import { RoomCardCarousel } from "../../components/RoomCardCarousel";
+
+type Room = {
+  id: string;
+  name: string;
+  price: number;
+  capacity: number;
+  description: string;
+  imageUrls: string[];
+};
 
 export const RoomsPage = () => {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
@@ -63,15 +71,17 @@ export const RoomsPage = () => {
       {rooms.length === 0 ? (
         <Typography sx={{ color: "text.secondary" }}>{t("rooms.noRooms")}</Typography>
       ) : (
-        <Grid container spacing={{ xs: 3, md: 4 }}>
+        <Grid container spacing={{ xs: 3, md: 4 }} alignItems="stretch">
           {rooms.map((room) => {
             const urls = (room.imageUrls ?? []).filter(Boolean);
 
             return (
-              <Grid key={room.id} sx={{ xs: 12, sm: 6, md: 4 }}>
+              // ✅ Grid2: NO item. Se usa "size"
+              <Grid key={room.id} size={{ xs: 12, sm: 6, md: 4 }} sx={{ display: "flex" }}>
                 <Card
                   elevation={0}
                   sx={{
+                    width: "100%",
                     height: "100%",
                     borderRadius: 4,
                     border: "1px solid",
@@ -86,9 +96,43 @@ export const RoomsPage = () => {
                     },
                   }}
                 >
-                  <RoomCardCarousel urls={urls} alt={room.name} />
+                  {/* ✅ Reservo SIEMPRE el mismo alto para la zona imagen */}
+                  <Box
+                    sx={{
+                      width: "100%",
+                      aspectRatio: "16 / 9",
+                      bgcolor: "grey.100",
+                      flexShrink: 0,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {urls.length > 0 ? (
+                      <RoomCardCarousel urls={urls} alt={room.name} />
+                    ) : (
+                      <Box
+                        sx={{
+                          height: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "text.secondary",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {t("rooms.noImage", "Sin imagen")}
+                      </Box>
+                    )}
+                  </Box>
 
-                  <CardContent sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.2, flex: 1 }}>
+                  <CardContent
+                    sx={{
+                      p: 2.5,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 1.2,
+                      flex: 1,
+                    }}
+                  >
                     <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
                       <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.2 }}>
                         {room.name}
@@ -96,7 +140,7 @@ export const RoomsPage = () => {
 
                       <Chip
                         size="small"
-                        label={`${room.capacity} ${room.capacity === 1 ? "pax" : "pax"}`}
+                        label={`${room.capacity} pax`}
                         sx={{ borderRadius: 999 }}
                       />
                     </Box>
@@ -109,7 +153,7 @@ export const RoomsPage = () => {
                         WebkitLineClamp: 3,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
-                        minHeight: 56, // mantiene altura consistente aunque un room tenga menos texto
+                        minHeight: 56,
                       }}
                     >
                       {room.description || t("rooms.defaultDesc", "Cómoda, luminosa y lista para tu estadía.")}

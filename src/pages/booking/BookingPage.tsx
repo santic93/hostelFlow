@@ -6,6 +6,7 @@ import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import "dayjs/locale/es";
 import "dayjs/locale/en";
 import "dayjs/locale/pt-br";
+
 import {
   Alert,
   Box,
@@ -19,10 +20,22 @@ import {
 import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { doc, getDoc } from "firebase/firestore";
+
 import HotelLoading from "../../components/HotelLoading";
 import { createReservation } from "../../services/reservations";
 import { db } from "../../firebase";
+
 dayjs.extend(isSameOrBefore);
+
+function getCallableErrorInfo(err: any) {
+  // Firebase Functions suele devolver: code / message / details
+  const code = err?.code ?? err?.name ?? "unknown";
+  const message = err?.message ?? "Unknown error";
+  const details = err?.details ?? null;
+
+  return { code, message, details };
+}
+
 export const BookingPage = () => {
   const navigate = useNavigate();
   const { hostelSlug, roomId } = useParams();
@@ -86,28 +99,48 @@ export const BookingPage = () => {
 
   const handleConfirm = async () => {
     setFormError(null);
+
     if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
     try {
       setLoading(true);
 
-      await createReservation({
+      const payload = {
         hostelSlug,
         roomId: selectedRoom.id,
         checkInISO: checkIn.startOf("day").toDate().toISOString(),
         checkOutISO: checkOut.startOf("day").toDate().toISOString(),
         fullName: fullName.trim(),
         email: email.trim().toLowerCase(),
-      });
+      };
 
-      setSuccess(true);
+      // Debug útil (lo podés borrar después)
+      console.log("createReservation payload:", payload);
+
+      const res = await createReservation(payload);
+
+      console.log("createReservation response:", res);
+
+      if (res?.ok) {
+        setSuccess(true);
+      } else {
+        setFormError(t("booking.errorSaving"));
+      }
     } catch (err: any) {
-      console.error("confirmReservation error:", err);
+      const info = getCallableErrorInfo(err);
+
+      console.error("createReservation error FULL:", err);
+      console.error("createReservation error parsed:", info);
 
       // Errores más comunes (function)
-      const msg = String(err?.message || "");
-      if (msg.toLowerCase().includes("fechas no disponibles") || err?.code === "already-exists") {
+      const msg = String(info.message || "").toLowerCase();
+      const code = String(info.code || "").toLowerCase();
+
+      if (msg.includes("fechas no disponibles") || code.includes("already-exists")) {
         setFormError(t("booking.unavailable"));
+      } else if (code.includes("permission-denied") || code.includes("unauthenticated")) {
+        // si alguna vez llegás a exigir auth para reservar
+        setFormError("No autorizado. Probá refrescar la página.");
       } else {
         setFormError(t("booking.errorSaving"));
       }
@@ -119,13 +152,7 @@ export const BookingPage = () => {
   if (!hostelSlug) return null;
 
   if (loading) {
-    return (
-      <HotelLoading
-        fullScreen={false}
-        text={t("booking.processing")}
-        subtitle=""
-      />
-    );
+    return <HotelLoading fullScreen={false} text={t("booking.processing")} subtitle="" />;
   }
 
   if (success) {
@@ -158,7 +185,7 @@ export const BookingPage = () => {
 
         <Grid container spacing={8} sx={{ mt: 4 }}>
           {/* LEFT */}
-          <Grid sx={{xs: 12, md: 7}}>
+          <Grid sx={{ xs: 12, md: 7 }}>
             <Stack spacing={4}>
               <DatePicker
                 label={t("booking.checkIn")}
@@ -166,7 +193,6 @@ export const BookingPage = () => {
                 minDate={dayjs()}
                 onChange={(newValue) => {
                   setCheckIn(newValue);
-                  // si el usuario cambia check-in y el check-out queda inválido, lo reseteo
                   if (checkOut && newValue && checkOut.isSameOrBefore(newValue, "day")) {
                     setCheckOut(null);
                   }

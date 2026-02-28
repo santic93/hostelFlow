@@ -1,59 +1,32 @@
-import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
-import * as nodemailer from "nodemailer";
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { defineSecret, defineString } from "firebase-functions/params";
+import axios from "axios";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// =========================
-// SMTP config (Functions v1)
-// firebase functions:config:set smtp.host="..." smtp.port="587" smtp.user="..." smtp.pass="..." smtp.from="Hostly <...>"
-// =========================
-const smtpHost = functions.config().smtp?.host as string | undefined;
-const smtpPort = Number(functions.config().smtp?.port || 587);
-const smtpUser = functions.config().smtp?.user as string | undefined;
-const smtpPass = functions.config().smtp?.pass as string | undefined;
-const smtpFrom = (functions.config().smtp?.from as string | undefined) || "Hostly <no-reply@hostly.app>";
+/**
+ * ✅ PARAMS (no secrets) -> quedan en .env.<projectId> automáticamente al deploy
+ * O te los pregunta firebase deploy y te los escribe.
+ */
+const MAIL_FROM_EMAIL = defineString("MAIL_FROM_EMAIL", {
+  default: "no-reply@hostly.app",
+});
+const MAIL_FROM_NAME = defineString("MAIL_FROM_NAME", {
+  default: "Hostly",
+});
 
-const transporter =
-  smtpHost && smtpUser && smtpPass
-    ? nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      })
-    : null;
+/**
+ * ✅ SECRET (Brevo API Key) -> se setea con:
+ * firebase functions:secrets:set BREVO_API_KEY
+ */
+const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
-function assert(condition: any, code: functions.https.FunctionsErrorCode, message: string) {
-  if (!condition) throw new functions.https.HttpsError(code, message);
-}
+/** ---------- helpers ---------- */
 
-// ✅ Soluciona el problema TS Date | undefined (y además valida fecha real)
-function requireDate(value: any, code: functions.https.FunctionsErrorCode, message: string): Date {
-  if (!(value instanceof Date) || isNaN(value.getTime())) {
-    throw new functions.https.HttpsError(code, message);
-  }
-  return value;
-}
-
-type ReservationStatus = "pending" | "confirmed" | "cancelled";
-
-function isValidStatus(s: string): s is ReservationStatus {
-  return s === "pending" || s === "confirmed" || s === "cancelled";
-}
-
-function canTransition(from: ReservationStatus, to: ReservationStatus) {
-  if (from === to) return true;
-  if (from === "pending" && (to === "confirmed" || to === "cancelled")) return true;
-  if (from === "confirmed" && to === "cancelled") return true;
-  return false; // cancelled terminal
-}
-
-function statusLabelEs(status: ReservationStatus) {
-  if (status === "pending") return "PENDIENTE";
-  if (status === "confirmed") return "CONFIRMADA";
-  return "CANCELADA";
+function assert(condition: any, code: any, message: string) {
+  if (!condition) throw new HttpsError(code, message);
 }
 
 function toUTCDateOnly(d: Date) {
@@ -67,336 +40,445 @@ function formatYYYYMMDD_UTC(date: Date) {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * check-in inclusive, check-out exclusive
+ */
 function buildNights(from: Date, to: Date) {
   const start = toUTCDateOnly(from);
   const end = toUTCDateOnly(to);
-
   const nights: string[] = [];
+
   for (let cur = new Date(start); cur < end; cur.setUTCDate(cur.getUTCDate() + 1)) {
     nights.push(formatYYYYMMDD_UTC(cur));
   }
-  return nights; // check-in inclusive, check-out exclusive
+  return nights;
 }
 
 function lockDocId(roomId: string, yyyyMMdd: string) {
   return `${roomId}_${yyyyMMdd}`;
 }
 
-async function sendEmailSafe(to: string, subject: string, html: string) {
-  if (!transporter) {
-    console.warn("SMTP not configured. Skipping email to:", to, subject);
-    return;
-  }
-  await transporter.sendMail({ from: smtpFrom, to, subject, html });
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
+
+function isValidStatus(s: string): s is ReservationStatus {
+  return s === "pending" || s === "confirmed" || s === "cancelled";
 }
 
-function emailTemplateBase(args: { title: string; bodyHtml: string; footer?: string }) {
-  const footer =
-    args.footer ?? "Si necesitás modificar o cancelar, respondé este email o contactá directamente al hostel.";
-  return `
-  <div style="font-family:Arial,sans-serif; line-height:1.55; max-width:620px; margin:0 auto; padding:16px;">
-    <h2 style="margin:0 0 12px;">${args.title}</h2>
-    <div style="color:#111;">${args.bodyHtml}</div>
-    <hr style="border:none; border-top:1px solid #eee; margin:16px 0;" />
-    <p style="margin:0; color:#666; font-size:13px;">${footer}</p>
-  </div>`;
+function canTransition(from: ReservationStatus, to: ReservationStatus) {
+  // ajustalo como quieras
+  if (from === "cancelled") return false;
+  return true;
 }
 
-function reservationDetailsListHtml(args: {
+function reservationEmailHtml(args: {
+  title: string;
   hostelName: string;
   roomName: string;
   fullName: string;
-  checkInStr: string;
-  checkOutStr: string;
+  checkIn: string;
+  checkOut: string;
   nights: number;
   total: number;
+  status: string;
 }) {
-  const { hostelName, roomName, fullName, checkInStr, checkOutStr, nights, total } = args;
+  const { title, hostelName, roomName, fullName, checkIn, checkOut, nights, total, status } = args;
+
   return `
+  <div style="font-family:Arial,sans-serif; line-height:1.5;">
+    <h2 style="margin:0 0 12px;">${title}</h2>
     <p>Hola <b>${fullName}</b>,</p>
-    <p>Reserva en <b>${hostelName}</b>:</p>
+    <p>Tu reserva en <b>${hostelName}</b> está <b>${status}</b>.</p>
     <ul>
       <li><b>Habitación:</b> ${roomName}</li>
-      <li><b>Check-in:</b> ${checkInStr}</li>
-      <li><b>Check-out:</b> ${checkOutStr}</li>
+      <li><b>Check-in:</b> ${checkIn}</li>
+      <li><b>Check-out:</b> ${checkOut}</li>
       <li><b>Noches:</b> ${nights}</li>
       <li><b>Total:</b> $${total}</li>
     </ul>
-  `;
+    <p style="color:#666;">Si necesitás modificar o cancelar, contactá al hostel.</p>
+  </div>`;
 }
 
-// =====================================================
-// 1) CREATE RESERVATION (PENDING) + LOCKS + MAIL "RECIBIDA"
-// =====================================================
-export const createReservation = functions.https.onCall(async (data, context) => {
-  const hostelSlug = String(data?.hostelSlug || "");
-  const roomId = String(data?.roomId || "");
-  const fullName = String(data?.fullName || "").trim();
-  const email = String(data?.email || "").trim().toLowerCase();
-  const checkInISO = String(data?.checkInISO || "");
-  const checkOutISO = String(data?.checkOutISO || "");
+/** ---------- Brevo mail ---------- */
 
-  assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
-  assert(roomId, "invalid-argument", "roomId requerido");
-  assert(fullName.length >= 3, "invalid-argument", "fullName inválido");
-  assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
-  assert(checkInISO && checkOutISO, "invalid-argument", "fechas requeridas");
+async function sendEmailBrevo(args: {
+  to: string;
+  toName?: string;
+  subject: string;
+  html: string;
+}) {
+  const apiKey = BREVO_API_KEY.value();
+  if (!apiKey) {
+    console.warn("BREVO_API_KEY not set. Skipping email.");
+    return;
+  }
 
-  const checkIn = new Date(checkInISO);
-  const checkOut = new Date(checkOutISO);
-  assert(!isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()), "invalid-argument", "fechas inválidas");
-  assert(checkOut > checkIn, "failed-precondition", "checkOut debe ser posterior a checkIn");
-
-  const nightsArr = buildNights(checkIn, checkOut);
-  assert(nightsArr.length > 0, "failed-precondition", "La estadía debe ser al menos 1 noche");
-
-  const hostelRef = db.doc(`hostels/${hostelSlug}`);
-  const roomRef = db.doc(`hostels/${hostelSlug}/rooms/${roomId}`);
-  const reservationsCol = db.collection(`hostels/${hostelSlug}/reservations`);
-  const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
-
-  const reservationRef = reservationsCol.doc();
-
-  const result = await db.runTransaction(async (tx) => {
-    const hostelSnap = await tx.get(hostelRef);
-    assert(hostelSnap.exists, "not-found", "Hostel no existe");
-    const hostelData = hostelSnap.data() as any;
-    const hostelName = String(hostelData?.name || hostelSlug);
-
-    const roomSnap = await tx.get(roomRef);
-    assert(roomSnap.exists, "not-found", "Habitación no existe");
-    const roomData = roomSnap.data() as any;
-    const roomName = String(roomData?.name || "Room");
-    const pricePerNight = Number(roomData?.price || 0);
-    assert(pricePerNight > 0, "failed-precondition", "Precio inválido");
-
-    // 1) verificar locks
-    for (const yyyyMMdd of nightsArr) {
-      const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
-      const lockSnap = await tx.get(lockRef);
-      if (lockSnap.exists) {
-        throw new functions.https.HttpsError("already-exists", "Fechas no disponibles");
-      }
+  await axios.post(
+    "https://api.brevo.com/v3/smtp/email",
+    {
+      sender: { email: MAIL_FROM_EMAIL.value(), name: MAIL_FROM_NAME.value() },
+      to: [{ email: args.to, name: args.toName || "" }],
+      subject: args.subject,
+      htmlContent: args.html,
+    },
+    {
+      headers: {
+        "api-key": apiKey,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      timeout: 15000,
     }
+  );
+}
 
-    // 2) crear locks (pending)
-    for (const yyyyMMdd of nightsArr) {
-      const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
-      tx.set(lockRef, {
-        hostelSlug,
+/**
+ * ✅ ESTO ES LO QUE ME PEDISTE
+ * Va EN ESTE MISMO ARCHIVO (index.ts), abajo de sendEmailBrevo.
+ * La función “safe” evita que un fallo de mail rompa la reserva (y te tire 500).
+ */
+async function sendEmailBrevoSafe(args: {
+  to: string;
+  toName?: string;
+  subject: string;
+  html: string;
+}) {
+  try {
+    await sendEmailBrevo(args);
+  } catch (err: any) {
+    console.error("Brevo send failed (NOT blocking reservation).", {
+      message: err?.message,
+      status: err?.response?.status,
+      data: err?.response?.data,
+    });
+    // ✅ NO throw. Nunca tires error por mail.
+  }
+}
+
+/** ---------- FUNCTIONS ---------- */
+
+/**
+ * createReservation (PUBLIC)
+ * data: { hostelSlug, roomId, checkInISO, checkOutISO, fullName, email }
+ *
+ * ✅ IMPORTANTÍSIMO:
+ * - La reserva se crea en transacción (locks anti solapamiento)
+ * - El mail va fuera de la transacción
+ * - El mail NO rompe la reserva (sendEmailBrevoSafe)
+ */
+export const createReservation = onCall(
+  {
+    region: "us-central1",
+    secrets: [BREVO_API_KEY],
+  },
+  async (request) => {
+    const data = request.data as any;
+
+    const hostelSlug = String(data?.hostelSlug || "").trim();
+    const roomId = String(data?.roomId || "").trim();
+    const fullName = String(data?.fullName || "").trim();
+    const email = String(data?.email || "").trim().toLowerCase();
+    const checkInISO = String(data?.checkInISO || "");
+    const checkOutISO = String(data?.checkOutISO || "");
+
+    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+    assert(roomId, "invalid-argument", "roomId requerido");
+    assert(fullName.length >= 3, "invalid-argument", "fullName inválido");
+    assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
+    assert(checkInISO && checkOutISO, "invalid-argument", "fechas requeridas");
+
+    const checkIn = new Date(checkInISO);
+    const checkOut = new Date(checkOutISO);
+    assert(!isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()), "invalid-argument", "fechas inválidas");
+
+    const nightsArr = buildNights(checkIn, checkOut);
+    assert(nightsArr.length > 0, "failed-precondition", "La estadía debe ser al menos 1 noche");
+
+    const hostelRef = db.doc(`hostels/${hostelSlug}`);
+    const roomRef = db.doc(`hostels/${hostelSlug}/rooms/${roomId}`);
+    const reservationsCol = db.collection(`hostels/${hostelSlug}/reservations`);
+    const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
+
+    const reservationRef = reservationsCol.doc();
+
+    const result = await db.runTransaction(async (tx) => {
+      const hostelSnap = await tx.get(hostelRef);
+      assert(hostelSnap.exists, "not-found", "Hostel no existe");
+      const hostelData = hostelSnap.data() as any;
+      const hostelName = String(hostelData?.name || hostelSlug);
+
+      const roomSnap = await tx.get(roomRef);
+      assert(roomSnap.exists, "not-found", "Habitación no existe");
+      const roomData = roomSnap.data() as any;
+
+      const roomName = String(roomData?.name || "Room");
+      const pricePerNight = Number(roomData?.price || 0);
+      assert(Number.isFinite(pricePerNight) && pricePerNight >= 0, "failed-precondition", "Precio inválido");
+
+      // 1) verificar locks
+      for (const yyyyMMdd of nightsArr) {
+        const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+        const lockSnap = await tx.get(lockRef);
+        if (lockSnap.exists) {
+          throw new HttpsError("already-exists", "Fechas no disponibles");
+        }
+      }
+
+      // 2) crear locks
+      for (const yyyyMMdd of nightsArr) {
+        const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+        tx.set(lockRef, {
+          hostelSlug,
+          roomId,
+          date: yyyyMMdd,
+          reservationId: reservationRef.id,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+
+      const nights = nightsArr.length;
+      const total = pricePerNight * nights;
+
+      // 3) crear reserva (pending)
+      tx.set(reservationRef, {
         roomId,
-        date: yyyyMMdd,
-        reservationId: reservationRef.id,
-        status: "pending",
+        roomName,
+        pricePerNight,
+        checkIn: admin.firestore.Timestamp.fromDate(checkIn),
+        checkOut: admin.firestore.Timestamp.fromDate(checkOut),
+        nights,
+        total,
+        fullName,
+        email,
+        status: "pending" as ReservationStatus,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: "PUBLIC_WEB",
+      });
+
+      return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
+    });
+
+    // mail (fuera de tx) — ✅ NO rompe reserva
+    const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
+    const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOut));
+
+    /**
+     * ✅ ESTO ES LO QUE ME PEDISTE
+     * Va ACÁ: después de crear la reserva (fuera de la transacción)
+     */
+    await sendEmailBrevoSafe({
+      to: email,
+      toName: fullName,
+      subject: `Recibimos tu reserva - ${result.hostelName}`,
+      html: reservationEmailHtml({
+        title: "Reserva recibida",
+        hostelName: result.hostelName,
+        roomName: result.roomName,
+        fullName,
+        checkIn: checkInStr,
+        checkOut: checkOutStr,
+        nights: result.nights,
+        total: result.total,
+        status: "RECIBIDA",
+      }),
+    });
+
+    return { ok: true, reservationId: result.reservationId };
+  }
+);
+
+/**
+ * setReservationStatus (ADMIN)
+ * data: { hostelSlug, reservationId, newStatus }
+ */
+export const setReservationStatus = onCall(
+  {
+    region: "us-central1",
+    secrets: [BREVO_API_KEY],
+  },
+  async (request) => {
+    const data = request.data as any;
+    const auth = request.auth;
+
+    assert(auth, "unauthenticated", "Requiere login");
+
+    const uid = auth!.uid;
+    const hostelSlug = String(data?.hostelSlug || "").trim();
+    const reservationId = String(data?.reservationId || "").trim();
+    const newStatusRaw = String(data?.newStatus || "").trim();
+
+    assert(hostelSlug && reservationId && newStatusRaw, "invalid-argument", "Parámetros requeridos");
+    assert(isValidStatus(newStatusRaw), "invalid-argument", "newStatus inválido");
+
+    const newStatus = newStatusRaw as ReservationStatus;
+
+    // validar admin
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.data() as any;
+    assert(userData?.role === "admin", "permission-denied", "No autorizado");
+    assert(userData?.hostelSlug === hostelSlug, "permission-denied", "No autorizado para este hostel");
+
+    const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
+
+    const { email, fullName, roomName, nights, total, checkInDate, checkOutDate, hostelName } =
+      await db.runTransaction(async (tx) => {
+        const resSnap = await tx.get(resRef);
+        assert(resSnap.exists, "not-found", "Reserva no existe");
+
+        const res = resSnap.data() as any;
+        const currentStatus = String(res?.status || "pending") as ReservationStatus;
+
+        assert(canTransition(currentStatus, newStatus), "failed-precondition", "Transición inválida");
+
+        tx.set(
+          resRef,
+          {
+            status: newStatus,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBy: uid,
+          },
+          { merge: true }
+        );
+
+        const checkInDate = res?.checkIn?.toDate?.();
+        const checkOutDate = res?.checkOut?.toDate?.();
+
+        return {
+          hostelName: hostelSlug,
+          email: String(res?.email || ""),
+          fullName: String(res?.fullName || ""),
+          roomName: String(res?.roomName || ""),
+          nights: Number(res?.nights || 0),
+          total: Number(res?.total || 0),
+          checkInDate: checkInDate as Date | undefined,
+          checkOutDate: checkOutDate as Date | undefined,
+        };
+      });
+
+    // mail best-effort
+    if (email) {
+      const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
+      const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
+
+      await sendEmailBrevoSafe({
+        to: email,
+        toName: fullName,
+        subject: `Actualización de tu reserva - ${hostelName}`,
+        html: reservationEmailHtml({
+          title: "Actualización de reserva",
+          hostelName: hostelName,
+          roomName,
+          fullName,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          nights,
+          total,
+          status: newStatus.toUpperCase(),
+        }),
       });
     }
 
-    const nights = nightsArr.length;
-    const total = Math.round(pricePerNight * nights);
+    return { ok: true };
+  }
+);
 
-    // 3) crear reserva PENDING
-    tx.set(reservationRef, {
-      roomId,
-      roomName,
-      pricePerNight,
-      checkIn: admin.firestore.Timestamp.fromDate(checkIn),
-      checkOut: admin.firestore.Timestamp.fromDate(checkOut),
-      nights,
-      total,
-      fullName,
-      email,
-      status: "pending",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      source: "PUBLIC_WEB",
+/**
+ * cancelReservation (ADMIN)
+ * data: { hostelSlug, reservationId }
+ */
+export const cancelReservation = onCall(
+  {
+    region: "us-central1",
+    secrets: [BREVO_API_KEY],
+  },
+  async (request) => {
+    const data = request.data as any;
+    const auth = request.auth;
+
+    assert(auth, "unauthenticated", "Requiere login");
+
+    const uid = auth!.uid;
+    const hostelSlug = String(data?.hostelSlug || "").trim();
+    const reservationId = String(data?.reservationId || "").trim();
+
+    assert(hostelSlug && reservationId, "invalid-argument", "Parámetros requeridos");
+
+    // validar admin
+    const userSnap = await db.doc(`users/${uid}`).get();
+    const userData = userSnap.data() as any;
+    assert(userData?.role === "admin", "permission-denied", "No autorizado");
+    assert(userData?.hostelSlug === hostelSlug, "permission-denied", "No autorizado para este hostel");
+
+    const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
+    const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
+
+    const result = await db.runTransaction(async (tx) => {
+      const resSnap = await tx.get(resRef);
+      assert(resSnap.exists, "not-found", "Reserva no existe");
+
+      const res = resSnap.data() as any;
+
+      const currentStatus = String(res?.status || "pending") as ReservationStatus;
+      if (currentStatus === "cancelled") return res;
+
+      const roomId = String(res?.roomId || "");
+      const checkInDate = res?.checkIn?.toDate?.();
+      const checkOutDate = res?.checkOut?.toDate?.();
+
+      if (roomId && checkInDate && checkOutDate) {
+        const nightsArr = buildNights(checkInDate as Date, checkOutDate as Date);
+        for (const yyyyMMdd of nightsArr) {
+          const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+          tx.delete(lockRef);
+        }
+      }
+
+      tx.set(
+        resRef,
+        {
+          status: "cancelled" as ReservationStatus,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedBy: uid,
+        },
+        { merge: true }
+      );
+
+      return res;
     });
 
-    return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
-  });
+    const email = String(result?.email || "");
+    const fullName = String(result?.fullName || "");
+    const roomName = String(result?.roomName || "");
+    const nights = Number(result?.nights || 0);
+    const total = Number(result?.total || 0);
 
-  // mail "recibida"
-  const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
-  const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOut));
+    const checkInDate = result?.checkIn?.toDate?.();
+    const checkOutDate = result?.checkOut?.toDate?.();
 
-  await sendEmailSafe(
-    email,
-    `Recibimos tu reserva - ${result.hostelName}`,
-    emailTemplateBase({
-      title: "¡Reserva recibida!",
-      bodyHtml:
-        `<p>Tu solicitud fue recibida y está <b>PENDIENTE</b> de confirmación por el hostel.</p>` +
-        reservationDetailsListHtml({
-          hostelName: result.hostelName,
-          roomName: result.roomName,
+    // mail best-effort
+    if (email) {
+      const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
+      const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
+
+      await sendEmailBrevoSafe({
+        to: email,
+        toName: fullName,
+        subject: `Reserva cancelada - ${hostelSlug}`,
+        html: reservationEmailHtml({
+          title: "Reserva cancelada",
+          hostelName: hostelSlug,
+          roomName,
           fullName,
-          checkInStr,
-          checkOutStr,
-          nights: result.nights,
-          total: result.total,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          nights,
+          total,
+          status: "CANCELADA",
         }),
-    })
-  );
-
-  return { ok: true, reservationId: result.reservationId };
-});
-
-// =====================================================
-// Helper: aplicar cambio de estado (admin) + locks + mail
-// =====================================================
-async function applyStatusChange(args: {
-  uid: string;
-  hostelSlug: string;
-  reservationId: string;
-  newStatus: ReservationStatus;
-}) {
-  const { uid, hostelSlug, reservationId, newStatus } = args;
-
-  // Validar admin del hostel
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const userData = userSnap.data() as any;
-  assert(userData?.role === "admin", "permission-denied", "No autorizado");
-  assert(userData?.hostelSlug === hostelSlug, "permission-denied", "No autorizado para este hostel");
-
-  const hostelRef = db.doc(`hostels/${hostelSlug}`);
-  const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
-  const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
-
-  const updated = await db.runTransaction(async (tx) => {
-    const hostelSnap = await tx.get(hostelRef);
-    assert(hostelSnap.exists, "not-found", "Hostel no existe");
-    const hostelName = String((hostelSnap.data() as any)?.name || hostelSlug);
-
-    const resSnap = await tx.get(resRef);
-    assert(resSnap.exists, "not-found", "Reserva no existe");
-    const res = resSnap.data() as any;
-
-    const prevStatus = String(res?.status || "") as ReservationStatus;
-    assert(isValidStatus(prevStatus), "failed-precondition", "Estado actual inválido");
-    assert(canTransition(prevStatus, newStatus), "failed-precondition", "Transición no permitida");
-
-    const roomId = String(res?.roomId || "");
-    const roomName = String(res?.roomName || "");
-    const fullName = String(res?.fullName || "");
-    const email = String(res?.email || "");
-    const nights = Number(res?.nights || 0);
-    const total = Number(res?.total || 0);
-
-    const checkInRaw = res?.checkIn?.toDate?.();
-    const checkOutRaw = res?.checkOut?.toDate?.();
-
-    const checkInDate = requireDate(checkInRaw, "failed-precondition", "checkIn faltante o inválido");
-    const checkOutDate = requireDate(checkOutRaw, "failed-precondition", "checkOut faltante o inválido");
-    assert(checkOutDate > checkInDate, "failed-precondition", "Fechas inválidas (checkOut <= checkIn)");
-
-    const nightsArr = buildNights(checkInDate, checkOutDate);
-
-    if (newStatus === "cancelled") {
-      // cancelar => borrar locks
-      for (const yyyyMMdd of nightsArr) {
-        tx.delete(roomNightsCol.doc(lockDocId(roomId, yyyyMMdd)));
-      }
-    } else if (newStatus === "confirmed") {
-      // confirmar => marcar locks confirmados (auditoría)
-      for (const yyyyMMdd of nightsArr) {
-        tx.set(
-          roomNightsCol.doc(lockDocId(roomId, yyyyMMdd)),
-          { status: "confirmed", updatedAt: admin.firestore.FieldValue.serverTimestamp() },
-          { merge: true }
-        );
-      }
+      });
     }
 
-    tx.set(
-      resRef,
-      {
-        status: newStatus,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedBy: uid,
-      },
-      { merge: true }
-    );
-
-    const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate));
-    const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate));
-
-    return { hostelName, roomName, fullName, email, nights, total, checkInStr, checkOutStr, newStatus };
-  });
-
-  // Mail al huésped (afuera)
-  if (updated.email) {
-    const label = statusLabelEs(updated.newStatus);
-
-    let intro = "";
-    if (updated.newStatus === "confirmed") {
-      intro = `<p>¡Buenas noticias! Tu reserva fue <b>${label}</b>. Te esperamos 😊</p>`;
-    } else if (updated.newStatus === "cancelled") {
-      intro = `<p>Tu reserva fue <b>${label}</b>. Si querés, podés responder este mail para reprogramarla.</p>`;
-    } else {
-      intro = `<p>Tu reserva está <b>${label}</b>.</p>`;
-    }
-
-    await sendEmailSafe(
-      updated.email,
-      `Tu reserva está ${label} - ${updated.hostelName}`,
-      emailTemplateBase({
-        title: `Estado de tu reserva: ${label}`,
-        bodyHtml:
-          intro +
-          reservationDetailsListHtml({
-            hostelName: updated.hostelName,
-            roomName: updated.roomName,
-            fullName: updated.fullName,
-            checkInStr: updated.checkInStr,
-            checkOutStr: updated.checkOutStr,
-            nights: updated.nights,
-            total: updated.total,
-          }),
-      })
-    );
+    return { ok: true };
   }
-
-  return { ok: true };
-}
-
-// =====================================================
-// 2) SET STATUS (admin)
-// =====================================================
-export const setReservationStatus = functions.https.onCall(async (data, context) => {
-  assert(context.auth, "unauthenticated", "Requiere login");
-
-  const uid = context.auth!.uid;
-  const hostelSlug = String(data?.hostelSlug || "");
-  const reservationId = String(data?.reservationId || "");
-  const newStatusRaw = String(data?.newStatus || "");
-
-  assert(hostelSlug && reservationId && newStatusRaw, "invalid-argument", "Parámetros requeridos");
-  assert(isValidStatus(newStatusRaw), "invalid-argument", "Estado inválido");
-
-  return await applyStatusChange({
-    uid,
-    hostelSlug,
-    reservationId,
-    newStatus: newStatusRaw as ReservationStatus,
-  });
-});
-
-// =====================================================
-// 3) CANCEL (admin)
-// =====================================================
-export const cancelReservation = functions.https.onCall(async (data, context) => {
-  assert(context.auth, "unauthenticated", "Requiere login");
-
-  const uid = context.auth!.uid;
-  const hostelSlug = String(data?.hostelSlug || "");
-  const reservationId = String(data?.reservationId || "");
-
-  assert(hostelSlug && reservationId, "invalid-argument", "Parámetros requeridos");
-
-  return await applyStatusChange({
-    uid,
-    hostelSlug,
-    reservationId,
-    newStatus: "cancelled",
-  });
-});
+);

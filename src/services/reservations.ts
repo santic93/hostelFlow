@@ -1,5 +1,9 @@
+// src/services/reservations.ts
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
+
+
+export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
 export type CreateReservationInput = {
   hostelSlug: string;
@@ -19,7 +23,7 @@ export async function createReservation(input: CreateReservationInput) {
 export async function setReservationStatus(input: {
   hostelSlug: string;
   reservationId: string;
-  newStatus: "pending" | "confirmed" | "cancelled";
+  newStatus: ReservationStatus;
 }) {
   const fn = httpsCallable(functions, "setReservationStatus");
   const res = await fn(input);

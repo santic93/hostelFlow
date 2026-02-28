@@ -170,6 +170,7 @@ export const createReservation = onCall(
   {
     region: "us-central1",
     secrets: [BREVO_API_KEY],
+     enforceAppCheck: true,
   },
   async (request) => {
     const data = request.data as any;
@@ -296,6 +297,7 @@ export const setReservationStatus = onCall(
   {
     region: "us-central1",
     secrets: [BREVO_API_KEY],
+    enforceAppCheck: true,
     // (después con App Check lo vamos a poner también acá)
   },
   async (req) => {
@@ -386,6 +388,8 @@ export const cancelReservation = onCall(
   {
     region: "us-central1",
     secrets: [BREVO_API_KEY],
+    enforceAppCheck: true,
+    
   },
   async (request) => {
     const data = request.data as any;

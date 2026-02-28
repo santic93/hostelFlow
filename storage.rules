@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function under5MB() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+
+    function isOwner(hostelSlug) {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/hostels/$(hostelSlug)).data.ownerUid
+          == request.auth.uid;
+    }
+
+    match /hostels/{hostelSlug}/{allPaths=**} {
+      allow read: if true;
+      allow write: if isOwner(hostelSlug) && isImage() && under5MB();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

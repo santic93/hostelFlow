@@ -8,3 +8,16 @@ typings/
 # Node.js dependency directory
 node_modules/
 *.local
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# --- Firebase functions local config ---
+.runtimeconfig.json
+
+# --- Logs ---
+firebase-debug.log
+firebase-debug.*.log

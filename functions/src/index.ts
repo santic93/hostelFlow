@@ -296,13 +296,19 @@ export const setReservationStatus = onCall(
   {
     region: "us-central1",
     secrets: [BREVO_API_KEY],
+    // (después con App Check lo vamos a poner también acá)
   },
   async (req) => {
     const data = req.data as {
       hostelSlug?: string;
       reservationId?: string;
-      newStatus?: string; // <-- lo recibimos como string y validamos
+      newStatus?: string;
     };
+
+    // 1) exigir login
+    assert(req.auth, "unauthenticated", "Requiere login");
+
+    const uid = req.auth!.uid;
 
     const hostelSlug = String(data?.hostelSlug || "").trim();
     const reservationId = String(data?.reservationId || "").trim();
@@ -315,26 +321,30 @@ export const setReservationStatus = onCall(
 
     const newStatus = newStatusRaw as ReservationStatus;
 
-    // ✅ opcional: exigir login
-    // if (!req.auth?.uid) throw new HttpsError("unauthenticated", "Login required");
+    // 2) validar admin del hostel (igual que cancelReservation)
+    const userSnap = await db.doc(`users/${uid}`).get();
+    assert(userSnap.exists, "permission-denied", "No autorizado");
 
+    const userData = userSnap.data() as any;
+    assert(userData?.role === "admin", "permission-denied", "No autorizado");
+    assert(userData?.hostelSlug === hostelSlug, "permission-denied", "No autorizado para este hostel");
+
+    // 3) update status
     const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
 
-    // Leemos el estado actual para validar transición
     const snap = await resRef.get();
     assert(snap.exists, "not-found", "Reserva no existe");
 
     const current = (snap.data()?.status ?? "pending") as ReservationStatus;
-
-    // ✅ usamos canTransition (así desaparece el warning)
     assert(canTransition(current, newStatus), "failed-precondition", `No se puede pasar de ${current} a ${newStatus}`);
 
     await resRef.update({
       status: newStatus,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy: uid,
     });
 
-    // (si querés) mail al cliente con best-effort (NO rompe la operación)
+    // 4) mail best-effort
     const email = String(snap.data()?.email || "");
     const fullName = String(snap.data()?.fullName || "");
     const roomName = String(snap.data()?.roomName || "");

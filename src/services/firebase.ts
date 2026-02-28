@@ -3,6 +3,7 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { setPersistence, browserSessionPersistence } from "firebase/auth";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 const firebaseConfig = {
     apiKey:  import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -13,13 +14,14 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-console.log("ENV CHECK", {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-});
-const app = initializeApp(firebaseConfig);
 
+export const app = initializeApp(firebaseConfig);
+
+// ✅ App Check (Web + reCAPTCHA v3)
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY),
+  isTokenAutoRefreshEnabled: true,
+});
 
 
 export const storage = getStorage(app);

@@ -604,6 +604,38 @@ export const createHostel = onCall(
     return { ok: true, slug };
   }
 );
+
+/**
+ * removeMember (MANAGER+)
+ * data: { hostelSlug, targetUid }
+ */
+export const removeMember = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (req) => {
+    assert(req.auth, "unauthenticated", "Requiere login");
+    const uid = req.auth!.uid;
+
+    const hostelSlug = String(req.data?.hostelSlug || "").trim();
+    const targetUid = String(req.data?.targetUid || "").trim();
+
+    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+    assert(targetUid, "invalid-argument", "targetUid requerido");
+
+    await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+
+    // no permitir que se borre a sí mismo si es owner (opcional, para evitar romper el hostel)
+    if (uid === targetUid) {
+      throw new HttpsError("failed-precondition", "No podés eliminarte a vos mismo");
+    }
+
+    await db.doc(`hostels/${hostelSlug}/members/${targetUid}`).delete();
+
+    return { ok: true };
+  }
+);
+
+
+
 function isNonEmptyString(v: any, minLen: number) {
   return typeof v === "string" && v.trim().length >= minLen;
 }

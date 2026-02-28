@@ -23,3 +23,40 @@ dist-ssr
 *.sln
 *.sw?
 .env
+# --- Env files (Vite / Firebase) ---
+.env
+.env.*
+!.env.example
+!.env.sample
+.env.local
+.env.*.local
+
+# --- Firebase / emulators ---
+.firebase/
+firestore-debug.log
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+
+# --- Vercel / Netlify ---
+.vercel/
+.netlify/
+
+# --- Build / cache ---
+dist/
+dist-ssr/
+build/
+coverage/
+.cache/
+.vite/
+.eslintcache
+
+# --- Secrets / keys (never commit) ---
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+serviceAccount*.json
+firebase-adminsdk*.json
+google-credentials*.json

@@ -1,100 +1,169 @@
-import { Box, Typography, Button, Grid } from "@mui/material";
-import { Link as RouterLink, useParams } from "react-router-dom";
-
-import { RoomsPage } from "../rooms/RoomsPage";
-import { useHostelPublic } from "../../hooks/useHostelPublic";
-import { Seo } from "../../components/Seo";
+import { useMemo, useState } from "react";
+import {
+  AppBar,
+  Box,
+  Button,
+  Container,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
+  Toolbar,
+  Typography,
+  Stack,
+  Divider,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import LanguageSwitcher from "../../components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
-// ...
 
-export const HomePage = () => {
-  const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const { hostel } = useHostelPublic(hostelSlug);
+export const MainLayout = () => {
+  const { user, role, hostelSlug } = useAuth();
+  const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
   const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
 
-  const base = window.location.origin;
-  const canonical = hostelSlug ? `${base}/${hostelSlug}` : `${base}/`;
+  if (!slugFromUrl) return null;
+  const base = `/${slugFromUrl}`;
 
-  // SEO traducible
-  const title = hostel?.name
-    ? t("seo.homeTitleWithHostel", { hostel: hostel.name })
-    : t("seo.homeTitle");
+  const links = useMemo(
+    () => [
+      { label: t("nav.rooms"), to: `${base}/rooms` },
+      { label: t("nav.book"), to: `${base}#book` },
+    ],
+    [t, base]
+  );
 
-  const description = hostel?.name
-    ? t("seo.homeDescWithHostel", { hostel: hostel.name })
-    : t("seo.homeDesc");
+  const adminLink =
+    user && role === "admin" && hostelSlug
+      ? { label: t("nav.admin"), to: `${base}/admin` }
+      : null;
 
   return (
-    <Box>
-      <Seo title={title} description={description} canonical={canonical} />
+    <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+      <AppBar
+        position="fixed"
+        elevation={0}
+        sx={{
+          backdropFilter: "blur(10px)",
+          backgroundColor: "rgba(18,18,18,0.72)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <Container>
+          <Toolbar disableGutters sx={{ minHeight: 64, gap: 1, px: { xs: 1, sm: 0 } }}>
+            {/* Mobile menu */}
+            <IconButton
+              onClick={() => setOpen(true)}
+              sx={{ display: { xs: "inline-flex", sm: "none" } }}
+              color="inherit"
+              aria-label="menu"
+            >
+              <MenuIcon />
+            </IconButton>
 
-      <Grid container sx={{ minHeight: "80vh" }}>
-        <Grid
-          size={{ xs: 12, md: 6 }}
-          sx={{ display: "flex", flexDirection: "column", justifyContent: "center", pr: { md: 6 } }}
-        >
-          <Typography variant="h1" gutterBottom>
-            {t("home.heroLine1")}
-            <br />
-            {t("home.heroLine2")}
-          </Typography>
+            <Typography
+              component={RouterLink}
+              to={base}
+              sx={{
+                textDecoration: "none",
+                color: "inherit",
+                fontWeight: 900,
+                letterSpacing: 1,
+                mr: 1,
+                flexGrow: { xs: 1, sm: 0 },
+                fontSize: 14,
+              }}
+            >
+              HOSTLY
+            </Typography>
 
-          <Button
-            variant="contained"
-            component={RouterLink}
-            to={hostelSlug ? `/${hostelSlug}/rooms` : "/"}
-            sx={{ mt: 4, width: "fit-content", px: 4, py: 1.5, letterSpacing: 1.5 }}
+            {/* Desktop nav */}
+            <Stack direction="row" spacing={1} sx={{ display: { xs: "none", sm: "flex" }, ml: 1 }}>
+              {links.map((l) => (
+                <Button
+                  key={l.to}
+                  component={RouterLink}
+                  to={l.to}
+                  color="inherit"
+                  sx={{ px: 1.5, opacity: 0.95 }}
+                >
+                  {l.label}
+                </Button>
+              ))}
+              {adminLink && (
+                <Button component={RouterLink} to={adminLink.to} color="inherit" sx={{ px: 1.5 }}>
+                  {adminLink.label}
+                </Button>
+              )}
+            </Stack>
+
+            <Box sx={{ flexGrow: 1 }} />
+            <LanguageSwitcher />
+          </Toolbar>
+        </Container>
+      </AppBar>
+
+      {/* ✅ Spacer: evita superposición */}
+      <Toolbar />
+
+      {/* Mobile Drawer */}
+      <Drawer
+        anchor="left"
+        open={open}
+        onClose={() => setOpen(false)}
+        PaperProps={{
+          sx: { width: 300, backgroundColor: "#0f0f10", color: "white" },
+        }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Typography sx={{ fontWeight: 900, letterSpacing: 1 }}>HOSTLY</Typography>
+          <Typography sx={{ opacity: 0.7, mt: 0.5, fontSize: 13 }}>{slugFromUrl}</Typography>
+        </Box>
+        <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
+        <List>
+          {links.map((l) => (
+            <ListItemButton key={l.to} component={RouterLink} to={l.to} onClick={() => setOpen(false)}>
+              <ListItemText primary={l.label} />
+            </ListItemButton>
+          ))}
+          {adminLink && (
+            <ListItemButton component={RouterLink} to={adminLink.to} onClick={() => setOpen(false)}>
+              <ListItemText primary={adminLink.label} />
+            </ListItemButton>
+          )}
+        </List>
+      </Drawer>
+
+      <Box component="main" sx={{ flex: 1, overflowX: "hidden" }}>
+        <Outlet />
+      </Box>
+
+      <Box component="footer" sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", background: "rgba(255,255,255,0.75)" }}>
+        <Container sx={{ py: 2 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            justifyContent="space-between"
+            alignItems={{ xs: "flex-start", sm: "center" }}
           >
-            {t("nav.book")}
-          </Button>
-        </Grid>
+            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
+              © {new Date().getFullYear()} HOSTLY.
+            </Typography>
 
-        {/* imagen igual */}
-        <Grid
-          size={{ xs: 12, md: 6 }}
-          sx={{
-            minHeight: { xs: 400, md: "auto" },
-            backgroundImage:
-              "url(https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1400&q=80)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-      </Grid>
-
-      <Grid container spacing={6} sx={{ mt: 12, alignItems: "center" }}>
-        <Grid
-          size={{ xs: 12, md: 6 }}
-          sx={{
-            minHeight: 400,
-            backgroundImage:
-              "url(https://images.unsplash.com/photo-1528909514045-2fa4ac7a08ba?auto=format&fit=crop&w=1400&q=80)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
-
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Typography variant="h2" gutterBottom>
-            {t("home.aboutTitle")}
-          </Typography>
-
-          <Typography variant="body1" sx={{ mb: 3 }}>
-            {t("home.aboutP1")}
-          </Typography>
-
-          <Typography variant="body1" sx={{ mb: 4 }}>
-            {t("home.aboutP2")}
-          </Typography>
-
-          <Button variant="outlined">{t("home.learnMore")}</Button>
-        </Grid>
-      </Grid>
-
-      <Box sx={{ mt: 16 }}>
-        <Grid container spacing={6}>
-          <RoomsPage />
-        </Grid>
+            <Stack direction="row" spacing={2} sx={{ fontSize: 13 }}>
+              <Typography component={RouterLink} to={`${base}/terms`} sx={{ textDecoration: "none" }}>
+                {t("footer.terms")}
+              </Typography>
+              <Typography component={RouterLink} to={`${base}/privacy`} sx={{ textDecoration: "none" }}>
+                {t("footer.privacy")}
+              </Typography>
+            </Stack>
+          </Stack>
+        </Container>
       </Box>
     </Box>
   );

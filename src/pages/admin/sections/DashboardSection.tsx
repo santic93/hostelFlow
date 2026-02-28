@@ -1,30 +1,26 @@
-import { useEffect, useState } from "react";
-type Reservation = {
-  total?: number;
-};
-
-type Language = "es" | "en" | "pt";
-import {  useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  Container,
   FormControl,
-  Grid,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   Typography,
 } from "@mui/material";
+import Grid from "@mui/material/Grid2";
 import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { useTranslation } from "react-i18next";
+import { db } from "../../../services/firebase";
 
-import { db } from "../../../services/firebase"; // ajustá path
-
-
+type Reservation = { total?: number };
+type Language = "es" | "en" | "pt";
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
@@ -37,9 +33,10 @@ export default function DashboardSection() {
   const [defaultLanguage, setDefaultLanguage] = useState<Language>("es");
   const [savingLang, setSavingLang] = useState(false);
   const [loading, setLoading] = useState(true);
+
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const currency = "USD"; // después lo hacemos configurable por hostel (AR$ / EUR / USD)
+  const currency = "USD";
   const money = useMemo(
     () =>
       new Intl.NumberFormat(i18n.language || "es", {
@@ -47,7 +44,7 @@ export default function DashboardSection() {
         currency,
         maximumFractionDigits: 0,
       }),
-    [i18n.language, currency]
+    [i18n.language]
   );
 
   useEffect(() => {
@@ -55,7 +52,6 @@ export default function DashboardSection() {
 
     const run = async () => {
       if (!hostelSlug) return;
-
       setLoading(true);
       setMsg(null);
 
@@ -78,11 +74,8 @@ export default function DashboardSection() {
         if (hostelSnap.exists()) {
           const data = hostelSnap.data() as any;
           const lng = (data?.defaultLanguage ?? "es") as Language;
-          if (lng === "es" || lng === "en" || lng === "pt") setDefaultLanguage(lng);
-          else setDefaultLanguage("es");
+          setDefaultLanguage(lng === "en" || lng === "pt" || lng === "es" ? lng : "es");
         }
-      } catch (err) {
-        console.error("DashboardSection fetch error:", err);
       } finally {
         if (alive) setLoading(false);
       }
@@ -96,94 +89,83 @@ export default function DashboardSection() {
 
   const handleSaveLanguage = async () => {
     if (!hostelSlug) return;
-
     setMsg(null);
+
     try {
       setSavingLang(true);
-
-      await updateDoc(doc(db, "hostels", hostelSlug), {
-        defaultLanguage,
-      });
-
-      // aplica al toque en el panel (admin)
+      await updateDoc(doc(db, "hostels", hostelSlug), { defaultLanguage });
       i18n.changeLanguage(defaultLanguage);
-
       setMsg({ type: "success", text: t("admin.dashboard.msgSaved") });
-    } catch (err) {
-      console.error("SAVE defaultLanguage error:", err);
+    } catch {
       setMsg({ type: "error", text: t("admin.dashboard.msgSaveError") });
     } finally {
       setSavingLang(false);
     }
   };
 
-  const StatCard = ({ title, value }: { title: string; value: React.ReactNode }) => (
-    <Paper elevation={3} sx={{ p: 3, borderRadius: 3 }}>
-      <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-        {title}
-      </Typography>
-      <Typography variant="h4" mt={1}>
-        {value}
-      </Typography>
-    </Paper>
+  const Stat = ({ title, value }: { title: string; value: React.ReactNode }) => (
+    <Card>
+      <CardContent>
+        <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 24 }}>{value}</Typography>
+      </CardContent>
+    </Card>
   );
 
   return (
-    <Box>
-      <Typography variant="h4" mb={3}>
-        {t("admin.dashboard.title")}
-      </Typography>
+    <Container disableGutters>
+      <Stack spacing={2}>
+        <Typography variant="h5">{t("admin.dashboard.title")}</Typography>
 
-      {msg && (
-        <Alert severity={msg.type} sx={{ mb: 3 }}>
-          {msg.text}
-        </Alert>
-      )}
+        {msg && <Alert severity={msg.type}>{msg.text}</Alert>}
 
-      {/* CONFIG */}
-      <Paper elevation={2} sx={{ p: 3, borderRadius: 3, mb: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          {t("admin.dashboard.configTitle")}
-        </Typography>
+        <Card>
+          <CardContent>
+            <Stack spacing={1.5}>
+              <Typography sx={{ fontWeight: 900 }}>{t("admin.dashboard.configTitle")}</Typography>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-          <FormControl size="small" sx={{ minWidth: 240 }} disabled={loading}>
-            <InputLabel>{t("admin.dashboard.defaultLanguageLabel")}</InputLabel>
-            <Select
-              label={t("admin.dashboard.defaultLanguageLabel")}
-              value={defaultLanguage}
-              onChange={(e) => setDefaultLanguage(e.target.value as Language)}
-            >
-              <MenuItem value="es">{t("admin.dashboard.languages.es")}</MenuItem>
-              <MenuItem value="en">{t("admin.dashboard.languages.en")}</MenuItem>
-              <MenuItem value="pt">{t("admin.dashboard.languages.pt")}</MenuItem>
-            </Select>
-          </FormControl>
+              <FormControl size="small" fullWidth>
+                <InputLabel>{t("admin.dashboard.defaultLanguageLabel")}</InputLabel>
+                <Select
+                  value={defaultLanguage}
+                  label={t("admin.dashboard.defaultLanguageLabel")}
+                  onChange={(e) => setDefaultLanguage(e.target.value as Language)}
+                >
+                  <MenuItem value="es">{t("admin.dashboard.languages.es")}</MenuItem>
+                  <MenuItem value="en">{t("admin.dashboard.languages.en")}</MenuItem>
+                  <MenuItem value="pt">{t("admin.dashboard.languages.pt")}</MenuItem>
+                </Select>
+              </FormControl>
 
-          <Button variant="contained" onClick={handleSaveLanguage} disabled={savingLang || loading}>
-            {savingLang ? t("admin.dashboard.saving") : t("admin.dashboard.save")}
-          </Button>
-        </Stack>
+              <Button variant="contained" onClick={handleSaveLanguage} disabled={savingLang}>
+                {savingLang ? t("admin.dashboard.saving") : t("admin.dashboard.save")}
+              </Button>
 
-        <Typography variant="body2" sx={{ color: "text.secondary", mt: 1.5 }}>
-          {t("admin.dashboard.help")}
-        </Typography>
-      </Paper>
+              <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                {t("admin.dashboard.help")}
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
 
-      {/* STATS */}
-      <Grid container spacing={3}>
-        <Grid sx={{ xs: 12, md: 4 }}>
-          <StatCard title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
+        <Grid container spacing={2}>
+          <Grid xs={12} sm={6} md={4}>
+            <Stat title={t("admin.dashboard.stats.revenue")} value={money.format(totalRevenue)} />
+          </Grid>
+          <Grid xs={12} sm={6} md={4}>
+            <Stat title={t("admin.dashboard.stats.reservations")} value={totalReservations} />
+          </Grid>
+          <Grid xs={12} sm={6} md={4}>
+            <Stat title={t("admin.dashboard.stats.rooms")} value={totalRooms} />
+          </Grid>
         </Grid>
 
-        <Grid sx={{ xs: 12, md: 4 }}>
-          <StatCard title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
-        </Grid>
-
-        <Grid sx={{ xs: 12, md: 4 }}>
-          <StatCard title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
-        </Grid>
-      </Grid>
-    </Box>
+        {loading && (
+          <Box sx={{ py: 2 }}>
+            <Typography sx={{ opacity: 0.75 }}>{t("loading.subtitle")}</Typography>
+          </Box>
+        )}
+      </Stack>
+    </Container>
   );
 }

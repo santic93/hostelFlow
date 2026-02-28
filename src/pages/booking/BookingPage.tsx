@@ -11,28 +11,25 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
   Container,
-  Grid,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import ArrowBackIosNewIcon from "@mui/icons-material/ArrowBackIosNew";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { doc, getDoc } from "firebase/firestore";
-
 import HotelLoading from "../../components/HotelLoading";
 import { createReservation } from "../../services/reservations";
-import { db } from "../../firebase";
+import { db } from "../../services/firebase";
 
 dayjs.extend(isSameOrBefore);
 
 function getCallableErrorInfo(err: any) {
-  // Firebase Functions suele devolver: code / message / details
   const code = err?.code ?? err?.name ?? "unknown";
   const message = err?.message ?? "Unknown error";
   const details = err?.details ?? null;
-
   return { code, message, details };
 }
 
@@ -43,23 +40,19 @@ export const BookingPage = () => {
 
   const lng = (i18n.language || "es").slice(0, 2);
   const dayjsLocale = lng === "pt" ? "pt-br" : lng === "en" ? "en" : "es";
-
   useEffect(() => {
     dayjs.locale(dayjsLocale);
   }, [dayjsLocale]);
 
   const [checkIn, setCheckIn] = useState<Dayjs | null>(null);
   const [checkOut, setCheckOut] = useState<Dayjs | null>(null);
-
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
-
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-
   const [formError, setFormError] = useState<string | null>(null);
 
   const isEmailValid = /^\S+@\S+\.\S+$/.test(email.trim());
@@ -68,15 +61,10 @@ export const BookingPage = () => {
   useEffect(() => {
     const fetchRoom = async () => {
       if (!hostelSlug || !roomId) return;
-
       const docSnap = await getDoc(doc(db, "hostels", hostelSlug, "rooms", roomId));
-      if (docSnap.exists()) {
-        setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
-      } else {
-        setSelectedRoom(null);
-      }
+      if (docSnap.exists()) setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
+      else setSelectedRoom(null);
     };
-
     fetchRoom();
   }, [hostelSlug, roomId]);
 
@@ -99,12 +87,10 @@ export const BookingPage = () => {
 
   const handleConfirm = async () => {
     setFormError(null);
-
     if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
     try {
       setLoading(true);
-
       const payload = {
         hostelSlug,
         roomId: selectedRoom.id,
@@ -114,33 +100,16 @@ export const BookingPage = () => {
         email: email.trim().toLowerCase(),
       };
 
-      // Debug útil (lo podés borrar después)
-      console.log("createReservation payload:", payload);
-
       const res = await createReservation(payload);
-
-      console.log("createReservation response:", res);
-
-      if (res?.ok) {
-        setSuccess(true);
-      } else {
-        setFormError(t("booking.errorSaving"));
-      }
+      if (res?.ok) setSuccess(true);
+      else setFormError(t("booking.errorSaving"));
     } catch (err: any) {
       const info = getCallableErrorInfo(err);
-
-      console.error("createReservation error FULL:", err);
-      console.error("createReservation error parsed:", info);
-
-      // Errores más comunes (function)
       const msg = String(info.message || "").toLowerCase();
       const code = String(info.code || "").toLowerCase();
 
       if (msg.includes("fechas no disponibles") || code.includes("already-exists")) {
         setFormError(t("booking.unavailable"));
-      } else if (code.includes("permission-denied") || code.includes("unauthenticated")) {
-        // si alguna vez llegás a exigir auth para reservar
-        setFormError("No autorizado. Probá refrescar la página.");
       } else {
         setFormError(t("booking.errorSaving"));
       }
@@ -151,132 +120,116 @@ export const BookingPage = () => {
 
   if (!hostelSlug) return null;
 
-  if (loading) {
-    return <HotelLoading fullScreen={false} text={t("booking.processing")} subtitle="" />;
-  }
+  if (loading) return <HotelLoading />;
 
   if (success) {
     return (
-      <Container sx={{ py: 15, textAlign: "center" }}>
-        <Typography variant="h2" gutterBottom>
-          {t("booking.successTitle")}
-        </Typography>
-        <Typography sx={{ mb: 4 }}>{t("booking.successText")}</Typography>
+      <Container sx={{ py: 6 }}>
+        <Card>
+          <CardContent>
+            <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
+              {t("booking.successTitle")}
+            </Typography>
+            <Typography sx={{ color: "text.secondary" }}>{t("booking.successText")}</Typography>
+          </CardContent>
+        </Card>
       </Container>
     );
   }
 
   return (
-    <>
-      <Button onClick={() => navigate(-1)} startIcon={<ArrowBackIosNewIcon />}>
-        {t("booking.back")}
-      </Button>
+    <Container sx={{ py: { xs: 3, sm: 5 } }}>
+      <Stack spacing={2}>
+        <Button variant="outlined" onClick={() => navigate(-1)} sx={{ alignSelf: "flex-start" }}>
+          {t("booking.back")}
+        </Button>
 
-      <Container sx={{ py: 10 }}>
-        <Typography variant="h2" gutterBottom>
-          {t("booking.title")}
-        </Typography>
+        <Typography variant="h2">{t("booking.title")}</Typography>
 
-        {formError && (
-          <Alert severity="error" sx={{ mt: 3 }}>
-            {formError}
-          </Alert>
-        )}
+        {formError && <Alert severity="error">{formError}</Alert>}
 
-        <Grid container spacing={8} sx={{ mt: 4 }}>
-          {/* LEFT */}
-          <Grid sx={{ xs: 12, md: 7 }}>
-            <Stack spacing={4}>
-              <DatePicker
-                label={t("booking.checkIn")}
-                value={checkIn}
-                minDate={dayjs()}
-                onChange={(newValue) => {
-                  setCheckIn(newValue);
-                  if (checkOut && newValue && checkOut.isSameOrBefore(newValue, "day")) {
-                    setCheckOut(null);
-                  }
-                }}
-              />
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="stretch">
+          {/* FORM */}
+          <Card sx={{ flex: 1 }}>
+            <CardContent>
+              <Stack spacing={2}>
+                <DatePicker
+                  label={t("booking.checkIn")}
+                  value={checkIn}
+                  onChange={(newValue) => {
+                    setCheckIn(newValue);
+                    if (checkOut && newValue && checkOut.isSameOrBefore(newValue, "day")) {
+                      setCheckOut(null);
+                    }
+                  }}
+                />
 
-              <DatePicker
-                label={t("booking.checkOut")}
-                value={checkOut}
-                minDate={checkIn || dayjs()}
-                onChange={(newValue) => setCheckOut(newValue)}
-              />
-            </Stack>
+                <DatePicker
+                  label={t("booking.checkOut")}
+                  value={checkOut}
+                  onChange={(newValue) => setCheckOut(newValue)}
+                  minDate={checkIn ? checkIn.add(1, "day") : undefined}
+                />
 
-            <Stack spacing={4} sx={{ mt: 6 }}>
-              <TextField
-                label={t("booking.fullName")}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                fullWidth
-              />
+                <TextField
+                  label={t("booking.fullName")}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  fullWidth
+                />
 
-              <TextField
-                label={t("booking.email")}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onBlur={() => setEmailTouched(true)}
-                fullWidth
-                error={showEmailError}
-                helperText={showEmailError ? t("booking.emailInvalid") : ""}
-              />
-            </Stack>
+                <TextField
+                  label={t("booking.email")}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onBlur={() => setEmailTouched(true)}
+                  fullWidth
+                  error={showEmailError}
+                  helperText={showEmailError ? t("booking.emailInvalid") : ""}
+                />
 
-            <Button
-              variant="contained"
-              fullWidth
-              sx={{ mt: 6, py: 2 }}
-              disabled={!isFormValid}
-              onClick={handleConfirm}
-            >
-              {t("booking.confirm")}
-            </Button>
-          </Grid>
+                <Button
+                  variant="contained"
+                  size="large"
+                  disabled={!isFormValid}
+                  onClick={handleConfirm}
+                >
+                  {t("booking.confirm")}
+                </Button>
+              </Stack>
+            </CardContent>
+          </Card>
 
-          {/* RIGHT */}
-          <Grid sx={{ xs: 12, md: 5 }}>
-            <Box
-              sx={{
-                border: "1px solid #E0E0E0",
-                borderRadius: 3,
-                p: 4,
-                position: { md: "sticky" },
-                top: { md: 100 },
-              }}
-            >
+          {/* SUMMARY */}
+          <Card sx={{ width: { xs: "100%", md: 380 }, flexShrink: 0 }}>
+            <CardContent>
               {selectedRoom ? (
-                <>
-                  <Typography variant="h5" gutterBottom>
-                    {selectedRoom.name}
-                  </Typography>
-
-                  <Typography sx={{ mb: 2 }}>
+                <Stack spacing={1.2}>
+                  <Typography sx={{ fontWeight: 900, fontSize: 18 }}>{selectedRoom.name}</Typography>
+                  <Typography sx={{ color: "text.secondary" }}>
                     {t("booking.summaryPerNight", { price: selectedRoom.price })}
                   </Typography>
-
-                  <Box sx={{ borderTop: "1px solid #eee", my: 3 }} />
-
-                  <Typography>
-                    {nights > 0
-                      ? t("booking.summaryNights", { n: nights })
-                      : t("booking.summarySelectDates")}
+                  <Typography sx={{ color: "text.secondary" }}>
+                    {nights > 0 ? t("booking.summaryNights", { n: nights }) : t("booking.summarySelectDates")}
                   </Typography>
 
-                  <Typography variant="h6" sx={{ mt: 2 }}>
+                  <Box sx={{ height: 10 }} />
+
+                  <Typography sx={{ fontWeight: 900, fontSize: 20 }}>
                     {t("booking.summaryTotal", { total })}
                   </Typography>
-                </>
+
+                  <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                    Confirmación por email. Sin comisión.
+                  </Typography>
+                </Stack>
               ) : (
-                <Typography>{t("booking.summarySelectRoom")}</Typography>
+                <Typography sx={{ opacity: 0.75 }}>{t("booking.summarySelectRoom")}</Typography>
               )}
-            </Box>
-          </Grid>
-        </Grid>
-      </Container>
-    </>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Stack>
+    </Container>
   );
 };

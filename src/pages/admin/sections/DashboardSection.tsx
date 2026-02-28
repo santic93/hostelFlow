@@ -14,7 +14,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/GridLegacy";
 import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
 import { useTranslation } from "react-i18next";
 import { db } from "../../../services/firebase";
@@ -149,13 +149,13 @@ export default function DashboardSection() {
         </Card>
 
         <Grid container spacing={2}>
-          <Grid xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={6} md={4}>
             <Stat title={t("admin.dashboard.stats.revenue")} value={money.format(totalRevenue)} />
           </Grid>
-          <Grid xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={6} md={4}>
             <Stat title={t("admin.dashboard.stats.reservations")} value={totalReservations} />
           </Grid>
-          <Grid xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={6} md={4}>
             <Stat title={t("admin.dashboard.stats.rooms")} value={totalRooms} />
           </Grid>
         </Grid>

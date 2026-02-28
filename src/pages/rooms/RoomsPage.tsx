@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { Box, Button, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
-import Grid from "@mui/material/Unstable_Grid2";
+import Grid from "@mui/material/GridLegacy";
 import { db } from "../../services/firebase";
 import { useTranslation } from "react-i18next";
 import { RoomCardCarousel } from "../../components/RoomCardCarousel";
@@ -71,7 +71,7 @@ export const RoomsPage = () => {
           {rooms.map((room) => {
             const urls = (room.imageUrls ?? []).filter(Boolean);
             return (
-              <Grid key={room.id} xs={12} sm={6} md={4}>
+              <Grid item key={room.id} xs={12} sm={6} md={4}>
                 <Card sx={{ overflow: "hidden" }}>
                   <Box sx={{ position: "relative" }}>
                     <RoomCardCarousel urls={urls} alt={room.name} />

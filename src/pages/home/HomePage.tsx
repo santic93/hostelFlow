@@ -1,170 +1,97 @@
-import { useMemo, useState } from "react";
-import {
-  AppBar,
-  Box,
-  Button,
-  Container,
-  Drawer,
-  IconButton,
-  List,
-  ListItemButton,
-  ListItemText,
-  Toolbar,
-  Typography,
-  Stack,
-  Divider,
-} from "@mui/material";
-import MenuIcon from "@mui/icons-material/Menu";
-import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import LanguageSwitcher from "../../components/LanguageSwitcher";
+import { Box, Button, Container, Stack, Typography, Card, CardContent } from "@mui/material";
+import { Link as RouterLink, useParams } from "react-router-dom";
+import { useHostelPublic } from "../../hooks/useHostelPublic";
+import { Seo } from "../../components/Seo";
 import { useTranslation } from "react-i18next";
 
-export const MainLayout = () => {
-  const { user, role, hostelSlug } = useAuth();
-  const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
+export const HomePage = () => {
+  const { hostelSlug } = useParams<{ hostelSlug: string }>();
+  const { hostel } = useHostelPublic(hostelSlug);
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
 
-  if (!slugFromUrl) return null;
-  const base = `/${slugFromUrl}`;
+  const base = window.location.origin;
+  const canonical = hostelSlug ? `${base}/${hostelSlug}` : `${base}/`;
 
-  const links = useMemo(
-    () => [
-      { label: t("nav.rooms"), to: `${base}/rooms` },
-      { label: t("nav.book"), to: `${base}#book` },
-    ],
-    [t, base]
-  );
-
-  const adminLink =
-    user && role === "admin" && hostelSlug
-      ? { label: t("nav.admin"), to: `${base}/admin` }
-      : null;
+  const title = hostel?.name
+    ? t("seo.homeTitleWithHostel", { hostel: hostel.name })
+    : t("seo.homeTitle");
+  const description = hostel?.name
+    ? t("seo.homeDescWithHostel", { hostel: hostel.name })
+    : t("seo.homeDesc");
 
   return (
-    <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-      <AppBar
-        position="fixed"
-        elevation={0}
-        sx={{
-          backdropFilter: "blur(10px)",
-          backgroundColor: "rgba(18,18,18,0.72)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <Container>
-          <Toolbar disableGutters sx={{ minHeight: 64, gap: 1, px: { xs: 1, sm: 0 } }}>
-            {/* Mobile menu */}
-            <IconButton
-              onClick={() => setOpen(true)}
-              sx={{ display: { xs: "inline-flex", sm: "none" } }}
-              color="inherit"
-              aria-label="menu"
-            >
-              <MenuIcon />
-            </IconButton>
+    <>
+      <Seo title={title} description={description} canonical={canonical} />
 
-            <Typography
-              component={RouterLink}
-              to={base}
-              sx={{
-                textDecoration: "none",
-                color: "inherit",
-                fontWeight: 900,
-                letterSpacing: 1,
-                mr: 1,
-                flexGrow: { xs: 1, sm: 0 },
-                fontSize: 14,
-              }}
-            >
-              HOSTLY
-            </Typography>
-
-            {/* Desktop nav */}
-            <Stack direction="row" spacing={1} sx={{ display: { xs: "none", sm: "flex" }, ml: 1 }}>
-              {links.map((l) => (
-                <Button
-                  key={l.to}
-                  component={RouterLink}
-                  to={l.to}
-                  color="inherit"
-                  sx={{ px: 1.5, opacity: 0.95 }}
-                >
-                  {l.label}
-                </Button>
-              ))}
-              {adminLink && (
-                <Button component={RouterLink} to={adminLink.to} color="inherit" sx={{ px: 1.5 }}>
-                  {adminLink.label}
-                </Button>
-              )}
-            </Stack>
-
-            <Box sx={{ flexGrow: 1 }} />
-            <LanguageSwitcher />
-          </Toolbar>
-        </Container>
-      </AppBar>
-
-      {/* ✅ Spacer: evita superposición */}
-      <Toolbar />
-
-      {/* Mobile Drawer */}
-      <Drawer
-        anchor="left"
-        open={open}
-        onClose={() => setOpen(false)}
-        PaperProps={{
-          sx: { width: 300, backgroundColor: "#0f0f10", color: "white" },
-        }}
-      >
-        <Box sx={{ p: 2 }}>
-          <Typography sx={{ fontWeight: 900, letterSpacing: 1 }}>HOSTLY</Typography>
-          <Typography sx={{ opacity: 0.7, mt: 0.5, fontSize: 13 }}>{slugFromUrl}</Typography>
-        </Box>
-        <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-        <List>
-          {links.map((l) => (
-            <ListItemButton key={l.to} component={RouterLink} to={l.to} onClick={() => setOpen(false)}>
-              <ListItemText primary={l.label} />
-            </ListItemButton>
-          ))}
-          {adminLink && (
-            <ListItemButton component={RouterLink} to={adminLink.to} onClick={() => setOpen(false)}>
-              <ListItemText primary={adminLink.label} />
-            </ListItemButton>
-          )}
-        </List>
-      </Drawer>
-
-      <Box component="main" sx={{ flex: 1, overflowX: "hidden" }}>
-        <Outlet />
-      </Box>
-
-      <Box component="footer" sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", background: "rgba(255,255,255,0.75)" }}>
-        <Container sx={{ py: 2 }}>
+      <Container sx={{ py: { xs: 3, sm: 5 } }}>
+        <Stack spacing={{ xs: 2, sm: 3 }}>
           <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1}
-            justifyContent="space-between"
-            alignItems={{ xs: "flex-start", sm: "center" }}
+            direction={{ xs: "column", md: "row" }}
+            spacing={{ xs: 2, md: 3 }}
+            alignItems={{ md: "stretch" }}
           >
-            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
-              © {new Date().getFullYear()} HOSTLY.
-            </Typography>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h1" sx={{ mb: 1 }}>
+                {t("home.heroLine1")}
+              </Typography>
+              <Typography variant="h1" sx={{ opacity: 0.95 }}>
+                {t("home.heroLine2")}
+              </Typography>
 
-            <Stack direction="row" spacing={2} sx={{ fontSize: 13 }}>
-              <Typography component={RouterLink} to={`${base}/terms`} sx={{ textDecoration: "none" }}>
-                {t("footer.terms")}
+              <Stack direction="row" spacing={1.2} sx={{ mt: 2, flexWrap: "wrap" }}>
+                <Button
+                  component={RouterLink}
+                  to={hostelSlug ? `/${hostelSlug}/rooms` : "/"}
+                  variant="contained"
+                  size="large"
+                >
+                  {t("nav.book")}
+                </Button>
+                <Button
+                  component={RouterLink}
+                  to={hostelSlug ? `/${hostelSlug}/rooms` : "/"}
+                  variant="outlined"
+                  size="large"
+                >
+                  {t("nav.rooms")}
+                </Button>
+              </Stack>
+
+              <Typography sx={{ mt: 2, color: "text.secondary", maxWidth: 560 }}>
+                {t("home.aboutP1")}
               </Typography>
-              <Typography component={RouterLink} to={`${base}/privacy`} sx={{ textDecoration: "none" }}>
-                {t("footer.privacy")}
-              </Typography>
-            </Stack>
+            </Box>
+
+            <Card sx={{ flex: 1, minHeight: { xs: 240, md: 420 }, overflow: "hidden" }}>
+              <CardContent sx={{ p: 0, height: "100%" }}>
+                <Box
+                  sx={{
+                    height: "100%",
+                    background:
+                      "linear-gradient(120deg, rgba(115,2,2,0.18), rgba(0,0,0,0)), radial-gradient(circle at 20% 0%, rgba(0,0,0,0.10), transparent 55%)",
+                    display: "flex",
+                    alignItems: "flex-end",
+                    p: 2,
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 800, letterSpacing: 0.2 }}>
+                    {hostel?.name ?? "HOSTLY"}
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
           </Stack>
-        </Container>
-      </Box>
-    </Box>
+
+          <Card>
+            <CardContent>
+              <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
+                {t("home.aboutTitle")}
+              </Typography>
+              <Typography sx={{ color: "text.secondary" }}>{t("home.aboutP2")}</Typography>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Container>
+    </>
   );
 };

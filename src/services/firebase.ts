@@ -16,7 +16,11 @@ const firebaseConfig = {
 
 
 export const app = initializeApp(firebaseConfig);
-
+// SOLO PARA DEV
+if (import.meta.env.DEV) {
+  // @ts-ignore
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
 // ✅ App Check (Web + reCAPTCHA v3)
 initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider(import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY),

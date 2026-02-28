@@ -24,7 +24,7 @@ import RoomsSection from "../features/admin/sections/RoomsSection";
 import ReservationsSection from "../features/admin/sections/ReservationSecition";
 import { theme } from "../theme/theme";
 import DateI18nProvider from "../features/providers/DateI18nProvider";
-import MembersSection from "../features/admin/sections/MemberSection";
+import MembersSection from "../features/admin/sections/MembersSection";
 
 export const router = createBrowserRouter([
   {

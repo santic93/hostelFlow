@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../services/firebase";
-import HotelLoading from "../components/HotelLoading";
 import { useTranslation } from "react-i18next";
+import { auth, db } from "../../services/firebase";
+import HotelLoading from "../../components/HotelLoading";
 
 type Role = "admin" | "guest";
 

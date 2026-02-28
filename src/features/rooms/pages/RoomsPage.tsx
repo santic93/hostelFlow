@@ -3,9 +3,10 @@ import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { Box, Button, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
-import { db } from "../../services/firebase";
 import { useTranslation } from "react-i18next";
-import { RoomCardCarousel } from "../../components/RoomCardCarousel";
+import { db } from "../../../services/firebase";
+import { RoomCardCarousel } from "../../../components/RoomCardCarousel";
+
 
 type Room = {
   id: string;

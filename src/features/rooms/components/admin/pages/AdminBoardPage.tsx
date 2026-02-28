@@ -4,10 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Box, Button, Typography } from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { collection, deleteDoc, doc, getDocs, orderBy, query } from "firebase/firestore";
-
-import { db } from "../../services/firebase";
-import type { Room } from "../../types/room";
-import { Seo } from "../../components/Seo";
+import type { Room } from "../../../../../types/room";
+import { Seo } from "../../../../../components/Seo";
+import { db } from "../../../../../services/firebase";
 
 export default function AdminRoomsPage() {
   const { t } = useTranslation();

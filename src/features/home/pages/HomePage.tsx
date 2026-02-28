@@ -1,8 +1,8 @@
 import { Box, Button, Container, Stack, Typography, Card, CardContent } from "@mui/material";
 import { Link as RouterLink, useParams } from "react-router-dom";
-import { useHostelPublic } from "../../hooks/useHostelPublic";
-import { Seo } from "../../components/Seo";
 import { useTranslation } from "react-i18next";
+import { useHostelPublic } from "../../../hooks/useHostelPublic";
+import { Seo } from "../../../components/Seo";
 
 export const HomePage = () => {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();

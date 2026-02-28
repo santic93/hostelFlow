@@ -1,28 +1,30 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
-import { theme } from "./theme/theme";
-import { RoomDetailPage } from "./pages/rooms/RoomDetailPage";
-import { RoomsPage } from "./pages/rooms/RoomsPage";
-import ProtectedRoute from "./components/ProtectedRoute";
-import { HomePage } from "./pages/home/HomePage";
-import { BookingPage } from "./pages/booking/BookingPage";
 import { MainLayout } from "./layouts/main/MainLayout";
-import { TermsPage } from "./pages/terms/TermsPage";
-import { PrivacyPage } from "./pages/privacyPage/PrivacyPage";
-import TenantGuard from "./layouts/tenant/TenantGuard";
-import DateI18nProvider from "./providers/DateI18nProvider";
-import AppErrorPage from "./pages/AppErrorPage";
-import RootRedirect from "./routes/RootLanding";
-import LoginPage from "./pages/login/LoginPage";
-import RegisterPage from "./pages/register/RegisterPage";
-import AdminRedirect from "./pages/admin/AdminRedirect";
 
-import DashboardSection from "./pages/admin/sections/DashboardSection";
-import RoomsSection from "./pages/admin/sections/RoomsSection";
+import TenantGuard from "./layouts/tenant/TenantGuard";
+
 import AdminShell from "./layouts/admin/AdminShell";
-import ReservationsSection from "./pages/admin/sections/ReservationSecition";
-import ForgotPasswordPage from "./pages/ForgotPassword";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AppErrorPage from "../features/AppErrorPage";
+import RootRedirect from "../routes/RootLanding";
+import LoginPage from "../features/login/LoginPage";
+import RegisterPage from "../features/register/RegisterPage";
+import AdminRedirect from "../features/admin/AdminRedirect";
+import ForgotPasswordPage from "../features/ForgotPassword";
+import ResetPasswordPage from "../features/ResetPasswordPage";
+import { HomePage } from "../features/home/pages/HomePage";
+import { RoomsPage } from "../features/rooms/pages/RoomsPage";
+import { RoomDetailPage } from "../features/rooms/pages/RoomDetailPage";
+import { BookingPage } from "../features/booking/BookingPage";
+import { TermsPage } from "../features/terms/TermsPage";
+import { PrivacyPage } from "../features/privacyPage/PrivacyPage";
+import ProtectedRoute from "../components/ProtectedRoute";
+import DashboardSection from "../features/admin/sections/DashboardSection";
+import RoomsSection from "../features/admin/sections/RoomsSection";
+import ReservationsSection from "../features/admin/sections/ReservationSecition";
+import { theme } from "../theme/theme";
+import DateI18nProvider from "../features/providers/DateI18nProvider";
+
 export const router = createBrowserRouter([
   {
     path: "/",

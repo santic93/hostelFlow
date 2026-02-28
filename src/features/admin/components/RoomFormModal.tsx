@@ -16,7 +16,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { db, storage } from "../../../services/firebase";
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../app/providers/AuthContext";
+
 type RoomFormValues = {
   name: string;
   price: number;

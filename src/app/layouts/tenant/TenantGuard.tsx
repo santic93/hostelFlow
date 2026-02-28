@@ -1,9 +1,9 @@
 import { Outlet, useParams, Link as RouterLink } from "react-router-dom";
 import { Container, Typography, Button, Stack } from "@mui/material";
-import { useHostelPublic } from "../../hooks/useHostelPublic";
+import { useHostelPublic } from "../../../hooks/useHostelPublic";
 import { useTranslation } from "react-i18next";
-import HotelLoading from "../../components/HotelLoading";
-import { useAuth } from "../../context/AuthContext";
+import HotelLoading from "../../../components/HotelLoading";
+import { useAuth } from "../../providers/AuthContext";
 
 function safeSlug(input?: string) {
   return (input ?? "").toString().trim();

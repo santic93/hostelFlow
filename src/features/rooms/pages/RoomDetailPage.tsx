@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { Box, Button, Card, CardContent, Container, Stack, Typography } from "@mui/material";
-import { db } from "../../services/firebase";
 import { useTranslation } from "react-i18next";
-import { RoomCardCarousel } from "../../components/RoomCardCarousel";
+import { db } from "../../../services/firebase";
+import { RoomCardCarousel } from "../../../components/RoomCardCarousel";
+
 
 type Room = {
   id: string;

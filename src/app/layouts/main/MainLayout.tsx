@@ -16,9 +16,9 @@ import {
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import LanguageSwitcher from "../../components/LanguageSwitcher";
+import LanguageSwitcher from "../../../components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../providers/AuthContext";
 
 export const MainLayout = () => {
   const { user, role, hostelSlug } = useAuth();

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../services/firebase";
-import { setTenantLanguage } from "../i18n";
+import { setTenantLanguage } from "../app/providers/i18n";
 
 type HostelPublic = {
   name: string;

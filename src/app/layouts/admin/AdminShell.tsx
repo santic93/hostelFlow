@@ -23,9 +23,9 @@ import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PublicIcon from "@mui/icons-material/Public";
 import { signOut } from "firebase/auth";
-import { auth } from "../../services/firebase";
-import { useAuth } from "../../context/AuthContext";
+import { auth } from "../../../services/firebase";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../../providers/AuthContext";
 
 type MenuKey = "dashboard" | "reservations" | "rooms";
 

@@ -22,8 +22,9 @@ import PublicIcon from "@mui/icons-material/Public";
 import MenuIcon from "@mui/icons-material/Menu";
 import { signOut } from "firebase/auth";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../providers/AuthContext";
 import { auth } from "../../services/firebase";
+
 
 
 export const AdminLayout = () => {

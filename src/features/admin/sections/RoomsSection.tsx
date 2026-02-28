@@ -18,7 +18,8 @@ import { db, storage } from "../../../services/firebase";
 import RoomFormModal from "../components/RoomFormModal";
 import { deleteObject, ref } from "firebase/storage";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "../../../context/AuthContext";
+import { useAuth } from "../../../app/providers/AuthContext";
+
 
 type Room = {
   id: string;

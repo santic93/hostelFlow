@@ -4,9 +4,9 @@ import { Navigate, useNavigate } from "react-router-dom";
 
 import { collection, getDocs, limit, query } from "firebase/firestore";
 import { doc, getDoc } from "firebase/firestore";
-import { useAuth } from "../context/AuthContext";
 import { db } from "../services/firebase";
 import HotelLoading from "../components/HotelLoading";
+import { useAuth } from "../app/providers/AuthContext";
 
 
 function extractTenantSlug(input: string) {

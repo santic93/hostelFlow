@@ -1,7 +1,7 @@
 import { Navigate } from "react-router-dom";
 import HotelLoading from "../../components/HotelLoading";
-import { useAuth } from "../../context/AuthContext";
 import { t } from "i18next";
+import { useAuth } from "../../app/providers/AuthContext";
 
 
 export default function AdminRedirect() {

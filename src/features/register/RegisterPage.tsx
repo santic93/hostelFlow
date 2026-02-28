@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link as RouterLink } from "react-router-dom";
-import { createUserWithEmailAndPassword, deleteUser } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip, Paper } from "@mui/material";
 import { auth, functions } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
@@ -83,48 +83,45 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
-const handleCreateHostel = async () => {
-  if (loading) return;
-  setMessage(null);
+  const handleCreateHostel = async () => {
+    if (loading) return;
+    setMessage(null);
 
-  const current = auth.currentUser ?? createdUser;
-  if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
+    const current = auth.currentUser ?? createdUser;
+    if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
 
-  if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
-  if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
+    if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
+    if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
 
-  try {
-    setLoading(true);
-
-    const createHostel = httpsCallable(functions, "createHostel");
-
-    await createHostel({
-      name: hostelName.trim(),
-      slug: normalizedSlug,
-    });
-
-    setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
-    navigate("/admin", { replace: true });
-  } catch (err: any) {
-    console.error(err);
-
-    // si el usuario se creó recién y falla el alta del hostel, borrarlo (tu lógica)
     try {
-      if (auth.currentUser) await deleteUser(auth.currentUser);
-    } catch {}
+      setLoading(true);
 
-    setCreatedUser(null);
+      const createHostel = httpsCallable(functions, "createHostel");
 
-    // Firebase functions errors suelen venir como err.code
-    if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
-      setMessage({ type: "error", text: t("register.errors.slugTaken") });
-    } else {
-      setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
+      await createHostel({
+        name: hostelName.trim(),
+        slug: normalizedSlug,
+      });
+
+      setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
+      navigate("/admin", { replace: true });
+    } catch (err: any) {
+      console.error(err);
+
+      // ❌ NO borramos el usuario por fallas de backend (AppCheck / funciones / red).
+      // Lo dejamos logueado para que pueda reintentar.
+      setCreatedUser(auth.currentUser ?? createdUser);
+
+      // Firebase functions errors suelen venir como err.code
+      if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
+        setMessage({ type: "error", text: t("register.errors.slugTaken") });
+      } else {
+        setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
+      }
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
   if (loading) {
     return (
       <HotelLoading

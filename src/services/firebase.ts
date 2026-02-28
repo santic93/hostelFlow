@@ -16,7 +16,7 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-
+console.log("[FIREBASE PROJECT]", firebaseConfig.projectId);
 // ✅ SOLO PARA DEV (App Check debug token)
 if (import.meta.env.DEV) {
   // @ts-ignore

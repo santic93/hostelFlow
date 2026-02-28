@@ -547,22 +547,27 @@ export const cancelReservation = onCall(
  * createHostel (AUTH REQUIRED)
  * data: { name, slug }
  * Crea:
- *  - hostels/{slug}
- *  - hostels/{slug}/members/{uid} role=owner
- *  - users/{uid}.activeHostelSlug = slug
+ * - hostels/{slug}
+ * - hostels/{slug}/members/{uid} role=owner
+ * - users/{uid}.activeHostelSlug = slug
  */
 export const createHostel = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (req) => {
     assert(req.auth, "unauthenticated", "Requiere login");
-    const uid = req.auth!.uid;
 
+    const uid = req.auth!.uid;
     const name = String(req.data?.name || "").trim();
     const slug = String(req.data?.slug || "").trim();
 
+    // ✅ validaciones
     assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
     assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
     assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
+
+    // ✅ sacamos esto de la transaction
+    const userRecord = await admin.auth().getUser(uid);
+    const email = String(userRecord.email || "").toLowerCase();
 
     const hostelRef = db.doc(`hostels/${slug}`);
     const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
@@ -579,9 +584,6 @@ export const createHostel = onCall(
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      const userRecord = await admin.auth().getUser(uid);
-      const email = String(userRecord.email || "").toLowerCase();
-
       tx.set(memberRef, {
         role: "owner",
         email,
@@ -597,13 +599,14 @@ export const createHostel = onCall(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
-        tx.set(userRef, { activeHostelSlug: slug }, { merge: true });
+        tx.set(userRef, { activeHostelSlug: slug, email }, { merge: true });
       }
     });
 
     return { ok: true, slug };
   }
 );
+
 
 /**
  * removeMember (MANAGER+)

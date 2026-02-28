@@ -6,7 +6,7 @@ import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { Seo } from "../../components/Seo";
 import { cancelReservation, setReservationStatus } from "../../services/reservations";
-import { db } from "../../firebase";
+import { db } from "../../services/firebase";
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 

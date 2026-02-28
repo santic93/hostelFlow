@@ -122,6 +122,8 @@ export const MainLayout = () => {
           </Toolbar>
         </Container>
       </AppBar>
+  {/* ✅ SPACER: reserva el alto del AppBar (56/64 según breakpoint) */}
+    <Toolbar />
 
       {/* Mobile drawer */}
       <Drawer

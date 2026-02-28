@@ -87,7 +87,7 @@ function reservationEmailHtml(args: {
   <div style="font-family:Arial,sans-serif; line-height:1.5;">
     <h2 style="margin:0 0 12px;">${title}</h2>
     <p>Hola <b>${fullName}</b>,</p>
-    <p>Tu reserva en <b>${hostelName}</b> está <b>${status}</b>.</p>
+    <p>Tu reserva en <b>${hostelName}</b> está <b>${status === "CONFIRMED" ? "CONFIRMADA" : status === "CANCELLED" ? "CANCELADA" : "PENDIENTE"}</b>.</p>
     <ul>
       <li><b>Habitación:</b> ${roomName}</li>
       <li><b>Check-in:</b> ${checkIn}</li>

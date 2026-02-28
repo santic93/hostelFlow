@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Box, Chip, MenuItem, Select, Typography } from "@mui/material";
+import {
+  Box,
+  Chip,
+  CircularProgress,
+  MenuItem,
+  Select,
+  Typography,
+  Stack,
+} from "@mui/material";
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../../../firebase";
@@ -22,6 +30,9 @@ export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { t } = useTranslation();
   const [rows, setRows] = useState<ReservationRow[]>([]);
+
+  // ✅ loader por fila
+  const [savingById, setSavingById] = useState<Record<string, boolean>>({});
 
   const fetchReservations = async () => {
     if (!hostelSlug) return;
@@ -54,25 +65,41 @@ export default function ReservationsSection() {
     fetchReservations();
   }, [hostelSlug]);
 
-  // ✅ Ahora actualiza via Cloud Function (no updateDoc)
-  const updateStatus = async (reservationId: string, newStatus: ReservationStatus) => {
-    if (!hostelSlug) return;
-
-    await setReservationStatus({
-      hostelSlug,
-      reservationId,
-      newStatus,
-    });
-
-    setRows((prev) =>
-      prev.map((r) => (r.id === reservationId ? { ...r, status: newStatus } : r))
-    );
-  };
-
   const statusLabel = (s: ReservationStatus) => {
     if (s === "confirmed") return t("admin.reservations.confirmed");
     if (s === "cancelled") return t("admin.reservations.cancelled");
     return t("admin.reservations.pending");
+  };
+
+  const updateStatus = async (reservationId: string, newStatus: ReservationStatus) => {
+    if (!hostelSlug) return;
+
+    // si ya está guardando, no hagas nada
+    if (savingById[reservationId]) return;
+
+    // UI: loading ON
+    setSavingById((prev) => ({ ...prev, [reservationId]: true }));
+
+    // (Opcional) optimista: mostrar el status nuevo ya
+    const prevRows = rows;
+    setRows((prev) =>
+      prev.map((r) => (r.id === reservationId ? { ...r, status: newStatus } : r))
+    );
+
+    try {
+      await setReservationStatus({
+        hostelSlug,
+        reservationId,
+        newStatus,
+      });
+    } catch (e) {
+      // rollback si falla
+      setRows(prevRows);
+      console.error("setReservationStatus failed", e);
+    } finally {
+      // UI: loading OFF
+      setSavingById((prev) => ({ ...prev, [reservationId]: false }));
+    }
   };
 
   const columns = useMemo<GridColDef<ReservationRow>[]>(() => {
@@ -101,9 +128,20 @@ export default function ReservationsSection() {
       {
         field: "status",
         headerName: t("admin.reservations.status"),
-        width: 160,
+        width: 180,
         renderCell: (params) => {
-          const v = params.value as ReservationStatus;
+          const v = params.row.status;
+          const saving = !!savingById[params.row.id];
+
+          if (saving) {
+            return (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={16} />
+                <Chip label={t("common.saving") ?? "Guardando..."} color="default" />
+              </Stack>
+            );
+          }
+
           const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
           return <Chip label={statusLabel(v)} color={color as any} />;
         },
@@ -112,22 +150,26 @@ export default function ReservationsSection() {
         field: "actions",
         headerName: t("admin.reservations.actions"),
         flex: 1.2,
-        renderCell: (params) => (
-          <Select
-            size="small"
-            value={params.row.status}
-            onChange={(e) =>
-              updateStatus(params.row.id, e.target.value as ReservationStatus) // ✅ acá va el id real
-            }
-          >
-            <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
-            <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
-            <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
-          </Select>
-        ),
+        renderCell: (params) => {
+          const saving = !!savingById[params.row.id];
+
+          return (
+            <Select
+              size="small"
+              value={params.row.status}
+              disabled={saving}
+              onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+              sx={{ minWidth: 170 }}
+            >
+              <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
+              <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
+              <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
+            </Select>
+          );
+        },
       },
     ];
-  }, [t]);
+  }, [t, savingById, rows]); // rows no es estrictamente necesario, pero ok
 
   return (
     <>

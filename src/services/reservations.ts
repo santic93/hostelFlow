@@ -1,6 +1,5 @@
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../firebase";
-
+import { functions } from "./firebase";
 
 export type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
@@ -29,10 +28,7 @@ export async function setReservationStatus(input: {
   return res.data as { ok: boolean };
 }
 
-export async function cancelReservation(input: {
-  hostelSlug: string;
-  reservationId: string;
-}) {
+export async function cancelReservation(input: { hostelSlug: string; reservationId: string }) {
   const fn = httpsCallable(functions, "cancelReservation");
   const res = await fn(input);
   return res.data as { ok: boolean };

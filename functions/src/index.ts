@@ -297,66 +297,52 @@ export const setReservationStatus = onCall(
     region: "us-central1",
     secrets: [BREVO_API_KEY],
   },
-  async (request) => {
-    const data = request.data as any;
-    const auth = request.auth;
+  async (req) => {
+    const data = req.data as {
+      hostelSlug?: string;
+      reservationId?: string;
+      newStatus?: string; // <-- lo recibimos como string y validamos
+    };
 
-    assert(auth, "unauthenticated", "Requiere login");
-
-    const uid = auth!.uid;
     const hostelSlug = String(data?.hostelSlug || "").trim();
     const reservationId = String(data?.reservationId || "").trim();
     const newStatusRaw = String(data?.newStatus || "").trim();
 
-    assert(hostelSlug && reservationId && newStatusRaw, "invalid-argument", "Parámetros requeridos");
+    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+    assert(reservationId, "invalid-argument", "reservationId requerido");
+    assert(newStatusRaw, "invalid-argument", "newStatus requerido");
     assert(isValidStatus(newStatusRaw), "invalid-argument", "newStatus inválido");
 
     const newStatus = newStatusRaw as ReservationStatus;
 
-    // validar admin
-    const userSnap = await db.doc(`users/${uid}`).get();
-    const userData = userSnap.data() as any;
-    assert(userData?.role === "admin", "permission-denied", "No autorizado");
-    assert(userData?.hostelSlug === hostelSlug, "permission-denied", "No autorizado para este hostel");
+    // ✅ opcional: exigir login
+    // if (!req.auth?.uid) throw new HttpsError("unauthenticated", "Login required");
 
     const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
 
-    const { email, fullName, roomName, nights, total, checkInDate, checkOutDate, hostelName } =
-      await db.runTransaction(async (tx) => {
-        const resSnap = await tx.get(resRef);
-        assert(resSnap.exists, "not-found", "Reserva no existe");
+    // Leemos el estado actual para validar transición
+    const snap = await resRef.get();
+    assert(snap.exists, "not-found", "Reserva no existe");
 
-        const res = resSnap.data() as any;
-        const currentStatus = String(res?.status || "pending") as ReservationStatus;
+    const current = (snap.data()?.status ?? "pending") as ReservationStatus;
 
-        assert(canTransition(currentStatus, newStatus), "failed-precondition", "Transición inválida");
+    // ✅ usamos canTransition (así desaparece el warning)
+    assert(canTransition(current, newStatus), "failed-precondition", `No se puede pasar de ${current} a ${newStatus}`);
 
-        tx.set(
-          resRef,
-          {
-            status: newStatus,
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            updatedBy: uid,
-          },
-          { merge: true }
-        );
+    await resRef.update({
+      status: newStatus,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
 
-        const checkInDate = res?.checkIn?.toDate?.();
-        const checkOutDate = res?.checkOut?.toDate?.();
+    // (si querés) mail al cliente con best-effort (NO rompe la operación)
+    const email = String(snap.data()?.email || "");
+    const fullName = String(snap.data()?.fullName || "");
+    const roomName = String(snap.data()?.roomName || "");
+    const nights = Number(snap.data()?.nights || 0);
+    const total = Number(snap.data()?.total || 0);
+    const checkInDate = snap.data()?.checkIn?.toDate?.();
+    const checkOutDate = snap.data()?.checkOut?.toDate?.();
 
-        return {
-          hostelName: hostelSlug,
-          email: String(res?.email || ""),
-          fullName: String(res?.fullName || ""),
-          roomName: String(res?.roomName || ""),
-          nights: Number(res?.nights || 0),
-          total: Number(res?.total || 0),
-          checkInDate: checkInDate as Date | undefined,
-          checkOutDate: checkOutDate as Date | undefined,
-        };
-      });
-
-    // mail best-effort
     if (email) {
       const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
       const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
@@ -364,10 +350,10 @@ export const setReservationStatus = onCall(
       await sendEmailBrevoSafe({
         to: email,
         toName: fullName,
-        subject: `Actualización de tu reserva - ${hostelName}`,
+        subject: `Estado de tu reserva - ${hostelSlug}`,
         html: reservationEmailHtml({
           title: "Actualización de reserva",
-          hostelName: hostelName,
+          hostelName: hostelSlug,
           roomName,
           fullName,
           checkIn: checkInStr,
@@ -382,7 +368,6 @@ export const setReservationStatus = onCall(
     return { ok: true };
   }
 );
-
 /**
  * cancelReservation (ADMIN)
  * data: { hostelSlug, reservationId }

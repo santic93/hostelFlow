@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Box, Typography, Chip, Select, MenuItem } from "@mui/material";
-import { DataGrid, type GridColDef } from "@mui/x-data-grid";
-import { collection, doc, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
 import { useTranslation } from "react-i18next";
-import { db } from "../../../services/firebase";
-
-type ReservationStatus = "pending" | "confirmed" | "cancelled";
+import { Box, Chip, MenuItem, Select, Typography } from "@mui/material";
+import { DataGrid, type GridColDef } from "@mui/x-data-grid";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "../../../firebase";
+import { setReservationStatus, type ReservationStatus } from "../../../services/reservations";
 
 type ReservationRow = {
   id: string;
@@ -55,14 +54,19 @@ export default function ReservationsSection() {
     fetchReservations();
   }, [hostelSlug]);
 
-  const updateStatus = async (id: string, newStatus: ReservationStatus) => {
+  // ✅ Ahora actualiza via Cloud Function (no updateDoc)
+  const updateStatus = async (reservationId: string, newStatus: ReservationStatus) => {
     if (!hostelSlug) return;
 
-    await updateDoc(doc(db, "hostels", hostelSlug, "reservations", id), {
-      status: newStatus,
+    await setReservationStatus({
+      hostelSlug,
+      reservationId,
+      newStatus,
     });
 
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r.id === reservationId ? { ...r, status: newStatus } : r))
+    );
   };
 
   const statusLabel = (s: ReservationStatus) => {
@@ -112,7 +116,9 @@ export default function ReservationsSection() {
           <Select
             size="small"
             value={params.row.status}
-            onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+            onChange={(e) =>
+              updateStatus(params.row.id, e.target.value as ReservationStatus) // ✅ acá va el id real
+            }
           >
             <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
             <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
@@ -136,9 +142,7 @@ export default function ReservationsSection() {
           pageSizeOptions={[5, 10, 20]}
           initialState={{ pagination: { paginationModel: { pageSize: 10, page: 0 } } }}
           disableRowSelectionOnClick
-          localeText={{
-            noRowsLabel: t("admin.reservations.empty"),
-          }}
+          localeText={{ noRowsLabel: t("admin.reservations.empty") }}
         />
       </Box>
     </>

@@ -1,4 +1,3 @@
-// src/services/reservations.ts
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 

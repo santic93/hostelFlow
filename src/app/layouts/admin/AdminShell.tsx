@@ -22,12 +22,13 @@ import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PublicIcon from "@mui/icons-material/Public";
+import GroupIcon from "@mui/icons-material/Group"; // ✅ NEW
 import { signOut } from "firebase/auth";
 import { auth } from "../../../services/firebase";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../providers/AuthContext";
 
-type MenuKey = "dashboard" | "reservations" | "rooms";
+type MenuKey = "dashboard" | "reservations" | "rooms" | "members";
 
 export default function AdminShell() {
   const { t } = useTranslation();
@@ -47,6 +48,7 @@ export default function AdminShell() {
       { key: "dashboard" as const, icon: <DashboardIcon />, to: "" },
       { key: "reservations" as const, icon: <BookIcon />, to: "reservations" },
       { key: "rooms" as const, icon: <MeetingRoomIcon />, to: "rooms" },
+      { key: "members" as const, icon: <GroupIcon />, to: "members" }, // ✅ NEW
     ],
     []
   );
@@ -54,7 +56,8 @@ export default function AdminShell() {
   const labelFor = (key: MenuKey) => {
     if (key === "dashboard") return t("admin.shell.menu.dashboard");
     if (key === "reservations") return t("admin.shell.menu.reservations");
-    return t("admin.shell.menu.rooms");
+    if (key === "rooms") return t("admin.shell.menu.rooms");
+    return t("admin.shell.menu.members", "Members");
   };
 
   const handleLogout = async () => {
@@ -65,6 +68,12 @@ export default function AdminShell() {
   const handleViewSite = () => {
     if (!hostelSlug) return;
     navigate(`/${hostelSlug}`);
+  };
+
+  const goTo = (to: string) => {
+    if (!hostelSlug) return;
+    navigate(`/${hostelSlug}/admin${to ? `/${to}` : ""}`);
+    setMobileOpen(false);
   };
 
   const DrawerContent = (
@@ -78,7 +87,7 @@ export default function AdminShell() {
             <ListItemButton
               key={item.key}
               selected={selected}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => goTo(item.to)}
               sx={{
                 mx: 1,
                 borderRadius: 2,
@@ -86,8 +95,6 @@ export default function AdminShell() {
                 "&.Mui-selected:hover": { backgroundColor: "rgba(115, 2, 2, 0.16)" },
               }}
               onMouseEnter={() => !isMobile && setDesktopOpen(true)}
-              component="a"
-              href={fullPath}
             >
               <ListItemIcon sx={{ minWidth: 44 }}>{item.icon}</ListItemIcon>
               {(desktopOpen || isMobile) && <ListItemText primary={labelFor(item.key)} />}

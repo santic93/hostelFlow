@@ -1,91 +1,91 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // =========================
-    // HELPERS (AUTH / ROLE)
-    // =========================
+    // -------------------------
+    // Helpers
+    // -------------------------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function userPath() {
+    function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
     function hasUserDoc() {
-      return isSignedIn() && exists(userPath());
+      return isSignedIn() && exists(userDocPath());
     }
 
     function userDoc() {
-      return get(userPath());
+      return get(userDocPath());
     }
 
-    function isAdmin() {
-      return hasUserDoc() && userDoc().data.role == "admin";
-    }
-
-    function adminHostelSlug() {
-      return userDoc().data.hostelSlug;
-    }
-
-    function isAdminOfHostel(hostelSlug) {
-      return isAdmin() && adminHostelSlug() == hostelSlug;
-    }
-
-    // Evita acceso si el user doc está mal formado (defensa extra)
-    function userDocWellFormed() {
+    // Compat: antes usabas users.hostelSlug, ahora activeHostelSlug
+    function activeHostelSlug() {
       return hasUserDoc()
-        && (userDoc().data.role in ["admin", "guest"])
-        && (userDoc().data.hostelSlug is string || userDoc().data.hostelSlug == null);
+        ? (userDoc().data.activeHostelSlug != null
+            ? userDoc().data.activeHostelSlug
+            : userDoc().data.hostelSlug)
+        : null;
     }
 
-    // Validación simple de strings
     function isNonEmptyString(v, minLen) {
       return v is string && v.size() >= minLen;
     }
 
-    // =========================
-    // USERS
-    // =========================
-    match /users/{uid} {
+    function memberPath(hostelSlug) {
+      return /databases/$(database)/documents/hostels/$(hostelSlug)/members/$(request.auth.uid);
+    }
 
-      // Solo cada uno lee su documento
+    function isMember(hostelSlug) {
+      return isSignedIn() && exists(memberPath(hostelSlug));
+    }
+
+    function memberRole(hostelSlug) {
+      return isMember(hostelSlug) ? get(memberPath(hostelSlug)).data.role : "guest";
+    }
+
+    function isStaffPlus(hostelSlug) {
+      return isMember(hostelSlug) && memberRole(hostelSlug) in ["owner", "manager", "staff"];
+    }
+
+    function isManagerPlus(hostelSlug) {
+      return isMember(hostelSlug) && memberRole(hostelSlug) in ["owner", "manager"];
+    }
+
+    // -------------------------
+    // USERS
+    // -------------------------
+    match /users/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
 
-      // Creación inicial del user doc (desde tu Register o bootstrap)
+      // Bootstrap: el user puede crear su doc, pero SIN roles.
       allow create: if isSignedIn()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasAny(["role"]) // permite createdAt/email etc
-        && request.resource.data.role in ["admin", "guest"]
-        // hostelSlug solo si es admin (o null/vacío si guest)
-        && (
-          (request.resource.data.role == "admin" && isNonEmptyString(request.resource.data.hostelSlug, 2))
-          || (request.resource.data.role == "guest" && (request.resource.data.hostelSlug == null || request.resource.data.hostelSlug == ""))
-        );
+        && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
+        && ( !("activeHostelSlug" in request.resource.data)
+             || request.resource.data.activeHostelSlug == null
+             || isNonEmptyString(request.resource.data.activeHostelSlug, 2) );
 
-      // ✅ Anti auto-escalation + anti cambio de hostel
-      // El usuario NO puede cambiar role ni hostelSlug desde el cliente.
+      // No permitir que el cliente agregue campos raros.
       allow update: if isSignedIn()
         && request.auth.uid == uid
-        && userDocWellFormed()
-        // No cambiar role ni hostelSlug
-        && request.resource.data.role == resource.data.role
-        && request.resource.data.hostelSlug == resource.data.hostelSlug;
+        && resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
+        && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"]);
 
       allow delete: if false;
     }
 
-    // =========================
+    // -------------------------
     // HOSTELS
-    // =========================
+    // -------------------------
     match /hostels/{hostelSlug} {
-
-      // Público: leer datos del hostel para landing/catálogo
+      // público
       allow read: if true;
 
-      // Crear hostel: solo autenticado; ownerUid debe ser el que crea
-      // y slug debe coincidir con el docId
+      // Crear hostel: autenticado, ownerUid = el que crea
       allow create: if isSignedIn()
         && request.resource.data.keys().hasAll(["name", "slug", "ownerUid", "createdAt"])
         && request.resource.data.ownerUid == request.auth.uid
@@ -93,87 +93,80 @@ service cloud.firestore {
         && isNonEmptyString(request.resource.data.name, 2)
         && isNonEmptyString(request.resource.data.slug, 2);
 
-      // Update hostel: SOLO admin del mismo hostel
-      // y NO puede cambiar ownerUid ni slug
-      allow update: if isAdminOfHostel(hostelSlug)
+      // Actualizar hostel: manager+
+      allow update: if isManagerPlus(hostelSlug)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.slug == resource.data.slug;
 
-      // En un SaaS vendible, borrar hostels desde cliente suele ser mala idea.
-      // Si lo querés habilitar, hacelo por backend/soporte.
       allow delete: if false;
 
-      // =========================
-      // ROOMS
-      // =========================
-      match /rooms/{roomId} {
+      // -------------------------
+      // MEMBERS
+      // -------------------------
+      match /members/{memberUid} {
+        // Cada miembro puede leer su doc; manager+ puede listar/ver miembros
+        allow read: if (isSignedIn() && request.auth.uid == memberUid)
+          || isManagerPlus(hostelSlug);
 
+        // Nadie escribe desde cliente (solo Functions Admin SDK)
+        allow create, update, delete: if false;
+      }
+
+      // -------------------------
+      // ROOMS
+      // -------------------------
+      match /rooms/{roomId} {
         function validRoom() {
           return request.resource.data.keys().hasAll(["name", "price", "capacity"])
             && isNonEmptyString(request.resource.data.name, 2)
-            // price puede venir int/number
             && (request.resource.data.price is int || request.resource.data.price is number)
             && request.resource.data.price > 0
             && (request.resource.data.capacity is int || request.resource.data.capacity is number)
             && request.resource.data.capacity >= 1
-            // campos opcionales típicos
-            && (
-              !("description" in request.resource.data) || request.resource.data.description is string
-            )
-            && (
-              !("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list
-            )
-            && (
-              !("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list
-            );
+            && (!("description" in request.resource.data) || request.resource.data.description is string)
+            && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
+            && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list);
         }
 
-        // Público: leer habitaciones
         allow read: if true;
 
-        // Admin del hostel: CRUD rooms
-        allow create: if isAdminOfHostel(hostelSlug) && validRoom();
-        allow update: if isAdminOfHostel(hostelSlug) && validRoom();
-        allow delete: if isAdminOfHostel(hostelSlug);
+        // staff+ puede operar rooms (si querés restringir más: manager+)
+        allow create: if isStaffPlus(hostelSlug) && validRoom();
+        allow update: if isStaffPlus(hostelSlug) && validRoom();
+        allow delete: if isManagerPlus(hostelSlug);
       }
 
-      // =========================
-      // RESERVATIONS (SOURCE OF TRUTH)
-      // =========================
+      // -------------------------
+      // RESERVATIONS (solo admin panel)
+      // -------------------------
       match /reservations/{reservationId} {
-
-        // ✅ SOLO admin del hostel puede leer
-        allow read: if isAdminOfHostel(hostelSlug);
-
-        // 🔒 NADIE escribe desde el cliente (anti-spam/anti-fraude)
-        // Solo Cloud Functions (Admin SDK) crea/edita/cancela.
-        allow create, update, delete: if false;
+        allow read: if isStaffPlus(hostelSlug);
+        allow create, update, delete: if false; // solo backend
       }
 
-      // =========================
-      // ROOM_NIGHTS (LOCKS anti solapamiento)
-      // =========================
+      // -------------------------
+      // EMAIL LOGS
+      // -------------------------
+      match /email_logs/{logId} {
+        allow read: if isManagerPlus(hostelSlug);
+        allow create, update, delete: if false; // solo backend
+      }
+
+      // -------------------------
+      // LOCKS
+      // -------------------------
       match /room_nights/{lockId} {
-
-        // Mantener privado (no hace falta en cliente)
         allow read: if false;
-
-        // 🔒 Solo backend (Admin SDK)
         allow create, update, delete: if false;
       }
 
-      // =========================
-      // (Opcional) Cualquier otra subcolección NO listada => denegar
-      // Esto evita "cosas raras" si alguien intenta inventar subcolecciones.
-      // =========================
+      // deny unknown subcollections
       match /{document=**} {
         allow read, write: if false;
       }
     }
 
-    // =========================
-    // DENY BY DEFAULT fuera de /users y /hostels
-    // =========================
+    // deny by default
     match /{document=**} {
       allow read, write: if false;
     }

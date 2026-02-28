@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../../providers/AuthContext";
 
 export const MainLayout = () => {
-  const { user, role, hostelSlug } = useAuth();
+  const { user, hostelSlug, canAccessAdmin } = useAuth(); // ✅ changed
   const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -38,7 +38,7 @@ export const MainLayout = () => {
   );
 
   const adminLink =
-    user && role === "admin" && hostelSlug
+    user && canAccessAdmin && hostelSlug
       ? { label: t("nav.admin"), to: `${base}/admin` }
       : null;
 

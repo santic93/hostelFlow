@@ -1,67 +1,82 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
-import { useTranslation } from "react-i18next";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 
-type Role = "admin" | "guest";
+export type Role = "owner" | "manager" | "staff" | "guest";
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
-  hostelSlug: string | null;
+
+  // ✅ nuevo modelo
+  activeHostelSlug: string | null;
   role: Role;
+
+  // ✅ compat: para no romper pantallas viejas
+  hostelSlug: string | null;
+
+  // ✅ helpers (dejan de existir comparaciones "admin")
+  isOwner: boolean;
+  isManager: boolean;
+  isStaff: boolean;
+  canAccessAdmin: boolean;
+
   loading: boolean;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  hostelSlug: null,
+  activeHostelSlug: null,
   role: "guest",
+
+  hostelSlug: null,
+
+  isOwner: false,
+  isManager: false,
+  isStaff: false,
+  canAccessAdmin: false,
+
   loading: true,
 });
 
-export const AuthProvider = ({ children }: any) => {
-  const { t } = useTranslation();
-
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [hostelSlug, setHostelSlug] = useState<string | null>(null);
+  const [activeHostelSlug, setActiveHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
   const [loading, setLoading] = useState(true);
 
-  const MIN_LOADING_MS = 1400;
+  // loader mínimo para evitar “parpadeo”
+  const MIN_LOADING_MS = 900;
   const [showLoading, setShowLoading] = useState(true);
 
-  // Loader “mínimo” para que no parpadee
   useEffect(() => {
     let timer: number | undefined;
-
     if (loading) {
       setShowLoading(true);
     } else {
       timer = window.setTimeout(() => setShowLoading(false), MIN_LOADING_MS);
     }
-
     return () => {
       if (timer) window.clearTimeout(timer);
     };
   }, [loading]);
 
   useEffect(() => {
-    let unsubscribeUserDoc: (() => void) | null = null;
+    let unsubUserDoc: null | (() => void) = null;
+    let unsubMemberDoc: null | (() => void) = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // limpio sub anterior si existía
-      if (unsubscribeUserDoc) {
-        unsubscribeUserDoc();
-        unsubscribeUserDoc = null;
-      }
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubUserDoc) unsubUserDoc();
+      if (unsubMemberDoc) unsubMemberDoc();
+      unsubUserDoc = null;
+      unsubMemberDoc = null;
 
       setLoading(true);
 
       if (!firebaseUser) {
         setUser(null);
-        setHostelSlug(null);
+        setActiveHostelSlug(null);
         setRole("guest");
         setLoading(false);
         return;
@@ -69,47 +84,95 @@ export const AuthProvider = ({ children }: any) => {
 
       setUser(firebaseUser);
 
+      // 1) user doc: solo para saber activeHostelSlug (compat con hostelSlug viejo)
       const userRef = doc(db, "users", firebaseUser.uid);
-
-      unsubscribeUserDoc = onSnapshot(
+      unsubUserDoc = onSnapshot(
         userRef,
         (snap) => {
           if (!snap.exists()) {
+            setActiveHostelSlug(null);
             setRole("guest");
-            setHostelSlug(null);
             setLoading(false);
             return;
           }
 
           const data = snap.data() as any;
-          const nextRole: Role = data?.role === "admin" ? "admin" : "guest";
-          const nextSlug = nextRole === "admin" ? (data?.hostelSlug ?? null) : null;
+          const slug = (data?.activeHostelSlug ?? data?.hostelSlug ?? null) as string | null;
 
-          setRole(nextRole);
-          setHostelSlug(nextSlug);
-          setLoading(false);
+          setActiveHostelSlug(slug);
+
+          // 2) member doc del hostel activo (si hay)
+          if (unsubMemberDoc) unsubMemberDoc();
+          unsubMemberDoc = null;
+
+          if (!slug) {
+            setRole("guest");
+            setLoading(false);
+            return;
+          }
+
+          const memberRef = doc(db, "hostels", slug, "members", firebaseUser.uid);
+          unsubMemberDoc = onSnapshot(
+            memberRef,
+            (m) => {
+              if (!m.exists()) {
+                setRole("guest");
+                setLoading(false);
+                return;
+              }
+              const r = String((m.data() as any)?.role || "guest") as Role;
+              setRole(r === "owner" || r === "manager" || r === "staff" ? r : "guest");
+              setLoading(false);
+            },
+            () => {
+              setRole("guest");
+              setLoading(false);
+            }
+          );
         },
         () => {
+          setActiveHostelSlug(null);
           setRole("guest");
-          setHostelSlug(null);
           setLoading(false);
         }
       );
     });
 
     return () => {
-      if (unsubscribeUserDoc) unsubscribeUserDoc();
-      unsubscribeAuth();
+      if (unsubUserDoc) unsubUserDoc();
+      if (unsubMemberDoc) unsubMemberDoc();
+      unsubAuth();
     };
   }, []);
 
+  // ✅ helpers derivados
+  const isOwner = role === "owner";
+  const isManager = role === "manager" || role === "owner";
+  const isStaff = role === "staff" || role === "manager" || role === "owner";
+  const canAccessAdmin = Boolean(user) && Boolean(activeHostelSlug) && isStaff;
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      activeHostelSlug,
+      role,
+
+      // compat
+      hostelSlug: activeHostelSlug,
+
+      isOwner,
+      isManager,
+      isStaff,
+      canAccessAdmin,
+
+      loading,
+    }),
+    [user, activeHostelSlug, role, isOwner, isManager, isStaff, canAccessAdmin, loading]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, hostelSlug, role, loading }}>
-      {showLoading ? (
-        <HotelLoading text={t("auth.entering")} subtitle={t("auth.checkingSession")} />
-      ) : (
-        children
-      )}
+    <AuthContext.Provider value={value}>
+      {showLoading ? <HotelLoading /> : children}
     </AuthContext.Provider>
   );
 };

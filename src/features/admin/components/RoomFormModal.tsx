@@ -55,7 +55,7 @@ export default function RoomFormModal({
   hostelSlug: hostelSlugProp,
 }: Props) {
   const { t } = useTranslation();
-  const { hostelSlug: hostelSlugCtx, role, loading: authLoading } = useAuth();
+  const { hostelSlug: hostelSlugCtx, loading: authLoading, canAccessAdmin } = useAuth();
 
   const resolvedHostelSlug = hostelSlugProp ?? hostelSlugCtx ?? null;
 
@@ -214,7 +214,7 @@ export default function RoomFormModal({
     await deleteObject(ref(storage, path));
   }
 
-  const readyForWrite = !authLoading && role === "admin" && Boolean(resolvedHostelSlug);
+  const readyForWrite = !authLoading && canAccessAdmin && Boolean(resolvedHostelSlug);
 
   const onSubmit = async (data: RoomFormValues) => {
     if (!readyForWrite || !resolvedHostelSlug) {

@@ -24,6 +24,7 @@ import RoomsSection from "../features/admin/sections/RoomsSection";
 import ReservationsSection from "../features/admin/sections/ReservationSecition";
 import { theme } from "../theme/theme";
 import DateI18nProvider from "../features/providers/DateI18nProvider";
+import MembersSection from "../features/admin/sections/MemberSection";
 
 export const router = createBrowserRouter([
   {
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
                   { index: true, element: <DashboardSection /> },
                   { path: "rooms", element: <RoomsSection /> },
                   { path: "reservations", element: <ReservationsSection /> },
+                  { path: "members", element: <MembersSection /> }, // ✅ NEW
                 ],
               },
             ],
@@ -78,6 +80,7 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
 function App() {
   return (
     <ThemeProvider theme={theme}>

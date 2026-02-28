@@ -35,7 +35,7 @@ export default function RoomsSection() {
   const { t } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
 
-  const { hostelSlug, role, loading } = useAuth();
+const { hostelSlug, loading, canAccessAdmin } = useAuth();
   const [openModal, setOpenModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
 
@@ -43,7 +43,7 @@ export default function RoomsSection() {
   const [pageError, setPageError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const ready = !loading && role === "admin" && Boolean(hostelSlug);
+  const ready = !loading && canAccessAdmin && Boolean(hostelSlug);
 
   const fetchRooms = async () => {
     if (!hostelSlug) return;
@@ -155,7 +155,7 @@ export default function RoomsSection() {
     );
   }
 
-  if (role !== "admin") {
+if (!canAccessAdmin) {
     return <Alert severity="error">No tenés permisos de administrador.</Alert>;
   }
 

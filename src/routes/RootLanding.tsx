@@ -35,7 +35,7 @@ function extractTenantSlug(input: string) {
 }
 
 export default function RootRedirect() {
-  const { user, role, hostelSlug, loading } = useAuth();
+const { user, hostelSlug, loading, canAccessAdmin } = useAuth();
   const navigate = useNavigate();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [slug, setSlug] = useState("");
@@ -51,7 +51,7 @@ export default function RootRedirect() {
   if (loading) return <HotelLoading text="Cargando..." />;
 
   // admin logueado -> panel
-  if (user && role === "admin" && hostelSlug) {
+  if (user && canAccessAdmin && hostelSlug) {
     return <Navigate to={`/${hostelSlug}/admin`} replace />;
   }
 

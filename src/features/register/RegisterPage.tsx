@@ -88,6 +88,7 @@ export default function RegisterPage() {
     setMessage(null);
 
     const current = auth.currentUser ?? createdUser;
+    await (auth.currentUser ?? createdUser)?.getIdToken(true);
     if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
 
     if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
@@ -104,7 +105,7 @@ export default function RegisterPage() {
       });
 
       setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
-      navigate("/admin", { replace: true });
+      navigate(`/${normalizedSlug}/admin`, { replace: true });
     } catch (err: any) {
       console.error(err);
 

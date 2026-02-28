@@ -3,6 +3,14 @@ import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import axios from "axios";
+import type { CallableRequest } from "firebase-functions/v2/https";
+
+function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any>["auth"]> {
+  if (!req.auth) throw new HttpsError("unauthenticated", "Requiere login");
+  return req.auth;
+}
+
+
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -11,23 +19,96 @@ const db = admin.firestore();
 const MAIL_FROM_EMAIL = defineString("MAIL_FROM_EMAIL", { default: "no-reply@hostly.app" });
 const MAIL_FROM_NAME = defineString("MAIL_FROM_NAME", { default: "Hostly" });
 
+
+// ✅ helper antes de usarse (así no te tira “isNonEmptyString no existe”)
+function isNonEmptyString(v: any, minLen: number) {
+  return typeof v === "string" && v.trim().length >= minLen;
+}
+
+function assert(condition: any, code: any, message: string) {
+  if (!condition) throw new HttpsError(code, message);
+}
+
+type MemberRole = "owner" | "manager" | "staff";
+function isValidMemberRole(r: string): r is MemberRole {
+  return r === "owner" || r === "manager" || r === "staff";
+}
+
+// (…dejás TODO tu resto de funciones tal cual…)
+
+export const createHostel = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (req) => {
+    // ✅ req.auth puede ser undefined -> lo cortamos acá
+    if (!req.auth) {
+      throw new HttpsError("unauthenticated", "Requiere login");
+    }
+
+    const uid = req.auth.uid;
+
+    const name = String(req.data?.name || "").trim();
+    const slug = String(req.data?.slug || "").trim();
+
+    assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
+    assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
+    assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
+
+    // email lo podés leer fuera de la tx
+    const userRecord = await admin.auth().getUser(uid);
+    const email = String(userRecord.email || "").toLowerCase();
+
+    const hostelRef = db.doc(`hostels/${slug}`);
+    const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
+    const userRef = db.doc(`users/${uid}`);
+
+    await db.runTransaction(async (tx) => {
+      // ✅ 1) TODOS LOS READS primero
+      const hostelSnap = await tx.get(hostelRef);
+      const userSnap = await tx.get(userRef);
+
+      assert(!hostelSnap.exists, "already-exists", "Ese slug ya existe");
+
+      // ✅ 2) DESPUÉS los WRITES
+      tx.set(hostelRef, {
+        name,
+        slug,
+        ownerUid: uid,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // ✅ ESTE ES EL DOC QUE TE DA PERMISOS EN EL FRONT
+      tx.set(memberRef, {
+        role: "owner",
+        email,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: uid,
+      });
+
+      if (!userSnap.exists) {
+        tx.set(userRef, {
+          email,
+          activeHostelSlug: slug,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        tx.set(userRef, { activeHostelSlug: slug, email }, { merge: true });
+      }
+    });
+
+    return { ok: true, slug };
+  }
+);
+
 /**
  * SECRET (Brevo API Key)
  * firebase functions:secrets:set BREVO_API_KEY
  */
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
-// -------------------- Helpers
-function assert(condition: any, code: any, message: string) {
-  if (!condition) throw new HttpsError(code, message);
-}
 
-type MemberRole = "owner" | "manager" | "staff";
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
-function isValidMemberRole(r: string): r is MemberRole {
-  return r === "owner" || r === "manager" || r === "staff";
-}
+
 function isValidStatus(s: string): s is ReservationStatus {
   return s === "pending" || s === "confirmed" || s === "cancelled";
 }
@@ -207,8 +288,8 @@ async function sendEmailBrevoSafe(args: {
 export const inviteMember = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (req) => {
-    assert(req.auth, "unauthenticated", "Requiere login");
-    const uid = req.auth!.uid;
+    const auth = requireAuth(req);
+    const uid = auth.uid;
 
     const hostelSlug = String(req.data?.hostelSlug || "").trim();
     const email = String(req.data?.email || "").trim().toLowerCase();
@@ -388,8 +469,8 @@ export const createReservation = onCall(
 export const setReservationStatus = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (req) => {
-    assert(req.auth, "unauthenticated", "Requiere login");
-    const uid = req.auth!.uid;
+    const auth = requireAuth(req);
+    const uid = auth.uid;
 
     const hostelSlug = String(req.data?.hostelSlug || "").trim();
     const reservationId = String(req.data?.reservationId || "").trim();
@@ -543,74 +624,6 @@ export const cancelReservation = onCall(
     return { ok: true };
   }
 );
-export const createHostel = onCall(
-  { region: "us-central1", enforceAppCheck: true },
-  async (req) => {
-
-    if (!req.auth) {
-      throw new HttpsError("unauthenticated", "Requiere login");
-    }
-
-    const uid = req.auth.uid;
-
-    const name = String(req.data?.name || "").trim();
-    const slug = String(req.data?.slug || "").trim();
-
-    assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
-    assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
-    assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
-
-    // ⚠️ Esto puede ir afuera de la tx sin problema
-    const userRecord = await admin.auth().getUser(uid);
-    const email = String(userRecord.email || "").toLowerCase();
-
-    const hostelRef = db.doc(`hostels/${slug}`);
-    const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
-    const userRef = db.doc(`users/${uid}`);
-
-    await db.runTransaction(async (tx) => {
-      // ✅ 1) READS PRIMERO (todos)
-      const [hostelSnap, userSnap] = await Promise.all([
-        tx.get(hostelRef),
-        tx.get(userRef),
-      ]);
-
-      assert(!hostelSnap.exists, "already-exists", "Ese slug ya existe");
-
-      // ✅ 2) WRITES DESPUÉS (todos)
-      tx.set(hostelRef, {
-        name,
-        slug,
-        ownerUid: uid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      tx.set(memberRef, {
-        role: "owner",
-        email,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdBy: uid,
-      });
-
-      if (!userSnap.exists) {
-        tx.set(userRef, {
-          email,
-          activeHostelSlug: slug,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } else {
-        tx.set(userRef, { activeHostelSlug: slug, email }, { merge: true });
-      }
-    });
-
-    return { ok: true, slug };
-  }
-);
-
-// Si ya existe en tu archivo, NO dupliques esta función:
-function isNonEmptyString(v: any, minLen: number) {
-  return typeof v === "string" && v.trim().length >= minLen;
-}
 
 /**
  * removeMember (MANAGER+)
@@ -619,8 +632,8 @@ function isNonEmptyString(v: any, minLen: number) {
 export const removeMember = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (req) => {
-    assert(req.auth, "unauthenticated", "Requiere login");
-    const uid = req.auth!.uid;
+    const auth = requireAuth(req);
+    const uid = auth.uid;
 
     const hostelSlug = String(req.data?.hostelSlug || "").trim();
     const targetUid = String(req.data?.targetUid || "").trim();

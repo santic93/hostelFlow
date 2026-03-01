@@ -198,6 +198,11 @@ export const resources = {
         },
 
         reservations: {
+          filterFrom: "Desde",
+          filterTo: "Hasta",
+          filterAll: "Todos los estados",
+          searchPlaceholder: "Buscar por nombre, email o habitación…",
+          unknownDate: "Fecha desconocida",
           title: "Reservas",
           empty: "Todavía no hay reservas.",
           seoTitle: "Reservas — HOSTLY",
@@ -540,32 +545,45 @@ export const resources = {
         },
 
         reservations: {
+          filterFrom: "From",
+          filterTo: "To",
+          filterAll: "All statuses",
+          searchPlaceholder: "Search by name, email or room…",
+          unknownDate: "Unknown date",
           title: "Reservations",
           empty: "No reservations yet.",
           seoTitle: "Reservations — HOSTLY",
           seoDescription: "Admin reservations",
+
+          guest: "Guest",
+          room: "Room",
+          email: "Email",
+          checkIn: "Check-in",
+          checkOut: "Check-out",
+          total: "Total",
+          status: "Status",
+          actions: "Actions",
+          pending: "Pending",
+          confirmed: "Confirmed",
+          cancelled: "Cancelled",
+
           columns: {
             guest: "Guest",
             room: "Room",
             email: "Email",
-            checkIn: "Check In",
-            checkOut: "Check Out",
+            checkIn: "Check-in",
+            checkOut: "Check-out",
             total: "Total",
             status: "Status",
             actions: "Actions",
           },
+
           statusValues: {
             pending: "Pending",
             confirmed: "Confirmed",
             cancelled: "Cancelled",
           },
-          actions: {
-            view: "View",
-            edit: "Edit",
-            cancel: "Cancel",
-          },
         },
-
         shell: {
           brand: "HOSTLY",
           viewSite: "View site",
@@ -882,32 +900,48 @@ export const resources = {
         },
 
         reservations: {
+          filterFrom: "De",
+          filterTo: "Até",
+          filterAll: "Todos os status",
+          searchPlaceholder: "Buscar por nome, email ou quarto…",
+          unknownDate: "Data desconhecida",
           title: "Reservas",
           empty: "Ainda não há reservas.",
           seoTitle: "Reservas — HOSTLY",
           seoDescription: "Admin reservas",
+
+          guest: "Hóspede",
+          room: "Quarto",
+          email: "Email",
+          checkIn: "Check-in",
+          checkOut: "Check-out",
+          total: "Total",
+          status: "Status",
+          actions: "Ações",
+
+
+
+          pending: "Pendente",
+          confirmed: "Confirmada",
+          cancelled: "Cancelada",
+
           columns: {
             guest: "Hóspede",
             room: "Quarto",
             email: "Email",
-            checkIn: "Check In",
-            checkOut: "Check Out",
+            checkIn: "Check-in",
+            checkOut: "Check-out",
             total: "Total",
             status: "Status",
             actions: "Ações",
           },
+
           statusValues: {
             pending: "Pendente",
             confirmed: "Confirmada",
             cancelled: "Cancelada",
           },
-          actions: {
-            view: "Ver",
-            edit: "Editar",
-            cancel: "Cancelar",
-          },
         },
-
         shell: {
           brand: "HOSTLY",
           viewSite: "Ver site",

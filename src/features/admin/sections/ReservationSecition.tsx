@@ -23,6 +23,7 @@ import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from "../../../services/firebase";
 import { setReservationStatus, type ReservationStatus } from "../../../services/reservations";
 
+
 type ReservationRow = {
   id: string;
   fullName: string;
@@ -37,7 +38,7 @@ type ReservationRow = {
 
 export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const { t } = useTranslation();
+ const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
 
   const [rows, setRows] = useState<ReservationRow[]>([]);
@@ -139,65 +140,64 @@ export default function ReservationsSection() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredRows, isMobile]);
 
-  const columns = useMemo<GridColDef[]>(() => {
-    return [
-      { field: "fullName", headerName: t("admin.reservations.guest"), flex: 1, minWidth: 160 },
-      { field: "roomName", headerName: t("admin.reservations.room"), flex: 1, minWidth: 140 },
-      { field: "email", headerName: t("admin.reservations.email"), flex: 1, minWidth: 200 },
-      {
-        field: "checkIn",
-        headerName: t("admin.reservations.checkIn"),
-        width: 130,
-        valueGetter: (_, row) => (row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-"),
+const columns = useMemo<GridColDef[]>(() => {
+  return [
+    { field: "fullName", headerName: t("admin.reservations.columns.guest"), flex: 1, minWidth: 160 },
+    { field: "roomName", headerName: t("admin.reservations.columns.room"), flex: 1, minWidth: 140 },
+    { field: "email", headerName: t("admin.reservations.columns.email"), flex: 1, minWidth: 200 },
+    {
+      field: "checkIn",
+      headerName: t("admin.reservations.columns.checkIn"),
+      width: 130,
+      valueGetter: (_, row) => (row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-"),
+    },
+    {
+      field: "checkOut",
+      headerName: t("admin.reservations.columns.checkOut"),
+      width: 130,
+      valueGetter: (_, row) => (row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-"),
+    },
+    {
+      field: "total",
+      headerName: t("admin.reservations.columns.total"),
+      width: 120,
+      valueGetter: (_, row) => `$${row.total}`,
+    },
+    {
+      field: "status",
+      headerName: t("admin.reservations.columns.status"),
+      width: 150,
+      renderCell: (params) => {
+        const v = params.row.status as ReservationStatus;
+        const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
+        return <Chip size="small" label={statusLabel(v)} color={color as any} />;
       },
-      {
-        field: "checkOut",
-        headerName: t("admin.reservations.checkOut"),
-        width: 130,
-        valueGetter: (_, row) => (row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-"),
-      },
-      {
-        field: "total",
-        headerName: t("admin.reservations.total"),
-        width: 120,
-        valueGetter: (_, row) => `$${row.total}`,
-      },
-      {
-        field: "status",
-        headerName: t("admin.reservations.status"),
-        width: 150,
-        renderCell: (params) => {
-          const v = params.row.status as ReservationStatus;
-          const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
-          return <Chip size="small" label={statusLabel(v)} color={color as any} />;
-        },
-      },
-      {
-        field: "actions",
-        headerName: t("admin.reservations.actions"),
-        width: 190,
-        sortable: false,
-        renderCell: (params) => {
-          const saving = !!savingById[params.row.id];
-          if (saving) return <CircularProgress size={18} />;
+    },
+    {
+      field: "actions",
+      headerName: t("admin.reservations.columns.actions"),
+      width: 190,
+      sortable: false,
+      renderCell: (params) => {
+        const saving = !!savingById[params.row.id];
+        if (saving) return <CircularProgress size={18} />;
 
-          return (
-            <Select
-              size="small"
-              value={params.row.status}
-              onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
-              sx={{ minWidth: 170 }}
-            >
-              <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
-              <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
-              <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
-            </Select>
-          );
-        },
+        return (
+          <Select
+            size="small"
+            value={params.row.status}
+            onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+            sx={{ minWidth: 170 }}
+          >
+            <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
+            <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
+            <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
+          </Select>
+        );
       },
-    ];
-  }, [t, savingById]);
-
+    },
+  ];
+}, [i18n.language, savingById]);
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={1.5} sx={{ mb: 2 }}>

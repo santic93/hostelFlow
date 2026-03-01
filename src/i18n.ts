@@ -4,6 +4,20 @@ import LanguageDetector from "i18next-browser-languagedetector";
 export const resources = {
   es: {
     translation: {
+      rooms: {
+        subtitle: "Elegí tu habitación y reservá en minutos.",
+        capacity: "{{n}} huésped",
+        capacity_plural: "{{n}} huéspedes",
+        defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
+        noImageTitle: "Sin imagen",
+        noImageSubtitle: "Esta habitación todavía no tiene fotos.",
+        perNight: "/ noche",
+        title: "Nuestras habitaciones",
+        fromPerNight: "Desde ${{price}} / noche",
+        viewRoom: "VER HABITACIÓN",
+        noRooms: "Aún no hay habitaciones disponibles.",
+        loading: "Cargando habitaciones...",
+      },
       // --- Global / shared ---
       common: {
         language: "Idioma",
@@ -128,6 +142,7 @@ export const resources = {
 
       admin: {
         rooms: {
+
           title: "Gestión de Habitaciones",
           subtitle: "Elegí tu habitación y reservá en minutos.",
           defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
@@ -302,13 +317,7 @@ export const resources = {
         bookThisRoom: "RESERVAR ESTA HABITACIÓN",
       },
 
-      rooms: {
-        title: "Nuestras habitaciones",
-        fromPerNight: "Desde ${{price}} / noche",
-        viewRoom: "VER HABITACIÓN",
-        noRooms: "Aún no hay habitaciones disponibles.",
-        loading: "Cargando habitaciones...",
-      },
+
 
       booking: {
         back: "Volver",
@@ -658,6 +667,13 @@ export const resources = {
       },
 
       rooms: {
+        subtitle: "Choose your room and book in minutes.",
+        capacity: "{{n}} guest",
+        capacity_plural: "{{n}} guests",
+        defaultDesc: "Comfortable, bright, and ready for your stay.",
+        noImageTitle: "No image",
+        noImageSubtitle: "This room doesn’t have photos yet.",
+        perNight: "/ night",
         title: "Our rooms",
         fromPerNight: "From ${{price}} / night",
         viewRoom: "VIEW ROOM",
@@ -1016,6 +1032,13 @@ export const resources = {
       },
 
       rooms: {
+        subtitle: "Escolha seu quarto e reserve em minutos.",
+        capacity: "{{n}} hóspede",
+        capacity_plural: "{{n}} hóspedes",
+        defaultDesc: "Confortável, iluminado e pronto para a sua estadia.",
+        noImageTitle: "Sem imagem",
+        noImageSubtitle: "Este quarto ainda não tem fotos.",
+        perNight: "/ noite",
         title: "Nossos quartos",
         fromPerNight: "A partir de ${{price}} / noite",
         viewRoom: "VER QUARTO",

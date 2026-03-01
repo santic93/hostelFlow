@@ -61,7 +61,7 @@ export const RoomsPage = () => {
       <Stack spacing={2} sx={{ mb: 2 }}>
         <Typography variant="h2">{t("rooms.title")}</Typography>
         <Typography sx={{ color: "text.secondary" }}>
-          {t("rooms.subtitle", "Elegí tu habitación y reservá en minutos.")}
+          {t("rooms.subtitle")}
         </Typography>
       </Stack>
 
@@ -96,7 +96,7 @@ export const RoomsPage = () => {
 
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography sx={{ fontWeight: 900 }}>
-                        ${room.price} <span style={{ fontWeight: 600, opacity: 0.7 }}>/ noche</span>
+                        ${room.price} <span style={{ fontWeight: 600, opacity: 0.7 }}>{t("rooms.perNight")}</span>
                       </Typography>
 
                       <Button

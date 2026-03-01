@@ -295,7 +295,11 @@ export default function RoomFormModal({
 
   return (
     <>
-      <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
+      <Dialog open={open} onClose={(reason) => {
+        (saving) ? undefined : onClose;
+        // evita cerrar al clickear el backdrop
+        if (reason === "backdropClick") return;
+      }} fullWidth maxWidth="sm">
         <DialogTitle>
           {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
         </DialogTitle>

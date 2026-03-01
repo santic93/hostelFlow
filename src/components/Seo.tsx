@@ -39,7 +39,7 @@ function upsertLink(rel: string, href: string) {
 
 export function Seo({ title, description, canonical, noindex }: SeoProps) {
   useEffect(() => {
-    document.title = title;
+    document.title = title.toUpperCase();
 
     if (description) upsertMeta("description", description);
 

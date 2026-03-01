@@ -67,15 +67,15 @@ export const HomePage = () => {
                 <Box
                   sx={{
                     height: "100%",
-                    background:
-                      "linear-gradient(120deg, rgba(115,2,2,0.18), rgba(0,0,0,0)), radial-gradient(circle at 20% 0%, rgba(0,0,0,0.10), transparent 55%)",
+                    backgroundImage:
+                      "url(https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=1400&q=80)",
                     display: "flex",
                     alignItems: "flex-end",
                     p: 2,
                   }}
                 >
                   <Typography sx={{ fontWeight: 800, letterSpacing: 0.2 }}>
-                    {hostel?.name ?? "HOSTLY"}
+                    {<b style={{ color: "white", textDecoration: "underline", fontStyle: "italic" }}>{"Hospedaje " + (hostel?.name.toUpperCase() ?? "HOSTLY")}</b>}
                   </Typography>
                 </Box>
               </CardContent>

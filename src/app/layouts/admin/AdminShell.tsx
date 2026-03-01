@@ -15,6 +15,7 @@ import {
   Container,
   useMediaQuery,
   Divider,
+  Chip,
 } from "@mui/material";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import BookIcon from "@mui/icons-material/Book";
@@ -22,12 +23,14 @@ import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PublicIcon from "@mui/icons-material/Public";
-import GroupIcon from "@mui/icons-material/Group"; // ✅ NEW
+import GroupIcon from "@mui/icons-material/Group";
+import AddIcon from "@mui/icons-material/Add";
+import MailOutlineIcon from "@mui/icons-material/MailOutline";
 import { signOut } from "firebase/auth";
 import { auth } from "../../../services/firebase";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../providers/AuthContext";
-import MailOutlineIcon from "@mui/icons-material/MailOutline";
+
 type MenuKey = "dashboard" | "reservations" | "rooms" | "members" | "emails";
 
 export default function AdminShell() {
@@ -40,7 +43,7 @@ export default function AdminShell() {
 
   const navigate = useNavigate();
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
-  const { user } = useAuth();
+  const { user, role, isOwner } = useAuth();
   const location = useLocation();
 
   const menu = useMemo(
@@ -48,7 +51,7 @@ export default function AdminShell() {
       { key: "dashboard" as const, icon: <DashboardIcon />, to: "" },
       { key: "reservations" as const, icon: <BookIcon />, to: "reservations" },
       { key: "rooms" as const, icon: <MeetingRoomIcon />, to: "rooms" },
-      { key: "members" as const, icon: <GroupIcon />, to: "members" }, // ✅ NEW
+      { key: "members" as const, icon: <GroupIcon />, to: "members" },
       { key: "emails" as const, icon: <MailOutlineIcon />, to: "emails" },
     ],
     []
@@ -78,8 +81,30 @@ export default function AdminShell() {
     setMobileOpen(false);
   };
 
+  const goCreateRoom = () => {
+    if (!hostelSlug) return;
+    // abre modal en RoomsSection (si pegaste el RoomsSection que te pasé)
+    navigate(`/${hostelSlug}/admin/rooms?new=1`);
+    setMobileOpen(false);
+  };
+
+  const roleChipLabel = (role || "guest").toUpperCase();
+
   const DrawerContent = (
     <Box sx={{ pt: 1 }}>
+      <Box sx={{ px: 1.5, pb: 1 }}>
+        <Chip
+          label={`ROLE: ${roleChipLabel}`}
+          sx={{
+            borderRadius: 999,
+            fontWeight: 900,
+            width: "100%",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.06)",
+          }}
+        />
+      </Box>
+
       <List>
         {menu.map((item) => {
           const fullPath = `/${hostelSlug}/admin${item.to ? `/${item.to}` : ""}`;
@@ -113,6 +138,18 @@ export default function AdminShell() {
             <PublicIcon />
           </ListItemIcon>
           {(desktopOpen || isMobile) && <ListItemText primary={t("admin.shell.viewSite")} />}
+        </ListItemButton>
+
+        {/* CTA crear habitación (solo owner) */}
+        <ListItemButton
+          onClick={goCreateRoom}
+          disabled={!isOwner}
+          sx={{ mx: 1, borderRadius: 2 }}
+        >
+          <ListItemIcon sx={{ minWidth: 44 }}>
+            <AddIcon />
+          </ListItemIcon>
+          {(desktopOpen || isMobile) && <ListItemText primary={t("admin.shell.createRoom", "Crear habitación")} />}
         </ListItemButton>
 
         <ListItemButton onClick={handleLogout} sx={{ mx: 1, borderRadius: 2 }}>
@@ -151,15 +188,14 @@ export default function AdminShell() {
 
             <Box sx={{ flexGrow: 1 }} />
 
-            <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignItems: "center" }}>
-              <Typography sx={{ fontSize: 13, opacity: 0.8 }}>{user?.email ?? ""}</Typography>
-              <Button variant="outlined" onClick={handleViewSite} disabled={!hostelSlug}>
-                {t("admin.shell.viewSite")}
-              </Button>
-              <Button variant="contained" onClick={handleLogout}>
-                {t("admin.shell.logout")}
-              </Button>
-            </Box>
+            <StackRight
+              hostelSlug={hostelSlug ?? null}
+              email={user?.email ?? ""}
+              onViewSite={handleViewSite}
+              onCreateRoom={goCreateRoom}
+              onLogout={handleLogout}
+              isOwner={isOwner}
+            />
           </Toolbar>
         </Container>
       </AppBar>
@@ -207,6 +243,46 @@ export default function AdminShell() {
           <Outlet />
         </Container>
       </Box>
+    </Box>
+  );
+}
+
+/** Extra: separar header actions para mantener limpio */
+function StackRight({
+  hostelSlug,
+  email,
+  onViewSite,
+  onCreateRoom,
+  onLogout,
+  isOwner,
+}: {
+  hostelSlug: string | null;
+  email: string;
+  onViewSite: () => void;
+  onCreateRoom: () => void;
+  onLogout: () => void;
+  isOwner: boolean;
+}) {
+  return (
+    <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignItems: "center" }}>
+      <Typography sx={{ fontSize: 13, opacity: 0.8 }}>{email}</Typography>
+
+      <Button variant="outlined" onClick={onViewSite} disabled={!hostelSlug} startIcon={<PublicIcon />}>
+        Ver sitio
+      </Button>
+
+      <Button
+        variant="outlined"
+        onClick={onCreateRoom}
+        disabled={!hostelSlug || !isOwner}
+        startIcon={<AddIcon />}
+      >
+        Crear habitación
+      </Button>
+
+      <Button variant="contained" onClick={onLogout} startIcon={<LogoutIcon />}>
+        Salir
+      </Button>
     </Box>
   );
 }

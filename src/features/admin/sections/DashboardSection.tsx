@@ -1,51 +1,120 @@
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import dayjs from "dayjs";
+import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
+dayjs.extend(isSameOrAfter);
+
 import {
   Alert,
   Box,
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
-  FormControl,
-  InputLabel,
+  Divider,
+  IconButton,
+  LinearProgress,
   MenuItem,
   Select,
   Stack,
   Typography,
 } from "@mui/material";
-import Grid from "@mui/material/GridLegacy";
+
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import AddIcon from "@mui/icons-material/Add";
 import { collection, doc, getDoc, getDocs, updateDoc } from "firebase/firestore";
-import { useTranslation } from "react-i18next";
 import { db } from "../../../services/firebase";
 
-type Reservation = { total?: number };
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
+type Reservation = {
+  total?: number;
+  status?: ReservationStatus;
+  checkIn?: any;  // Timestamp
+  checkOut?: any; // Timestamp
+};
+
 type Language = "es" | "en" | "pt";
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
+  const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalReservations, setTotalReservations] = useState(0);
   const [totalRooms, setTotalRooms] = useState(0);
 
-  const [defaultLanguage, setDefaultLanguage] = useState<Language>("es");
+  const [pendingCount, setPendingCount] = useState(0);
+  const [nextCheckins, setNextCheckins] = useState(0);
+  const [nextCheckouts, setNextCheckouts] = useState(0);
+  const [occupancyPct, setOccupancyPct] = useState(0);
+
+  // ✅ NO lo eliminamos: selector idioma predeterminado
+  const [defaultLang, setDefaultLang] = useState<Language>("es");
   const [savingLang, setSavingLang] = useState(false);
-  const [loading, setLoading] = useState(true);
 
-  const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const base = window.location.origin;
+  const publicUrl = hostelSlug ? `${base}/${hostelSlug}` : base;
 
-  const currency = "USD";
   const money = useMemo(
     () =>
       new Intl.NumberFormat(i18n.language || "es", {
         style: "currency",
-        currency,
+        currency: "USD",
         maximumFractionDigits: 0,
       }),
     [i18n.language]
   );
+
+  const StatCard = ({ title, value }: { title: string; value: React.ReactNode }) => (
+    <Card sx={{ borderRadius: 4 }}>
+      <CardContent>
+        <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 26, letterSpacing: -0.3 }}>{value}</Typography>
+      </CardContent>
+    </Card>
+  );
+
+  const badgeSx = { borderRadius: 999, fontWeight: 900, bgcolor: "rgba(0,0,0,0.06)" } as const;
+
+  const copyPublicLink = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setMsg({ type: "success", text: t("admin.dashboard.copied", "Link copiado") });
+    } catch {
+      setMsg({ type: "error", text: t("admin.dashboard.copyError", "No se pudo copiar") });
+    }
+  };
+
+  const openPublic = () => window.open(publicUrl, "_blank", "noopener,noreferrer");
+
+  const goCreateRoom = () => {
+    if (!hostelSlug) return;
+    navigate(`/${hostelSlug}/admin/rooms`);
+  };
+
+  const saveDefaultLanguage = async () => {
+    if (!hostelSlug) return;
+    setSavingLang(true);
+    setMsg(null);
+    try {
+      await updateDoc(doc(db, "hostels", hostelSlug), {
+        defaultLanguage: defaultLang,
+        updatedAt: new Date(),
+      });
+      setMsg({ type: "success", text: t("admin.dashboard.msgSaved", "Idioma predeterminado actualizado ✅") });
+    } catch {
+      setMsg({ type: "error", text: t("admin.dashboard.msgSaveError", "No se pudo guardar el idioma. Revisá permisos/reglas.") });
+    } finally {
+      setSavingLang(false);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -65,17 +134,65 @@ export default function DashboardSection() {
         if (!alive) return;
 
         const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
-        const revenue = reservations.reduce((acc, curr) => acc + (curr.total ?? 0), 0);
 
+        // ✅ idioma predeterminado (no eliminar)
+        if (hostelSnap.exists()) {
+          const data = hostelSnap.data() as any;
+          const lng = String(data?.defaultLanguage ?? "es").slice(0, 2) as Language;
+          setDefaultLang(lng === "en" || lng === "pt" || lng === "es" ? lng : "es");
+        } else {
+          setDefaultLang("es");
+        }
+
+        const revenue = reservations.reduce((acc, curr) => acc + Number(curr.total ?? 0), 0);
         setTotalRevenue(revenue);
         setTotalReservations(reservations.length);
         setTotalRooms(roomsSnap.size);
 
-        if (hostelSnap.exists()) {
-          const data = hostelSnap.data() as any;
-          const lng = (data?.defaultLanguage ?? "es") as Language;
-          setDefaultLanguage(lng === "en" || lng === "pt" || lng === "es" ? lng : "es");
+        // badges
+        const pending = reservations.filter((r) => (r.status ?? "pending") === "pending").length;
+        setPendingCount(pending);
+
+        const now = dayjs();
+        const nextIn = reservations.filter((r) => {
+          const d = r.checkIn?.toDate?.();
+          return d ? dayjs(d).isSameOrAfter(now.startOf("day"), "day") : false;
+        }).length;
+
+        const nextOut = reservations.filter((r) => {
+          const d = r.checkOut?.toDate?.();
+          return d ? dayjs(d).isSameOrAfter(now.startOf("day"), "day") : false;
+        }).length;
+
+        setNextCheckins(nextIn);
+        setNextCheckouts(nextOut);
+
+        // ocupación simple (30 días)
+        const days = 30;
+        const horizonStart = now.startOf("day");
+        const horizonEnd = now.add(days, "day").startOf("day");
+
+        let occupiedNights = 0;
+        const totalCapacityNights = Math.max(1, roomsSnap.size) * days;
+
+        for (const r of reservations) {
+          const inD = r.checkIn?.toDate?.();
+          const outD = r.checkOut?.toDate?.();
+          if (!inD || !outD) continue;
+
+          const a = dayjs(inD).startOf("day");
+          const b = dayjs(outD).startOf("day");
+
+          const start = a.isAfter(horizonStart) ? a : horizonStart;
+          const end = b.isBefore(horizonEnd) ? b : horizonEnd;
+
+          occupiedNights += Math.max(0, end.diff(start, "day"));
         }
+
+        const pct = Math.max(0, Math.min(100, Math.round((occupiedNights / totalCapacityNights) * 100)));
+        setOccupancyPct(pct);
+      } catch {
+        setMsg({ type: "error", text: t("admin.dashboard.loadError", "No se pudo cargar el dashboard") });
       } finally {
         if (alive) setLoading(false);
       }
@@ -85,84 +202,214 @@ export default function DashboardSection() {
     return () => {
       alive = false;
     };
-  }, [hostelSlug]);
+  }, [hostelSlug, t]);
 
-  const handleSaveLanguage = async () => {
-    if (!hostelSlug) return;
-    setMsg(null);
+  const checklist = useMemo(() => {
+    const hasHostel = Boolean(hostelSlug);
+    const hasRoom = totalRooms > 0;
+    const imagesOk = totalRooms > 0; // proxy
+    const hasReservation = totalReservations > 0;
+    return { hasHostel, hasRoom, imagesOk, hasReservation };
+  }, [hostelSlug, totalRooms, totalReservations]);
 
-    try {
-      setSavingLang(true);
-      await updateDoc(doc(db, "hostels", hostelSlug), { defaultLanguage });
-      i18n.changeLanguage(defaultLanguage);
-      setMsg({ type: "success", text: t("admin.dashboard.msgSaved") });
-    } catch {
-      setMsg({ type: "error", text: t("admin.dashboard.msgSaveError") });
-    } finally {
-      setSavingLang(false);
-    }
-  };
-
-  const Stat = ({ title, value }: { title: string; value: React.ReactNode }) => (
-    <Card>
-      <CardContent>
-        <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>{title}</Typography>
-        <Typography sx={{ fontWeight: 900, fontSize: 24 }}>{value}</Typography>
-      </CardContent>
-    </Card>
+  const ChecklistItem = ({ done, label }: { done: boolean; label: string }) => (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Chip
+        size="small"
+        label={done ? t("common.done", "Listo") : t("common.todo", "Pendiente")}
+        color={done ? "success" : "warning"}
+        sx={{ borderRadius: 999, fontWeight: 900, minWidth: 92 }}
+      />
+      <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
+    </Stack>
   );
 
   return (
     <Container disableGutters>
-      <Stack spacing={2}>
-        <Typography variant="h5">{t("admin.dashboard.title")}</Typography>
+      <Stack spacing={2.2}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", md: "center" }}
+          justifyContent="space-between"
+        >
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 900 }}>
+              {t("admin.dashboard.title", "Dashboard")}
+            </Typography>
+            <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+              {t("admin.dashboard.subtitle", "Resumen operativo del hostel")}
+            </Typography>
+          </Box>
+
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="stretch">
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={goCreateRoom}
+              disabled={!hostelSlug}
+              sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+            >
+              {t("admin.dashboard.ctaCreateRoom", "Crear habitación")}
+            </Button>
+
+            <Button
+              variant="outlined"
+              startIcon={<OpenInNewIcon />}
+              onClick={openPublic}
+              disabled={!hostelSlug}
+              sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+            >
+              {t("admin.dashboard.viewSite", "Ver sitio")}
+            </Button>
+          </Stack>
+        </Stack>
 
         {msg && <Alert severity={msg.type}>{msg.text}</Alert>}
 
-        <Card>
+        {/* ✅ Config - NO se elimina */}
+        <Card sx={{ borderRadius: 4 }}>
           <CardContent>
-            <Stack spacing={1.5}>
-              <Typography sx={{ fontWeight: 900 }}>{t("admin.dashboard.configTitle")}</Typography>
+            <Typography sx={{ fontWeight: 900, mb: 1 }}>
+              {t("admin.dashboard.configTitle", "Configuración del sitio")}
+            </Typography>
 
-              <FormControl size="small" fullWidth>
-                <InputLabel>{t("admin.dashboard.defaultLanguageLabel")}</InputLabel>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ sm: "center" }}>
+              <Box sx={{ minWidth: 220 }}>
+                <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>
+                  {t("admin.dashboard.defaultLanguageLabel", "Idioma predeterminado")}
+                </Typography>
+
                 <Select
-                  value={defaultLanguage}
-                  label={t("admin.dashboard.defaultLanguageLabel")}
-                  onChange={(e) => setDefaultLanguage(e.target.value as Language)}
+                  size="small"
+                  value={defaultLang}
+                  onChange={(e) => setDefaultLang(e.target.value as Language)}
+                  sx={{ width: "100%" }}
                 >
-                  <MenuItem value="es">{t("admin.dashboard.languages.es")}</MenuItem>
-                  <MenuItem value="en">{t("admin.dashboard.languages.en")}</MenuItem>
-                  <MenuItem value="pt">{t("admin.dashboard.languages.pt")}</MenuItem>
+                  <MenuItem value="es">{t("admin.dashboard.languages.es", "Español (ES)")}</MenuItem>
+                  <MenuItem value="en">{t("admin.dashboard.languages.en", "English (EN)")}</MenuItem>
+                  <MenuItem value="pt">{t("admin.dashboard.languages.pt", "Português (PT)")}</MenuItem>
                 </Select>
-              </FormControl>
+              </Box>
 
-              <Button variant="contained" onClick={handleSaveLanguage} disabled={savingLang}>
-                {savingLang ? t("admin.dashboard.saving") : t("admin.dashboard.save")}
+              <Button
+                variant="contained"
+                onClick={saveDefaultLanguage}
+                disabled={!hostelSlug || savingLang}
+                sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none", alignSelf: { xs: "stretch", sm: "end" } }}
+              >
+                {savingLang ? t("admin.dashboard.saving", "Guardando...") : t("admin.dashboard.save", "Guardar")}
               </Button>
+            </Stack>
 
-              <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                {t("admin.dashboard.help")}
+            <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
+              {t(
+                "admin.dashboard.help",
+                "Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes)."
+              )}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        {/* Public link + badges */}
+        <Card sx={{ borderRadius: 4 }}>
+          <CardContent>
+            <Stack spacing={1.2}>
+              <Typography sx={{ fontWeight: 900 }}>
+                {t("admin.dashboard.publicLinkTitle", "Link público")}
               </Typography>
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 1,
+                    borderRadius: 3,
+                    border: "1px solid rgba(0,0,0,0.08)",
+                    bgcolor: "rgba(0,0,0,0.02)",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontSize: 13,
+                    flex: 1,
+                    overflowX: "auto",
+                  }}
+                >
+                  {publicUrl}
+                </Box>
+
+                <IconButton onClick={copyPublicLink} sx={{ border: "1px solid rgba(0,0,0,0.10)", borderRadius: 3 }}>
+                  <ContentCopyIcon fontSize="small" />
+                </IconButton>
+
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                  <Chip sx={badgeSx} label={`${pendingCount} ${t("admin.dashboard.badges.pending", "pendientes")}`} />
+                  <Chip sx={badgeSx} label={`${nextCheckins} ${t("admin.dashboard.badges.nextCheckins", "próx. check-in")}`} />
+                  <Chip sx={badgeSx} label={`${nextCheckouts} ${t("admin.dashboard.badges.nextCheckouts", "próx. check-out")}`} />
+                </Stack>
+              </Stack>
             </Stack>
           </CardContent>
         </Card>
 
-        <Grid container spacing={2}>
-          <Grid item xs={12} sm={6} md={4}>
-            <Stat title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-           <Stat title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-        <Stat title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
-          </Grid>
-        </Grid>
+        {/* Checklist */}
+        <Card sx={{ borderRadius: 4 }}>
+          <CardContent>
+            <Typography sx={{ fontWeight: 900, mb: 1 }}>
+              {t("admin.dashboard.checklistTitle", "Setup checklist")}
+            </Typography>
+
+            <Stack spacing={1}>
+              <ChecklistItem done={checklist.hasHostel} label={t("admin.dashboard.checklist.createdHostel", "Hostel creado")} />
+              <ChecklistItem done={checklist.hasRoom} label={t("admin.dashboard.checklist.firstRoom", "Primera habitación")} />
+              <ChecklistItem done={checklist.imagesOk} label={t("admin.dashboard.checklist.images", "Imágenes cargadas")} />
+              <ChecklistItem done={checklist.hasReservation} label={t("admin.dashboard.checklist.testBooking", "Reserva de prueba")} />
+            </Stack>
+
+            <Divider sx={{ my: 1.6 }} />
+
+            <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+              {t(
+                "admin.dashboard.checklistHelp",
+                "Tip: completá estos pasos y ya tenés un demo presentable para mostrar a un hostel."
+              )}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        {/* Stats sin Grid MUI */}
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" } }}>
+          <StatCard title={t("admin.dashboard.cards.revenue", "Ingresos totales")} value={money.format(totalRevenue)} />
+          <StatCard title={t("admin.dashboard.cards.reservations", "Reservas totales")} value={totalReservations} />
+          <StatCard title={t("admin.dashboard.cards.rooms", "Habitaciones activas")} value={totalRooms} />
+        </Box>
+
+        {/* Occupancy */}
+        <Card sx={{ borderRadius: 4 }}>
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Typography sx={{ fontWeight: 900 }}>
+                {t("admin.dashboard.occupancyTitle", "Ocupación (30 días)")}
+              </Typography>
+              <Chip sx={{ borderRadius: 999, fontWeight: 900 }} label={`${occupancyPct}%`} />
+            </Stack>
+
+            <Box sx={{ mt: 1.5 }}>
+              <LinearProgress variant="determinate" value={occupancyPct} />
+            </Box>
+
+            <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
+              {t(
+                "admin.dashboard.occupancyHelp",
+                "Estimación simple para ver tracción. Luego lo hacemos exacto con locks por noche."
+              )}
+            </Typography>
+          </CardContent>
+        </Card>
 
         {loading && (
-          <Box sx={{ py: 2 }}>
-            <Typography sx={{ opacity: 0.75 }}>{t("loading.subtitle")}</Typography>
+          <Box sx={{ py: 1 }}>
+            <Typography sx={{ opacity: 0.75, fontSize: 13 }}>
+              {t("loading.subtitle", "Cargando…")}
+            </Typography>
           </Box>
         )}
       </Stack>

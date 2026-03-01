@@ -33,6 +33,8 @@ export const resources = {
         back: "Volver",
         remove: "Quitar",
         uploadImages: "Subir imágenes (hasta 6)",
+        done: "Listo",
+        todo: "Pendiente",
       },
 
       uploadImages: "Subir imágenes (hasta 6)",
@@ -146,7 +148,6 @@ export const resources = {
 
       admin: {
         rooms: {
-
           title: "Gestión de Habitaciones",
           subtitle: "Elegí tu habitación y reservá en minutos.",
           defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
@@ -217,6 +218,16 @@ export const resources = {
         },
 
         reservations: {
+          loadError: "Error cargando reservas",
+          updateError: "No se pudo actualizar el estado",
+          quickConfirm: "Confirmar",
+          quickCancel: "Cancelar",
+          confirmCancel: {
+            title: "¿Cancelar reserva?",
+            body: "Esta acción marcará la reserva como cancelada. Podés volver a cambiar el estado más tarde.",
+            keep: "Mantener",
+            confirm: "Cancelar",
+          },
           filterFrom: "Desde",
           filterTo: "Hasta",
           filterAll: "Todos los estados",
@@ -261,6 +272,34 @@ export const resources = {
 
         dashboard: {
           title: "Dashboard",
+          subtitle: "Resumen operativo del hostel",
+          ctaCreateRoom: "Crear habitación",
+          viewSite: "Ver sitio",
+          copied: "Link copiado",
+          copyError: "No se pudo copiar",
+          loadError: "No se pudo cargar el dashboard",
+
+          publicLinkTitle: "Link público",
+          badges: {
+            pending: "pendientes",
+            nextCheckins: "próx. check-in",
+            nextCheckouts: "próx. check-out",
+          },
+
+          checklistTitle: "Setup checklist",
+          checklistHelp:
+            "Tip: completá estos pasos y ya tenés un demo presentable para mostrar a un hostel.",
+          checklist: {
+            createdHostel: "Hostel creado",
+            firstRoom: "Primera habitación",
+            images: "Imágenes cargadas",
+            testBooking: "Reserva de prueba",
+          },
+
+          occupancyTitle: "Ocupación (30 días)",
+          occupancyHelp:
+            "Estimación simple para ver tracción. Luego lo hacemos exacto con locks por noche.",
+
           configTitle: "Configuración del sitio",
           defaultLanguageLabel: "Idioma predeterminado",
           save: "Guardar",
@@ -299,9 +338,21 @@ export const resources = {
         previewEmptyTitle: "Todavía no hay habitaciones publicadas",
         previewEmptyDesc: "Si estás en modo admin, cargá la primera habitación para que la gente pueda reservar.",
         features: {
-          a: { eyebrow: "DIRECTO", title: "Reserva sin vueltas", desc: "Elegís habitación, confirmás fechas y listo. Sin pasos raros." },
-          b: { eyebrow: "CLARO", title: "Precios transparentes", desc: "Ves el total antes de enviar la solicitud. Sin sorpresas." },
-          c: { eyebrow: "MULTI-IDIOMA", title: "Tu sitio, en 1 click", desc: "Español, English, Português. El huésped entra y entiende." },
+          a: {
+            eyebrow: "DIRECTO",
+            title: "Reserva sin vueltas",
+            desc: "Elegís habitación, confirmás fechas y listo. Sin pasos raros.",
+          },
+          b: {
+            eyebrow: "CLARO",
+            title: "Precios transparentes",
+            desc: "Ves el total antes de enviar la solicitud. Sin sorpresas.",
+          },
+          c: {
+            eyebrow: "MULTI-IDIOMA",
+            title: "Tu sitio, en 1 click",
+            desc: "Español, English, Português. El huésped entra y entiende.",
+          },
         },
         heroLine1: "Más que una estadía, una experiencia.",
         heroLine2: "Reservá fácil. Viví auténtico.",
@@ -334,8 +385,6 @@ export const resources = {
         fromPerNight: "Desde ${{price}} / noche",
         bookThisRoom: "RESERVAR ESTA HABITACIÓN",
       },
-
-
 
       booking: {
         back: "Volver",
@@ -393,6 +442,8 @@ export const resources = {
         back: "Back",
         remove: "Remove",
         uploadImages: "Upload images (up to 6)",
+        done: "Done",
+        todo: "To do",
       },
 
       uploadImages: "Upload images (up to 6)",
@@ -576,6 +627,17 @@ export const resources = {
         },
 
         reservations: {
+          loadError: "Error loading reservations",
+          updateError: "Could not update status",
+          quickConfirm: "Confirm",
+          quickCancel: "Cancel",
+          confirmCancel: {
+            title: "Cancel reservation?",
+            body: "This will mark the reservation as cancelled. You can change the status again later.",
+            keep: "Keep",
+            confirm: "Cancel",
+          },
+
           filterFrom: "From",
           filterTo: "To",
           filterAll: "All statuses",
@@ -628,6 +690,32 @@ export const resources = {
 
         dashboard: {
           title: "Dashboard",
+          subtitle: "Operational overview",
+          ctaCreateRoom: "Create room",
+          viewSite: "View site",
+          copied: "Link copied",
+          copyError: "Could not copy",
+          loadError: "Could not load dashboard",
+
+          publicLinkTitle: "Public link",
+          badges: {
+            pending: "pending",
+            nextCheckins: "next check-ins",
+            nextCheckouts: "next check-outs",
+          },
+
+          checklistTitle: "Setup checklist",
+          checklistHelp: "Tip: complete these steps and you’ll have a presentable demo to show a hostel.",
+          checklist: {
+            createdHostel: "Hostel created",
+            firstRoom: "First room",
+            images: "Images uploaded",
+            testBooking: "Test booking",
+          },
+
+          occupancyTitle: "Occupancy (30 days)",
+          occupancyHelp: "Simple estimate for traction. Later we’ll make it exact with nightly locks.",
+
           configTitle: "Site settings",
           defaultLanguageLabel: "Default language",
           save: "Save",
@@ -773,6 +861,8 @@ export const resources = {
         back: "Voltar",
         remove: "Remover",
         uploadImages: "Enviar imagens (até 6)",
+        done: "Pronto",
+        todo: "Pendente",
       },
 
       uploadImages: "Enviar imagens (até 6)",
@@ -956,6 +1046,17 @@ export const resources = {
         },
 
         reservations: {
+          loadError: "Erro ao carregar reservas",
+          updateError: "Não foi possível atualizar o status",
+          quickConfirm: "Confirmar",
+          quickCancel: "Cancelar",
+          confirmCancel: {
+            title: "Cancelar reserva?",
+            body: "Isso marcará a reserva como cancelada. Você pode mudar o status novamente depois.",
+            keep: "Manter",
+            confirm: "Cancelar",
+          },
+
           filterFrom: "De",
           filterTo: "Até",
           filterAll: "Todos os status",
@@ -974,8 +1075,6 @@ export const resources = {
           total: "Total",
           status: "Status",
           actions: "Ações",
-
-
 
           pending: "Pendente",
           confirmed: "Confirmada",
@@ -1011,6 +1110,32 @@ export const resources = {
 
         dashboard: {
           title: "Dashboard",
+          subtitle: "Visão operacional",
+          ctaCreateRoom: "Criar quarto",
+          viewSite: "Ver site",
+          copied: "Link copiado",
+          copyError: "Não foi possível copiar",
+          loadError: "Não foi possível carregar o dashboard",
+
+          publicLinkTitle: "Link público",
+          badges: {
+            pending: "pendentes",
+            nextCheckins: "próx. check-ins",
+            nextCheckouts: "próx. check-outs",
+          },
+
+          checklistTitle: "Checklist de setup",
+          checklistHelp: "Dica: complete estes passos e você terá um demo pronto para apresentar a um hostel.",
+          checklist: {
+            createdHostel: "Hostel criado",
+            firstRoom: "Primeiro quarto",
+            images: "Imagens enviadas",
+            testBooking: "Reserva de teste",
+          },
+
+          occupancyTitle: "Ocupação (30 dias)",
+          occupancyHelp: "Estimativa simples. Depois fazemos exato com locks por noite.",
+
           configTitle: "Configurações do site",
           defaultLanguageLabel: "Idioma padrão",
           save: "Salvar",

@@ -15,13 +15,19 @@ import {
   Divider,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
-import { Link as RouterLink, Outlet, useParams } from "react-router-dom";
+import { NavLink, Outlet, useParams } from "react-router-dom";
 import LanguageSwitcher from "../../../components/LanguageSwitcher";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../providers/AuthContext";
 
+type NavItem = {
+  label: string;
+  to: string;
+  variant?: "text" | "contained" | "outlined";
+};
+
 export const MainLayout = () => {
-  const { user, hostelSlug, canAccessAdmin } = useAuth(); // ✅ changed
+  const { user, hostelSlug, canAccessAdmin } = useAuth();
   const { hostelSlug: slugFromUrl } = useParams<{ hostelSlug: string }>();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -29,18 +35,29 @@ export const MainLayout = () => {
   if (!slugFromUrl) return null;
   const base = `/${slugFromUrl}`;
 
-  const links = useMemo(
+  const closeDrawer = () => setOpen(false);
+
+  // ✅ público: Reservar va a rooms (nada de #book)
+  const links = useMemo<NavItem[]>(
     () => [
-      { label: t("nav.rooms"), to: `${base}/rooms` },
-      { label: t("nav.book"), to: `${base}/rooms` },
+      { label: t("nav.rooms"), to: `${base}/rooms`, variant: "text" },
+    
     ],
     [t, base]
   );
 
-  const adminLink =
-    user && canAccessAdmin && hostelSlug
-      ? { label: t("nav.admin"), to: `${base}/admin` }
-      : null;
+  const adminLink: NavItem | null =
+    user && canAccessAdmin && hostelSlug ? { label: t("nav.admin"), to: `${base}/admin`, variant: "outlined" } : null;
+
+  const desktopButtonSx = (isActive: boolean) => ({
+    px: 1.5,
+    borderRadius: 999,
+    textTransform: "none",
+    fontWeight: 800,
+    ...(isActive && {
+      backgroundColor: "rgba(255,255,255,0.10)",
+    }),
+  });
 
   return (
     <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
@@ -65,9 +82,11 @@ export const MainLayout = () => {
               <MenuIcon />
             </IconButton>
 
+            {/* Brand */}
             <Typography
-              component={RouterLink}
+              component={NavLink}
               to={base}
+              onClick={closeDrawer}
               sx={{
                 textDecoration: "none",
                 color: "inherit",
@@ -82,20 +101,51 @@ export const MainLayout = () => {
             </Typography>
 
             {/* Desktop nav */}
-            <Stack direction="row" spacing={1} sx={{ display: { xs: "none", sm: "flex" }, ml: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ display: { xs: "none", sm: "flex" }, ml: 1, alignItems: "center" }}>
               {links.map((l) => (
                 <Button
-                  key={l.to}
-                  component={RouterLink}
+                  key={l.to + l.label}
+                  component={NavLink}
                   to={l.to}
-                  color="inherit"
-                  sx={{ px: 1.5, opacity: 0.95 }}
+                  // ✅ activa solo para rutas exactas cuando corresponde
+                  end={l.to === base}
+                  variant={l.variant ?? "text"}
+                  color={l.variant === "contained" ? "primary" : "inherit"}
+                  sx={() => ({
+                    ...desktopButtonSx(false),
+                    ...(typeof l.variant === "string" && l.variant !== "contained"
+                      ? { color: "white", opacity: 0.95 }
+                      : {}),
+                    "&.active": desktopButtonSx(true),
+                    ...(l.variant === "contained"
+                      ? {
+                          fontWeight: 900,
+                          boxShadow: "none",
+                          "&:hover": { boxShadow: "none" },
+                        }
+                      : {}),
+                  })}
                 >
                   {l.label}
                 </Button>
               ))}
+
               {adminLink && (
-                <Button component={RouterLink} to={adminLink.to} color="inherit" sx={{ px: 1.5 }}>
+                <Button
+                  component={NavLink}
+                  to={adminLink.to}
+                  variant="outlined"
+                  sx={{
+                    px: 1.5,
+                    borderRadius: 999,
+                    textTransform: "none",
+                    fontWeight: 800,
+                    borderColor: "rgba(255,255,255,0.35)",
+                    color: "white",
+                    "&:hover": { borderColor: "rgba(255,255,255,0.6)" },
+                    "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
+                  }}
+                >
                   {adminLink.label}
                 </Button>
               )}
@@ -107,14 +157,14 @@ export const MainLayout = () => {
         </Container>
       </AppBar>
 
-      {/* ✅ Spacer: evita superposición */}
+      {/* spacer */}
       <Toolbar />
 
       {/* Mobile Drawer */}
       <Drawer
         anchor="left"
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={closeDrawer}
         PaperProps={{
           sx: { width: 300, backgroundColor: "#0f0f10", color: "white" },
         }}
@@ -123,26 +173,67 @@ export const MainLayout = () => {
           <Typography sx={{ fontWeight: 900, letterSpacing: 1 }}>HOSTLY</Typography>
           <Typography sx={{ opacity: 0.7, mt: 0.5, fontSize: 13 }}>{slugFromUrl}</Typography>
         </Box>
+
         <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
-        <List>
+
+        <List sx={{ py: 0.5 }}>
           {links.map((l) => (
-            <ListItemButton key={l.to} component={RouterLink} to={l.to} onClick={() => setOpen(false)}>
-              <ListItemText primary={l.label} />
+            <ListItemButton
+              key={l.to + l.label}
+              component={NavLink}
+              to={l.to}
+              onClick={closeDrawer}
+              sx={{
+                borderRadius: 2,
+                mx: 1,
+                my: 0.5,
+                "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
+              }}
+            >
+              <ListItemText
+                primary={l.label}
+                primaryTypographyProps={{
+                  fontWeight: l.variant === "contained" ? 900 : 700,
+                }}
+              />
             </ListItemButton>
           ))}
+
           {adminLink && (
-            <ListItemButton component={RouterLink} to={adminLink.to} onClick={() => setOpen(false)}>
-              <ListItemText primary={adminLink.label} />
-            </ListItemButton>
+            <>
+              <Divider sx={{ my: 1.2, borderColor: "rgba(255,255,255,0.08)" }} />
+              <ListItemButton
+                component={NavLink}
+                to={adminLink.to}
+                onClick={closeDrawer}
+                sx={{
+                  borderRadius: 2,
+                  mx: 1,
+                  my: 0.5,
+                  "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
+                }}
+              >
+                <ListItemText primary={adminLink.label} primaryTypographyProps={{ fontWeight: 800 }} />
+              </ListItemButton>
+            </>
           )}
         </List>
       </Drawer>
 
+      {/* Main */}
       <Box component="main" sx={{ flex: 1, overflowX: "hidden" }}>
         <Outlet />
       </Box>
 
-      <Box component="footer" sx={{ borderTop: "1px solid rgba(0,0,0,0.08)", background: "rgba(255,255,255,0.75)" }}>
+      {/* Footer */}
+      <Box
+        component="footer"
+        sx={{
+          borderTop: "1px solid rgba(0,0,0,0.08)",
+          background: "rgba(255,255,255,0.75)",
+          backdropFilter: "blur(8px)",
+        }}
+      >
         <Container sx={{ py: 2 }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -150,15 +241,13 @@ export const MainLayout = () => {
             justifyContent="space-between"
             alignItems={{ xs: "flex-start", sm: "center" }}
           >
-            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
-              © {new Date().getFullYear()} HOSTLY.
-            </Typography>
+            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>© {new Date().getFullYear()} HOSTLY.</Typography>
 
             <Stack direction="row" spacing={2} sx={{ fontSize: 13 }}>
-              <Typography component={RouterLink} to={`${base}/terms`} sx={{ textDecoration: "none" }}>
+              <Typography component={NavLink} to={`${base}/terms`} style={{ textDecoration: "none" }}>
                 {t("footer.terms")}
               </Typography>
-              <Typography component={RouterLink} to={`${base}/privacy`} sx={{ textDecoration: "none" }}>
+              <Typography component={NavLink} to={`${base}/privacy`} style={{ textDecoration: "none" }}>
                 {t("footer.privacy")}
               </Typography>
             </Stack>

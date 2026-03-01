@@ -4,6 +4,10 @@ import LanguageDetector from "i18next-browser-languagedetector";
 export const resources = {
   es: {
     translation: {
+      badge: "Reserva directa",
+      badge2: "Sin comisiones",
+      visualTitle: "Tu próxima estadía empieza acá.",
+      visualSubtitle: "Elegí habitación, confirmá fechas y listo.",
       rooms: {
         subtitle: "Elegí tu habitación y reservá en minutos.",
         capacity: "{{n}} huésped",
@@ -360,6 +364,10 @@ export const resources = {
 
   en: {
     translation: {
+      badge: "Book direct",
+      badge2: "No fees",
+      visualTitle: "Your next stay starts here.",
+      visualSubtitle: "Pick a room, choose dates, done.",
       // --- Global / shared ---
       common: {
         language: "Language",
@@ -722,6 +730,10 @@ export const resources = {
 
   pt: {
     translation: {
+      badge: "Reserva direta",
+      badge2: "Sem taxas",
+      visualTitle: "Sua próxima estadia começa aqui.",
+      visualSubtitle: "Escolha o quarto, selecione as datas e pronto.",
       // --- Global / shared ---
       common: {
         language: "Idioma",

@@ -94,6 +94,6 @@ coverage
 *.njsproj
 *.sln
 *.sw?
-
+*.txt
 .vscode/*
 !.vscode/extensions.json

@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import dayjs from "dayjs";
-import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
-dayjs.extend(isSameOrAfter);
 
 import {
   Alert,
@@ -32,11 +30,15 @@ type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
   total?: number;
   status?: ReservationStatus;
-  checkIn?: any;  // Timestamp
+  checkIn?: any; // Timestamp
   checkOut?: any; // Timestamp
 };
 
 type Language = "es" | "en" | "pt";
+
+function isSameOrAfterDay(a: dayjs.Dayjs, b: dayjs.Dayjs) {
+  return a.isSame(b, "day") || a.isAfter(b, "day");
+}
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
@@ -64,7 +66,7 @@ export default function DashboardSection() {
 
   const money = useMemo(
     () =>
-      new Intl.NumberFormat(i18n.language || "es", {
+      new Intl.NumberFormat((i18n.language || "es").slice(0, 2), {
         style: "currency",
         currency: "USD",
         maximumFractionDigits: 0,
@@ -86,9 +88,9 @@ export default function DashboardSection() {
   const copyPublicLink = async () => {
     try {
       await navigator.clipboard.writeText(publicUrl);
-      setMsg({ type: "success", text: t("admin.dashboard.copied", "Link copiado") });
+      setMsg({ type: "success", text: t("admin.dashboard.copied") });
     } catch {
-      setMsg({ type: "error", text: t("admin.dashboard.copyError", "No se pudo copiar") });
+      setMsg({ type: "error", text: t("admin.dashboard.copyError") });
     }
   };
 
@@ -108,9 +110,9 @@ export default function DashboardSection() {
         defaultLanguage: defaultLang,
         updatedAt: new Date(),
       });
-      setMsg({ type: "success", text: t("admin.dashboard.msgSaved", "Idioma predeterminado actualizado ✅") });
+      setMsg({ type: "success", text: t("admin.dashboard.msgSaved") });
     } catch {
-      setMsg({ type: "error", text: t("admin.dashboard.msgSaveError", "No se pudo guardar el idioma. Revisá permisos/reglas.") });
+      setMsg({ type: "error", text: t("admin.dashboard.msgSaveError") });
     } finally {
       setSavingLang(false);
     }
@@ -154,14 +156,18 @@ export default function DashboardSection() {
         setPendingCount(pending);
 
         const now = dayjs();
+        const today = now.startOf("day");
+
         const nextIn = reservations.filter((r) => {
           const d = r.checkIn?.toDate?.();
-          return d ? dayjs(d).isSameOrAfter(now.startOf("day"), "day") : false;
+          if (!d) return false;
+          return isSameOrAfterDay(dayjs(d).startOf("day"), today);
         }).length;
 
         const nextOut = reservations.filter((r) => {
           const d = r.checkOut?.toDate?.();
-          return d ? dayjs(d).isSameOrAfter(now.startOf("day"), "day") : false;
+          if (!d) return false;
+          return isSameOrAfterDay(dayjs(d).startOf("day"), today);
         }).length;
 
         setNextCheckins(nextIn);
@@ -169,8 +175,8 @@ export default function DashboardSection() {
 
         // ocupación simple (30 días)
         const days = 30;
-        const horizonStart = now.startOf("day");
-        const horizonEnd = now.add(days, "day").startOf("day");
+        const horizonStart = today;
+        const horizonEnd = today.add(days, "day");
 
         let occupiedNights = 0;
         const totalCapacityNights = Math.max(1, roomsSnap.size) * days;
@@ -192,7 +198,7 @@ export default function DashboardSection() {
         const pct = Math.max(0, Math.min(100, Math.round((occupiedNights / totalCapacityNights) * 100)));
         setOccupancyPct(pct);
       } catch {
-        setMsg({ type: "error", text: t("admin.dashboard.loadError", "No se pudo cargar el dashboard") });
+        setMsg({ type: "error", text: t("admin.dashboard.loadError") });
       } finally {
         if (alive) setLoading(false);
       }
@@ -207,7 +213,10 @@ export default function DashboardSection() {
   const checklist = useMemo(() => {
     const hasHostel = Boolean(hostelSlug);
     const hasRoom = totalRooms > 0;
-    const imagesOk = totalRooms > 0; // proxy
+
+    // ⚠️ proxy por ahora: en el próximo paso lo hacemos real leyendo rooms.imageUrls
+    const imagesOk = totalRooms > 0;
+
     const hasReservation = totalReservations > 0;
     return { hasHostel, hasRoom, imagesOk, hasReservation };
   }, [hostelSlug, totalRooms, totalReservations]);
@@ -216,7 +225,7 @@ export default function DashboardSection() {
     <Stack direction="row" spacing={1} alignItems="center">
       <Chip
         size="small"
-        label={done ? t("common.done", "Listo") : t("common.todo", "Pendiente")}
+        label={done ? t("common.done") : t("common.todo")}
         color={done ? "success" : "warning"}
         sx={{ borderRadius: 999, fontWeight: 900, minWidth: 92 }}
       />
@@ -235,10 +244,10 @@ export default function DashboardSection() {
         >
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
-              {t("admin.dashboard.title", "Dashboard")}
+              {t("admin.dashboard.title")}
             </Typography>
             <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
-              {t("admin.dashboard.subtitle", "Resumen operativo del hostel")}
+              {t("admin.dashboard.subtitle")}
             </Typography>
           </Box>
 
@@ -250,7 +259,7 @@ export default function DashboardSection() {
               disabled={!hostelSlug}
               sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
             >
-              {t("admin.dashboard.ctaCreateRoom", "Crear habitación")}
+              {t("admin.dashboard.ctaCreateRoom")}
             </Button>
 
             <Button
@@ -260,7 +269,7 @@ export default function DashboardSection() {
               disabled={!hostelSlug}
               sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
             >
-              {t("admin.dashboard.viewSite", "Ver sitio")}
+              {t("admin.dashboard.viewSite")}
             </Button>
           </Stack>
         </Stack>
@@ -271,13 +280,13 @@ export default function DashboardSection() {
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Typography sx={{ fontWeight: 900, mb: 1 }}>
-              {t("admin.dashboard.configTitle", "Configuración del sitio")}
+              {t("admin.dashboard.configTitle")}
             </Typography>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ sm: "center" }}>
               <Box sx={{ minWidth: 220 }}>
                 <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>
-                  {t("admin.dashboard.defaultLanguageLabel", "Idioma predeterminado")}
+                  {t("admin.dashboard.defaultLanguageLabel")}
                 </Typography>
 
                 <Select
@@ -286,9 +295,9 @@ export default function DashboardSection() {
                   onChange={(e) => setDefaultLang(e.target.value as Language)}
                   sx={{ width: "100%" }}
                 >
-                  <MenuItem value="es">{t("admin.dashboard.languages.es", "Español (ES)")}</MenuItem>
-                  <MenuItem value="en">{t("admin.dashboard.languages.en", "English (EN)")}</MenuItem>
-                  <MenuItem value="pt">{t("admin.dashboard.languages.pt", "Português (PT)")}</MenuItem>
+                  <MenuItem value="es">{t("admin.dashboard.languages.es")}</MenuItem>
+                  <MenuItem value="en">{t("admin.dashboard.languages.en")}</MenuItem>
+                  <MenuItem value="pt">{t("admin.dashboard.languages.pt")}</MenuItem>
                 </Select>
               </Box>
 
@@ -296,17 +305,19 @@ export default function DashboardSection() {
                 variant="contained"
                 onClick={saveDefaultLanguage}
                 disabled={!hostelSlug || savingLang}
-                sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none", alignSelf: { xs: "stretch", sm: "end" } }}
+                sx={{
+                  borderRadius: 999,
+                  fontWeight: 900,
+                  textTransform: "none",
+                  alignSelf: { xs: "stretch", sm: "end" },
+                }}
               >
-                {savingLang ? t("admin.dashboard.saving", "Guardando...") : t("admin.dashboard.save", "Guardar")}
+                {savingLang ? t("admin.dashboard.saving") : t("admin.dashboard.save")}
               </Button>
             </Stack>
 
             <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
-              {t(
-                "admin.dashboard.help",
-                "Esto define el idioma inicial que verán los huéspedes al entrar al sitio del hostel (si no eligieron otro antes)."
-              )}
+              {t("admin.dashboard.help")}
             </Typography>
           </CardContent>
         </Card>
@@ -316,7 +327,7 @@ export default function DashboardSection() {
           <CardContent>
             <Stack spacing={1.2}>
               <Typography sx={{ fontWeight: 900 }}>
-                {t("admin.dashboard.publicLinkTitle", "Link público")}
+                {t("admin.dashboard.publicLinkTitle")}
               </Typography>
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
@@ -336,14 +347,18 @@ export default function DashboardSection() {
                   {publicUrl}
                 </Box>
 
-                <IconButton onClick={copyPublicLink} sx={{ border: "1px solid rgba(0,0,0,0.10)", borderRadius: 3 }}>
+                <IconButton
+                  onClick={copyPublicLink}
+                  sx={{ border: "1px solid rgba(0,0,0,0.10)", borderRadius: 3 }}
+                  aria-label={t("admin.dashboard.copyAria", "Copiar link")}
+                >
                   <ContentCopyIcon fontSize="small" />
                 </IconButton>
 
                 <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                  <Chip sx={badgeSx} label={`${pendingCount} ${t("admin.dashboard.badges.pending", "pendientes")}`} />
-                  <Chip sx={badgeSx} label={`${nextCheckins} ${t("admin.dashboard.badges.nextCheckins", "próx. check-in")}`} />
-                  <Chip sx={badgeSx} label={`${nextCheckouts} ${t("admin.dashboard.badges.nextCheckouts", "próx. check-out")}`} />
+                  <Chip sx={badgeSx} label={`${pendingCount} ${t("admin.dashboard.badges.pending")}`} />
+                  <Chip sx={badgeSx} label={`${nextCheckins} ${t("admin.dashboard.badges.nextCheckins")}`} />
+                  <Chip sx={badgeSx} label={`${nextCheckouts} ${t("admin.dashboard.badges.nextCheckouts")}`} />
                 </Stack>
               </Stack>
             </Stack>
@@ -354,32 +369,29 @@ export default function DashboardSection() {
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Typography sx={{ fontWeight: 900, mb: 1 }}>
-              {t("admin.dashboard.checklistTitle", "Setup checklist")}
+              {t("admin.dashboard.checklistTitle")}
             </Typography>
 
             <Stack spacing={1}>
-              <ChecklistItem done={checklist.hasHostel} label={t("admin.dashboard.checklist.createdHostel", "Hostel creado")} />
-              <ChecklistItem done={checklist.hasRoom} label={t("admin.dashboard.checklist.firstRoom", "Primera habitación")} />
-              <ChecklistItem done={checklist.imagesOk} label={t("admin.dashboard.checklist.images", "Imágenes cargadas")} />
-              <ChecklistItem done={checklist.hasReservation} label={t("admin.dashboard.checklist.testBooking", "Reserva de prueba")} />
+              <ChecklistItem done={checklist.hasHostel} label={t("admin.dashboard.checklist.createdHostel")} />
+              <ChecklistItem done={checklist.hasRoom} label={t("admin.dashboard.checklist.firstRoom")} />
+              <ChecklistItem done={checklist.imagesOk} label={t("admin.dashboard.checklist.images")} />
+              <ChecklistItem done={checklist.hasReservation} label={t("admin.dashboard.checklist.testBooking")} />
             </Stack>
 
             <Divider sx={{ my: 1.6 }} />
 
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-              {t(
-                "admin.dashboard.checklistHelp",
-                "Tip: completá estos pasos y ya tenés un demo presentable para mostrar a un hostel."
-              )}
+              {t("admin.dashboard.checklistHelp")}
             </Typography>
           </CardContent>
         </Card>
 
         {/* Stats sin Grid MUI */}
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" } }}>
-          <StatCard title={t("admin.dashboard.cards.revenue", "Ingresos totales")} value={money.format(totalRevenue)} />
-          <StatCard title={t("admin.dashboard.cards.reservations", "Reservas totales")} value={totalReservations} />
-          <StatCard title={t("admin.dashboard.cards.rooms", "Habitaciones activas")} value={totalRooms} />
+          <StatCard title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
+          <StatCard title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
+          <StatCard title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
         </Box>
 
         {/* Occupancy */}
@@ -387,7 +399,7 @@ export default function DashboardSection() {
           <CardContent>
             <Stack direction="row" justifyContent="space-between" alignItems="center">
               <Typography sx={{ fontWeight: 900 }}>
-                {t("admin.dashboard.occupancyTitle", "Ocupación (30 días)")}
+                {t("admin.dashboard.occupancyTitle")}
               </Typography>
               <Chip sx={{ borderRadius: 999, fontWeight: 900 }} label={`${occupancyPct}%`} />
             </Stack>
@@ -397,10 +409,7 @@ export default function DashboardSection() {
             </Box>
 
             <Typography sx={{ mt: 1, fontSize: 13, color: "text.secondary" }}>
-              {t(
-                "admin.dashboard.occupancyHelp",
-                "Estimación simple para ver tracción. Luego lo hacemos exacto con locks por noche."
-              )}
+              {t("admin.dashboard.occupancyHelp")}
             </Typography>
           </CardContent>
         </Card>
@@ -408,7 +417,7 @@ export default function DashboardSection() {
         {loading && (
           <Box sx={{ py: 1 }}>
             <Typography sx={{ opacity: 0.75, fontSize: 13 }}>
-              {t("loading.subtitle", "Cargando…")}
+              {t("common.loading")}
             </Typography>
           </Box>
         )}

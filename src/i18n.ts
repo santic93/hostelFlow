@@ -24,6 +24,7 @@ export const resources = {
       },
       // --- Global / shared ---
       common: {
+        
         showPassword: "Mostrar contraseña",
         hidePassword: "Ocultar contraseña",
         language: "Idioma",

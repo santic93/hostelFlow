@@ -1043,6 +1043,9 @@ i18n
       caches: ["localStorage"],
     },
     react: { useSuspense: false },
+    returnNull: false,
+    returnEmptyString: false,
+    parseMissingKeyHandler: (key) => key.split(".").slice(-1)[0],
   });
 
 export const setTenantLanguage = (lng?: string | null) => {

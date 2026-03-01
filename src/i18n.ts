@@ -8,6 +8,7 @@ export const resources = {
       badge2: "Sin comisiones",
       visualTitle: "Tu próxima estadía empieza acá.",
       visualSubtitle: "Elegí habitación, confirmá fechas y listo.",
+
       rooms: {
         subtitle: "Elegí tu habitación y reservá en minutos.",
         capacity: "{{n}} huésped",
@@ -22,9 +23,9 @@ export const resources = {
         noRooms: "Aún no hay habitaciones disponibles.",
         loading: "Cargando habitaciones...",
       },
+
       // --- Global / shared ---
       common: {
-        
         showPassword: "Mostrar contraseña",
         hidePassword: "Ocultar contraseña",
         language: "Idioma",
@@ -38,6 +39,11 @@ export const resources = {
         uploadImages: "Subir imágenes (hasta 6)",
         done: "Listo",
         todo: "Pendiente",
+
+        // ✅ NEW
+        refresh: "Refrescar",
+        deleting: "Eliminando…",
+        delete: "Eliminar",
       },
 
       uploadImages: "Subir imágenes (hasta 6)",
@@ -146,7 +152,8 @@ export const resources = {
           hostelCreatedRedirecting: "Hostel creado ✅ Redirigiendo al panel...",
         },
         errors: {
-          passwordWeak: "La contraseña es débil. Usá mínimo 10 caracteres con mayúscula, minúscula, número y símbolo.",
+          passwordWeak:
+            "La contraseña es débil. Usá mínimo 10 caracteres con mayúscula, minúscula, número y símbolo.",
           emailRequired: "Ingresá un email",
           passwordMin: "Password mínimo 6 caracteres",
           emailInUse: "Ese email ya está en uso. Probá iniciar sesión en Admin Login.",
@@ -162,12 +169,31 @@ export const resources = {
       },
 
       admin: {
+        // ✅ NEW (para RoomsSection/AdminShell)
+        errors: {
+          noPanelAccess: "No tenés permisos para acceder al panel.",
+          loadingHostel: "Cargando tu hostel…",
+        },
+
         rooms: {
           title: "Gestión de Habitaciones",
-          subtitle: "Elegí tu habitación y reservá en minutos.",
+          subtitle: "Creá y editá habitaciones. Sumá fotos para que tu sitio se vea pro.",
           defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
           noImageTitle: "Sin imagen",
           noImageSubtitle: "Esta habitación todavía no tiene fotos.",
+
+          // ✅ NEW empty state coherente
+          emptyTitle: "Todavía no tenés habitaciones",
+          emptyDesc: "Creá la primera para que el público pueda reservar.",
+
+          // ✅ NEW pequeños textos usados en mobile cards
+          perNight: "/ noche",
+          labels: {
+            capacityShort: "Cap:",
+          },
+          fallback: {
+            noDescription: "Sin descripción",
+          },
 
           messages: {
             loadingPermissions: "Cargando permisos/hostel… (evita errores al subir imágenes)",
@@ -184,6 +210,25 @@ export const resources = {
             tooLargeAfter: "Una imagen quedó muy pesada luego de comprimir ({{mb}}MB). Probá otra.",
             invalidImage: "Imagen inválida",
             compressFailed: "Error comprimiendo imagen",
+
+            // ✅ NEW
+            loadError: "Error cargando habitaciones",
+            deletedOk: "Habitación eliminada ✅",
+            deleteError: "No se pudo eliminar la habitación",
+            deleteErrorShort: "No se pudo eliminar",
+            onlyOwnerCanEdit: "Solo el owner puede crear/editar habitaciones. (Esto coincide con tu política.)",
+          },
+
+          // ✅ NEW permisos
+          errors: {
+            noCreatePermission: "No tenés permisos para crear habitaciones.",
+            noDeletePermission: "Solo el owner puede eliminar habitaciones.",
+          },
+
+          // ✅ NEW confirm delete (anidado, consistente)
+          confirmDelete: {
+            title: "Eliminar habitación",
+            desc: "Vas a borrar la habitación y sus imágenes. Esta acción no se puede deshacer.",
           },
 
           modal: {
@@ -203,32 +248,27 @@ export const resources = {
             selectedFile: "Seleccionado: {{name}}",
           },
 
-          errors: {
-            nameRequired: "El nombre es obligatorio",
-            priceRequired: "Precio obligatorio",
-            priceMin: "Debe ser mayor a 0",
-            capacityRequired: "Capacidad obligatoria",
-            capacityMin: "Mínimo 1 persona",
-            imageUrlInvalid: "Debe ser una URL válida (http/https)",
-          },
-
-          common: {
-            save: "Guardar",
-            saving: "Guardando...",
-            cancel: "Cancelar",
-            close: "Cerrar",
-          },
-
           columns: {
             name: "Nombre",
             price: "Precio",
             capacity: "Capacidad",
+            images: "Fotos",
             actions: "Acciones",
           },
+
+          // ✅ acciones coherentes en todo el admin
           actions: {
-            create: "Crear",
+            create: "Crear habitación",
             edit: "Editar",
             delete: "Eliminar",
+          },
+
+          // ✅ badges coherentes
+          badges: {
+            total: "habitaciones",
+            withImages: "con fotos",
+            photosCount: "{{n}} fotos",
+            noPhotos: "Sin fotos",
           },
         },
 
@@ -278,10 +318,23 @@ export const resources = {
           brand: "HOSTLY",
           viewSite: "Ver sitio",
           logout: "Salir",
+
+          // ✅ NEW: chip rol
+          roleChip: "ROL: {{role}}",
+
           menu: {
             dashboard: "Dashboard",
             reservations: "Reservas",
             rooms: "Habitaciones",
+
+            // ✅ NEW
+            members: "Miembros",
+            emails: "Emails",
+          },
+
+          // ✅ NEW: acciones (para evitar CREATEROOM)
+          actions: {
+            createRoom: "Crear habitación",
           },
         },
 
@@ -446,6 +499,7 @@ export const resources = {
       badge2: "No fees",
       visualTitle: "Your next stay starts here.",
       visualSubtitle: "Pick a room, choose dates, done.",
+
       // --- Global / shared ---
       common: {
         showPassword: "Show password",
@@ -461,6 +515,11 @@ export const resources = {
         uploadImages: "Upload images (up to 6)",
         done: "Done",
         todo: "To do",
+
+        // ✅ NEW
+        refresh: "Refresh",
+        deleting: "Deleting…",
+        delete: "Delete",
       },
 
       uploadImages: "Upload images (up to 6)",
@@ -585,12 +644,25 @@ export const resources = {
       },
 
       admin: {
+        // ✅ NEW
+        errors: {
+          noPanelAccess: "You don’t have permission to access the dashboard.",
+          loadingHostel: "Loading your hostel…",
+        },
+
         rooms: {
           title: "Room Management",
-          subtitle: "Choose your room and book in minutes.",
+          subtitle: "Create and edit rooms. Add photos to make your site look pro.",
           defaultDesc: "Comfortable, bright, and ready for your stay.",
           noImageTitle: "No image",
           noImageSubtitle: "This room doesn’t have photos yet.",
+
+          emptyTitle: "You don’t have any rooms yet",
+          emptyDesc: "Create the first one so guests can book.",
+
+          perNight: "/ night",
+          labels: { capacityShort: "Cap:" },
+          fallback: { noDescription: "No description" },
 
           messages: {
             loadingPermissions: "Loading permissions/hostel… (prevents upload errors)",
@@ -607,6 +679,22 @@ export const resources = {
             tooLargeAfter: "An image is still too large after compressing ({{mb}}MB). Try another one.",
             invalidImage: "Invalid image",
             compressFailed: "Error compressing image",
+
+            loadError: "Error loading rooms",
+            deletedOk: "Room deleted ✅",
+            deleteError: "Could not delete the room",
+            deleteErrorShort: "Could not delete",
+            onlyOwnerCanEdit: "Only the owner can create/edit rooms. (Matches your policy.)",
+          },
+
+          errors: {
+            noCreatePermission: "You don’t have permission to create rooms.",
+            noDeletePermission: "Only the owner can delete rooms.",
+          },
+
+          confirmDelete: {
+            title: "Delete room",
+            desc: "You’re about to delete the room and its images. This can’t be undone.",
           },
 
           modal: {
@@ -626,32 +714,25 @@ export const resources = {
             selectedFile: "Selected: {{name}}",
           },
 
-          errors: {
-            nameRequired: "Name is required",
-            priceRequired: "Price is required",
-            priceMin: "Must be greater than 0",
-            capacityRequired: "Capacity is required",
-            capacityMin: "Minimum 1 person",
-            imageUrlInvalid: "Must be a valid URL (http/https)",
-          },
-
-          common: {
-            save: "Save",
-            saving: "Saving...",
-            cancel: "Cancel",
-            close: "Close",
-          },
-
           columns: {
             name: "Name",
             price: "Price",
             capacity: "Capacity",
+            images: "Photos",
             actions: "Actions",
           },
+
           actions: {
-            create: "Create",
+            create: "Create room",
             edit: "Edit",
             delete: "Delete",
+          },
+
+          badges: {
+            total: "rooms",
+            withImages: "with photos",
+            photosCount: "{{n}} photos",
+            noPhotos: "No photos",
           },
         },
 
@@ -706,14 +787,24 @@ export const resources = {
             cancelled: "Cancelled",
           },
         },
+
         shell: {
           brand: "HOSTLY",
           viewSite: "View site",
           logout: "Logout",
+
+          roleChip: "ROLE: {{role}}",
+
           menu: {
             dashboard: "Dashboard",
             reservations: "Reservations",
             rooms: "Rooms",
+            members: "Members",
+            emails: "Emails",
+          },
+
+          actions: {
+            createRoom: "Create room",
           },
         },
 
@@ -879,6 +970,7 @@ export const resources = {
       badge2: "Sem taxas",
       visualTitle: "Sua próxima estadia começa aqui.",
       visualSubtitle: "Escolha o quarto, selecione as datas e pronto.",
+
       // --- Global / shared ---
       common: {
         showPassword: "Mostrar senha",
@@ -894,6 +986,11 @@ export const resources = {
         uploadImages: "Enviar imagens (até 6)",
         done: "Pronto",
         todo: "Pendente",
+
+        // ✅ NEW
+        refresh: "Atualizar",
+        deleting: "Excluindo…",
+        delete: "Excluir",
       },
 
       uploadImages: "Enviar imagens (até 6)",
@@ -1018,12 +1115,25 @@ export const resources = {
       },
 
       admin: {
+        // ✅ NEW
+        errors: {
+          noPanelAccess: "Você não tem permissão para acessar o painel.",
+          loadingHostel: "Carregando seu hostel…",
+        },
+
         rooms: {
           title: "Gestão de Quartos",
-          subtitle: "Escolha seu quarto e reserve em minutos.",
+          subtitle: "Crie e edite quartos. Adicione fotos para deixar o site mais profissional.",
           defaultDesc: "Confortável, iluminado e pronto para a sua estadia.",
           noImageTitle: "Sem imagem",
           noImageSubtitle: "Este quarto ainda não tem fotos.",
+
+          emptyTitle: "Você ainda não tem quartos",
+          emptyDesc: "Crie o primeiro para que os hóspedes possam reservar.",
+
+          perNight: "/ noite",
+          labels: { capacityShort: "Cap:" },
+          fallback: { noDescription: "Sem descrição" },
 
           messages: {
             loadingPermissions: "Carregando permissões/hostel… (evita erros ao enviar imagens)",
@@ -1040,6 +1150,22 @@ export const resources = {
             tooLargeAfter: "Uma imagem ainda ficou grande após comprimir ({{mb}}MB). Tente outra.",
             invalidImage: "Imagem inválida",
             compressFailed: "Erro ao comprimir imagem",
+
+            loadError: "Erro ao carregar quartos",
+            deletedOk: "Quarto excluído ✅",
+            deleteError: "Não foi possível excluir o quarto",
+            deleteErrorShort: "Não foi possível excluir",
+            onlyOwnerCanEdit: "Apenas o owner pode criar/editar quartos. (Isso segue sua política.)",
+          },
+
+          errors: {
+            noCreatePermission: "Você não tem permissão para criar quartos.",
+            noDeletePermission: "Apenas o owner pode excluir quartos.",
+          },
+
+          confirmDelete: {
+            title: "Excluir quarto",
+            desc: "Você vai excluir o quarto e suas imagens. Esta ação não pode ser desfeita.",
           },
 
           modal: {
@@ -1059,32 +1185,25 @@ export const resources = {
             selectedFile: "Selecionado: {{name}}",
           },
 
-          errors: {
-            nameRequired: "O nome é obrigatório",
-            priceRequired: "Preço obrigatório",
-            priceMin: "Deve ser maior que 0",
-            capacityRequired: "Capacidade obrigatória",
-            capacityMin: "Mínimo 1 pessoa",
-            imageUrlInvalid: "Deve ser uma URL válida (http/https)",
-          },
-
-          common: {
-            save: "Salvar",
-            saving: "Salvando...",
-            cancel: "Cancelar",
-            close: "Fechar",
-          },
-
           columns: {
             name: "Nome",
             price: "Preço",
             capacity: "Capacidade",
+            images: "Fotos",
             actions: "Ações",
           },
+
           actions: {
-            create: "Criar",
+            create: "Criar quarto",
             edit: "Editar",
             delete: "Excluir",
+          },
+
+          badges: {
+            total: "quartos",
+            withImages: "com fotos",
+            photosCount: "{{n}} fotos",
+            noPhotos: "Sem fotos",
           },
         },
 
@@ -1140,14 +1259,24 @@ export const resources = {
             cancelled: "Cancelada",
           },
         },
+
         shell: {
           brand: "HOSTLY",
           viewSite: "Ver site",
           logout: "Sair",
+
+          roleChip: "FUNÇÃO: {{role}}",
+
           menu: {
             dashboard: "Dashboard",
             reservations: "Reservas",
             rooms: "Quartos",
+            members: "Membros",
+            emails: "Emails",
+          },
+
+          actions: {
+            createRoom: "Criar quarto",
           },
         },
 
@@ -1307,7 +1436,6 @@ export const resources = {
     },
   },
 } as const;
-
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)

@@ -61,8 +61,9 @@ export default function AdminShell() {
     if (key === "dashboard") return t("admin.shell.menu.dashboard");
     if (key === "reservations") return t("admin.shell.menu.reservations");
     if (key === "rooms") return t("admin.shell.menu.rooms");
-    if (key === "emails") return "Email Logs";
-    return t("admin.shell.menu.members", "Members");
+    if (key === "members") return t("admin.shell.menu.members", "Miembros");
+    if (key === "emails") return t("admin.shell.menu.emails", "Emails");
+    return key;
   };
 
   const handleLogout = async () => {
@@ -83,7 +84,6 @@ export default function AdminShell() {
 
   const goCreateRoom = () => {
     if (!hostelSlug) return;
-    // abre modal en RoomsSection (si pegaste el RoomsSection que te pasé)
     navigate(`/${hostelSlug}/admin/rooms?new=1`);
     setMobileOpen(false);
   };
@@ -94,7 +94,7 @@ export default function AdminShell() {
     <Box sx={{ pt: 1 }}>
       <Box sx={{ px: 1.5, pb: 1 }}>
         <Chip
-          label={`ROLE: ${roleChipLabel}`}
+          label={t("admin.shell.roleChip", "ROL: {{role}}", { role: roleChipLabel })}
           sx={{
             borderRadius: 999,
             fontWeight: 900,
@@ -149,7 +149,9 @@ export default function AdminShell() {
           <ListItemIcon sx={{ minWidth: 44 }}>
             <AddIcon />
           </ListItemIcon>
-          {(desktopOpen || isMobile) && <ListItemText primary={t("admin.shell.createRoom", "Crear habitación")} />}
+          {(desktopOpen || isMobile) && (
+            <ListItemText primary={t("admin.shell.actions.createRoom", "Crear habitación")} />
+          )}
         </ListItemButton>
 
         <ListItemButton onClick={handleLogout} sx={{ mx: 1, borderRadius: 2 }}>
@@ -247,7 +249,6 @@ export default function AdminShell() {
   );
 }
 
-/** Extra: separar header actions para mantener limpio */
 function StackRight({
   hostelSlug,
   email,
@@ -263,12 +264,20 @@ function StackRight({
   onLogout: () => void;
   isOwner: boolean;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Box sx={{ display: { xs: "none", sm: "flex" }, gap: 1, alignItems: "center" }}>
       <Typography sx={{ fontSize: 13, opacity: 0.8 }}>{email}</Typography>
 
-      <Button variant="outlined" onClick={onViewSite} disabled={!hostelSlug} startIcon={<PublicIcon />}>
-        Ver sitio
+      <Button
+        variant="outlined"
+        onClick={onViewSite}
+        disabled={!hostelSlug}
+        startIcon={<PublicIcon />}
+        sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+      >
+        {t("admin.shell.viewSite")}
       </Button>
 
       <Button
@@ -276,12 +285,18 @@ function StackRight({
         onClick={onCreateRoom}
         disabled={!hostelSlug || !isOwner}
         startIcon={<AddIcon />}
+        sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
       >
-        Crear habitación
+        {t("admin.shell.actions.createRoom", "Crear habitación")}
       </Button>
 
-      <Button variant="contained" onClick={onLogout} startIcon={<LogoutIcon />}>
-        Salir
+      <Button
+        variant="contained"
+        onClick={onLogout}
+        startIcon={<LogoutIcon />}
+        sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+      >
+        {t("admin.shell.logout")}
       </Button>
     </Box>
   );

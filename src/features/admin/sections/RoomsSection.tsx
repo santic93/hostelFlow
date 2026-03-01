@@ -51,10 +51,44 @@ type ToastState = {
   severity: "success" | "error" | "info";
 };
 
+function AdminEmptyState({
+  title,
+  desc,
+  ctaLabel,
+  onCta,
+  disabled,
+}: {
+  title: string;
+  desc: string;
+  ctaLabel: string;
+  onCta: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Card sx={{ borderRadius: 3 }}>
+      <CardContent>
+        <Typography sx={{ fontWeight: 900 }}>{title}</Typography>
+        <Typography sx={{ mt: 0.5, color: "text.secondary" }}>{desc}</Typography>
+
+        <Button
+          sx={{ mt: 2, borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+          variant="contained"
+          disabled={disabled}
+          startIcon={<AddIcon />}
+          onClick={onCta}
+          fullWidth
+        >
+          {ctaLabel}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function RoomsSection() {
   const { t } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
-  const { hostelSlug, loading: authLoading, canAccessAdmin, isOwner, isManager } = useAuth();
+  const { hostelSlug, loading: authLoading, canAccessAdmin, isOwner } = useAuth();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -84,9 +118,8 @@ export default function RoomsSection() {
 
   const closeToast = () => setToast((p) => ({ ...p, open: false }));
 
-  const canEditRooms = isOwner; // 🔒 tu decisión: SOLO owner crea/edita
-  const canDeleteRooms = isOwner; // 🔒 tu decisión: SOLO owner borra
-  // Si querés permitir manager, cambiá a: const canEditRooms = isManager; const canDeleteRooms = isManager;
+  const canEditRooms = isOwner; // SOLO owner crea/edita
+  const canDeleteRooms = isOwner; // SOLO owner borra
 
   const fetchRooms = async () => {
     if (!hostelSlug) return;
@@ -117,7 +150,7 @@ export default function RoomsSection() {
         })
       );
     } catch (e: any) {
-      setPageError(e?.message ?? "Error cargando habitaciones");
+      setPageError(e?.message ?? t("admin.rooms.messages.loadError", "Error cargando habitaciones"));
     } finally {
       setLoadingRooms(false);
     }
@@ -130,21 +163,20 @@ export default function RoomsSection() {
     const params = new URLSearchParams(location.search);
     const wantsNew = params.get("new") === "1";
 
-    if (wantsNew) {
-      if (!canEditRooms) {
-        openToast("error", "No tenés permisos para crear habitaciones.");
-        // limpiamos query para que no quede “pegado”
-        params.delete("new");
-        navigate({ search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
-        return;
-      }
+    if (!wantsNew) return;
 
-      setSelectedRoom(null);
-      setOpenModal(true);
-
+    if (!canEditRooms) {
+      openToast("error", t("admin.rooms.errors.noCreatePermission", "No tenés permisos para crear habitaciones."));
       params.delete("new");
       navigate({ search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
+      return;
     }
+
+    setSelectedRoom(null);
+    setOpenModal(true);
+
+    params.delete("new");
+    navigate({ search: params.toString() ? `?${params.toString()}` : "" }, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
@@ -155,7 +187,7 @@ export default function RoomsSection() {
 
   const askDelete = (id: string, name: string) => {
     if (!canDeleteRooms) {
-      openToast("error", "Solo el owner puede eliminar habitaciones.");
+      openToast("error", t("admin.rooms.errors.noDeletePermission", "Solo el owner puede eliminar habitaciones."));
       return;
     }
     setDeleteTarget({ id, name });
@@ -188,10 +220,10 @@ export default function RoomsSection() {
 
       // 3) update state
       setRooms((prev) => prev.filter((r) => r.id !== id));
-      openToast("success", t("admin.rooms.messages.deletedOk", "Habitación eliminada"));
+      openToast("success", t("admin.rooms.messages.deletedOk", "Habitación eliminada ✅"));
     } catch (e: any) {
-      setPageError(e?.message ?? "No se pudo eliminar la habitación");
-      openToast("error", e?.message ?? "No se pudo eliminar");
+      setPageError(e?.message ?? t("admin.rooms.messages.deleteError", "No se pudo eliminar la habitación"));
+      openToast("error", e?.message ?? t("admin.rooms.messages.deleteErrorShort", "No se pudo eliminar"));
     } finally {
       setDeletingId(null);
       setDeleteTarget(null);
@@ -204,14 +236,19 @@ export default function RoomsSection() {
   const columns = useMemo<GridColDef[]>(
     () => [
       { field: "name", headerName: t("admin.rooms.columns.name"), flex: 1, minWidth: 180 },
-      { field: "price", headerName: t("admin.rooms.columns.price"), width: 120, valueGetter: (_, r) => `$${r.price}` },
+      {
+        field: "price",
+        headerName: t("admin.rooms.columns.price"),
+        width: 120,
+        valueGetter: (_, r) => `$${(r as Room).price}`,
+      },
       { field: "capacity", headerName: t("admin.rooms.columns.capacity"), width: 120 },
       {
         field: "images",
         headerName: t("admin.rooms.columns.images", "Fotos"),
         width: 110,
         sortable: false,
-        valueGetter: (_, r) => (r.imageUrls?.length ?? 0),
+        valueGetter: (_, r) => ((r as Room).imageUrls?.length ?? 0),
       },
       {
         field: "actions",
@@ -265,12 +302,17 @@ export default function RoomsSection() {
   }
 
   if (!canAccessAdmin) {
-    return <Alert severity="error">No tenés permisos para acceder al panel.</Alert>;
+    return <Alert severity="error">{t("admin.errors.noPanelAccess", "No tenés permisos para acceder al panel.")}</Alert>;
   }
 
   if (!hostelSlug) {
-    return <Typography sx={{ opacity: 0.75 }}>Cargando tu hostel…</Typography>;
+    return <Typography sx={{ opacity: 0.75 }}>{t("admin.errors.loadingHostel", "Cargando tu hostel…")}</Typography>;
   }
+
+  const openCreateModal = () => {
+    setSelectedRoom(null);
+    setOpenModal(true);
+  };
 
   return (
     <Container disableGutters>
@@ -286,8 +328,15 @@ export default function RoomsSection() {
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               {t("admin.rooms.title")}
             </Typography>
+            <Typography sx={{ mt: 0.25, color: "text.secondary", fontSize: 13 }}>
+              {t("admin.rooms.subtitle")}
+            </Typography>
+
             <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-              <Chip label={`${total} ${t("admin.rooms.badges.total", "habitaciones")}`} sx={{ borderRadius: 999, fontWeight: 900 }} />
+              <Chip
+                label={`${total} ${t("admin.rooms.badges.total", "habitaciones")}`}
+                sx={{ borderRadius: 999, fontWeight: 900 }}
+              />
               <Chip
                 icon={<ImageIcon />}
                 label={`${withImages}/${total} ${t("admin.rooms.badges.withImages", "con fotos")}`}
@@ -303,6 +352,7 @@ export default function RoomsSection() {
               onClick={fetchRooms}
               disabled={loadingRooms}
               sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+              fullWidth={isMobile}
             >
               {loadingRooms ? t("common.loading", "Cargando…") : t("common.refresh", "Refrescar")}
             </Button>
@@ -311,20 +361,21 @@ export default function RoomsSection() {
               variant="contained"
               startIcon={<AddIcon />}
               disabled={!canEditRooms}
-              onClick={() => {
-                setSelectedRoom(null);
-                setOpenModal(true);
-              }}
+              onClick={openCreateModal}
               sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+              fullWidth={isMobile}
             >
-              {t("admin.rooms.modal.createTitle")}
+              {t("admin.rooms.actions.create", "Crear habitación")}
             </Button>
           </Stack>
         </Stack>
 
         {!canEditRooms && (
           <Alert severity="info">
-            Solo el <b>owner</b> puede crear/editar habitaciones. (Esto coincide con tu política.)
+            {t(
+              "admin.rooms.messages.onlyOwnerCanEdit",
+              "Solo el owner puede crear/editar habitaciones. (Esto coincide con tu política.)"
+            )}
           </Alert>
         )}
 
@@ -338,29 +389,13 @@ export default function RoomsSection() {
             <CircularProgress />
           </Box>
         ) : rooms.length === 0 ? (
-          <Card sx={{ borderRadius: 3 }}>
-            <CardContent>
-              <Typography sx={{ fontWeight: 900 }}>
-                {t("admin.rooms.emptyTitle", "Todavía no tenés habitaciones")}
-              </Typography>
-              <Typography sx={{ mt: 0.5, opacity: 0.75 }}>
-                {t("admin.rooms.emptyDesc", "Creá la primera para que el público pueda reservar.")}
-              </Typography>
-
-              <Button
-                sx={{ mt: 2, borderRadius: 999, fontWeight: 900, textTransform: "none" }}
-                variant="contained"
-                disabled={!canEditRooms}
-                startIcon={<AddIcon />}
-                onClick={() => {
-                  setSelectedRoom(null);
-                  setOpenModal(true);
-                }}
-              >
-                {t("admin.rooms.modal.createTitle")}
-              </Button>
-            </CardContent>
-          </Card>
+          <AdminEmptyState
+            title={t("admin.rooms.emptyTitle")}
+            desc={t("admin.rooms.emptyDesc")}
+            ctaLabel={t("admin.rooms.actions.create", "Crear habitación")}
+            onCta={openCreateModal}
+            disabled={!canEditRooms}
+          />
         ) : isMobile ? (
           <Stack spacing={1.5}>
             {rooms.map((r) => {
@@ -377,22 +412,29 @@ export default function RoomsSection() {
                         </Typography>
                         <Chip
                           size="small"
-                          label={imgCount > 0 ? `${imgCount} fotos` : "Sin fotos"}
+                          label={
+                            imgCount > 0
+                              ? t("admin.rooms.badges.photosCount", "{{n}} fotos", { n: imgCount })
+                              : t("admin.rooms.badges.noPhotos", "Sin fotos")
+                          }
                           color={imgCount > 0 ? "success" : "default"}
                           sx={{ borderRadius: 999, fontWeight: 900 }}
                         />
                       </Stack>
 
                       <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                        {r.description || "-"}
+                        {r.description || t("admin.rooms.fallback.noDescription", "Sin descripción")}
                       </Typography>
 
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Typography sx={{ fontWeight: 900 }}>
-                          ${r.price} <span style={{ fontWeight: 600, opacity: 0.7 }}>/ noche</span>
+                          ${r.price}{" "}
+                          <span style={{ fontWeight: 600, opacity: 0.7 }}>
+                            {t("admin.rooms.perNight", "/ noche")}
+                          </span>
                         </Typography>
                         <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
-                          Cap: {r.capacity}
+                          {t("admin.rooms.labels.capacityShort", "Cap:")} {r.capacity}
                         </Typography>
                       </Stack>
 
@@ -406,6 +448,7 @@ export default function RoomsSection() {
                             setSelectedRoom(r);
                             setOpenModal(true);
                           }}
+                          fullWidth
                         >
                           {t("admin.rooms.actions.edit")}
                         </Button>
@@ -417,8 +460,9 @@ export default function RoomsSection() {
                           startIcon={<DeleteOutlineIcon />}
                           disabled={!canDeleteRooms || busy}
                           onClick={() => askDelete(r.id, r.name)}
+                          fullWidth
                         >
-                          {busy ? "Eliminando…" : t("admin.rooms.actions.delete")}
+                          {busy ? t("common.deleting", "Eliminando…") : t("admin.rooms.actions.delete")}
                         </Button>
                       </Stack>
                     </Stack>
@@ -447,19 +491,22 @@ export default function RoomsSection() {
           initialData={selectedRoom}
           onSuccess={() => {
             fetchRooms();
-            openToast("success", t("admin.rooms.messages.savedOk", "Guardado"));
+            openToast("success", t("admin.rooms.messages.savedOk", "Guardado ✅"));
           }}
           hostelSlug={hostelSlug}
         />
 
         {/* Confirm delete */}
-        <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="xs">
           <DialogTitle sx={{ fontWeight: 900 }}>
-            {t("admin.rooms.confirmDeleteTitle", "Eliminar habitación")}
+            {t("admin.rooms.confirmDelete.title", "Eliminar habitación")}
           </DialogTitle>
           <DialogContent>
-            <Typography sx={{ opacity: 0.8 }}>
-              {t("admin.rooms.confirmDeleteDesc", "Vas a borrar la habitación y sus imágenes. Esta acción no se puede deshacer.")}
+            <Typography sx={{ color: "text.secondary" }}>
+              {t(
+                "admin.rooms.confirmDelete.desc",
+                "Vas a borrar la habitación y sus imágenes. Esta acción no se puede deshacer."
+              )}
             </Typography>
             {deleteTarget?.name ? (
               <Typography sx={{ mt: 1, fontWeight: 900 }}>

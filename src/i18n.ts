@@ -1,19 +1,33 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-
-const resources = {
+export const resources = {
   es: {
     translation: {
+      // --- Global / shared ---
+      common: {
+        language: "Idioma",
+        save: "Guardar",
+        saving: "Guardando...",
+        loading: "Cargando...",
+        cancel: "Cancelar",
+        close: "Cerrar",
+        back: "Volver",
+        remove: "Quitar",
+        uploadImages: "Subir imágenes (hasta 6)",
+      },
+
       uploadImages: "Subir imágenes (hasta 6)",
       remove: "Quitar",
       maxImagesHelp: "Máximo 6 imágenes. Recomendado: JPG/PNG, hasta ~2MB.",
+
       carousel: {
         next: "Siguiente",
         back: "Anterior",
         of: "{{current}} de {{total}}",
         empty: "Sin imágenes",
       },
+
       errors: {
         genericTitle: "Algo salió mal",
         genericDesc: "Ocurrió un error inesperado.",
@@ -23,13 +37,16 @@ const resources = {
         back: "Volver",
         errorWithStatus: "Error {{status}}",
       },
+
       auth: {
         entering: "Ingresando...",
         checkingSession: "Verificando sesión...",
       },
+
       gallery: {
         title: "Galería",
       },
+
       login: {
         title: "Admin Login",
         seoTitle: "Login — HOSTLY",
@@ -60,6 +77,7 @@ const resources = {
           genericWithCode: "Error: {{code}}",
         },
       },
+
       register: {
         haveAccount: "Ya tengo cuenta (login)",
         title: {
@@ -107,11 +125,10 @@ const resources = {
           hostelCreateGeneric: "Error creando hostel (Firestore). Revisá reglas/permisos.",
         },
       },
+
       admin: {
-
-
         rooms: {
-
+          title: "Gestión de Habitaciones",
           subtitle: "Elegí tu habitación y reservá en minutos.",
           defaultDesc: "Cómoda, luminosa y lista para tu estadía.",
           noImageTitle: "Sin imagen",
@@ -133,10 +150,12 @@ const resources = {
             invalidImage: "Imagen inválida",
             compressFailed: "Error comprimiendo imagen",
           },
+
           modal: {
             editTitle: "Editar habitación",
             createTitle: "Crear habitación",
           },
+
           form: {
             uploadImages: "Subir imágenes (hasta 6)",
             remove: "Quitar",
@@ -148,6 +167,7 @@ const resources = {
             imageUrlHelp: "Ej: https://.../foto.jpg",
             selectedFile: "Seleccionado: {{name}}",
           },
+
           errors: {
             nameRequired: "El nombre es obligatorio",
             priceRequired: "Precio obligatorio",
@@ -156,12 +176,14 @@ const resources = {
             capacityMin: "Mínimo 1 persona",
             imageUrlInvalid: "Debe ser una URL válida (http/https)",
           },
+
           common: {
             save: "Guardar",
             saving: "Guardando...",
             cancel: "Cancelar",
+            close: "Cerrar",
           },
-          title: "Gestión de Habitaciones",
+
           columns: {
             name: "Nombre",
             price: "Precio",
@@ -169,6 +191,7 @@ const resources = {
             actions: "Acciones",
           },
           actions: {
+            create: "Crear",
             edit: "Editar",
             delete: "Eliminar",
           },
@@ -176,17 +199,6 @@ const resources = {
 
         reservations: {
           title: "Reservas",
-          guest: "Huésped",
-          room: "Habitación",
-          email: "Email",
-          checkIn: "Check-in",
-          checkOut: "Check-out",
-          total: "Total",
-          status: "Estado",
-          actions: "Acciones",
-          pending: "Pendiente",
-          confirmed: "Confirmada",
-          cancelled: "Cancelada",
           empty: "Todavía no hay reservas.",
           seoTitle: "Reservas — HOSTLY",
           seoDescription: "Admin reservas",
@@ -205,6 +217,11 @@ const resources = {
             confirmed: "Confirmada",
             cancelled: "Cancelada",
           },
+          actions: {
+            view: "Ver",
+            edit: "Editar",
+            cancel: "Cancelar",
+          },
         },
 
         shell: {
@@ -216,10 +233,7 @@ const resources = {
             reservations: "Reservas",
             rooms: "Habitaciones",
           },
-
         },
-
-
 
         dashboard: {
           title: "Dashboard",
@@ -241,28 +255,27 @@ const resources = {
             pt: "Português (PT)",
           },
         },
-
-
-
       },
+
       nav: {
         rooms: "HABITACIONES",
         contact: "CONTACTO",
         book: "RESERVAR",
         admin: "Admin",
       },
+
       home: {
         heroLine1: "Más que una estadía, una experiencia.",
         heroLine2: "Reservá fácil. Viví auténtico.",
         title1: "Hostel independiente",
         title2: "en el corazón de la ciudad",
         aboutTitle: "Sobre nuestro hostel",
-        aboutP1:
-          "Ubicado en el vibrante centro de la ciudad, nuestro hostel combina confort, diseño y comunidad.",
-        aboutP2:
-          "Desde habitaciones compartidas hasta suites privadas, cada detalle está pensado para inspirar.",
+        aboutP1: "Ubicado en el vibrante centro de la ciudad, nuestro hostel combina confort, diseño y comunidad.",
+        aboutP2: "Desde habitaciones compartidas hasta suites privadas, cada detalle está pensado para inspirar.",
         learnMore: "VER MÁS",
-      }, seo: {
+      },
+
+      seo: {
         homeTitle: "HOSTLY — Reservá tu estadía",
         homeTitleWithHostel: "{{hostel}} — Reservá tu estadía",
         homeDesc: "Reservá habitaciones y gestioná tu hostel con HOSTLY.",
@@ -273,8 +286,9 @@ const resources = {
         rights: "Todos los derechos reservados.",
         terms: "Términos",
         privacy: "Privacidad",
-
+        poweredBy: "Powered by HOSTLY",
       },
+
       roomDetail: {
         loading: "Cargando habitación...",
         notFound: "Habitación no encontrada",
@@ -282,6 +296,7 @@ const resources = {
         fromPerNight: "Desde ${{price}} / noche",
         bookThisRoom: "RESERVAR ESTA HABITACIÓN",
       },
+
       rooms: {
         title: "Nuestras habitaciones",
         fromPerNight: "Desde ${{price}} / noche",
@@ -289,6 +304,7 @@ const resources = {
         noRooms: "Aún no hay habitaciones disponibles.",
         loading: "Cargando habitaciones...",
       },
+
       booking: {
         back: "Volver",
         title: "Reservá tu estadía",
@@ -309,9 +325,7 @@ const resources = {
         summaryNights: "{{n}} noches",
         summaryTotal: "Total: ${{total}}",
       },
-      common: {
-        language: "Idioma",
-      },
+
       tenant: {
         loadingTitle: "Cargando hostel…",
         loadingSubtitle: "Verificando disponibilidad del sitio…",
@@ -322,24 +336,40 @@ const resources = {
           adminLogin: "Admin login",
         },
       },
+
       loading: {
         title: "Cargando...",
         subtitle: "Preparando todo para vos…",
       },
     },
-
   },
+
   en: {
     translation: {
+      // --- Global / shared ---
+      common: {
+        language: "Language",
+        save: "Save",
+        saving: "Saving...",
+        loading: "Loading...",
+        cancel: "Cancel",
+        close: "Close",
+        back: "Back",
+        remove: "Remove",
+        uploadImages: "Upload images (up to 6)",
+      },
+
       uploadImages: "Upload images (up to 6)",
       remove: "Remove",
       maxImagesHelp: "Up to 6 images. Recommended: JPG/PNG, up to ~2MB.",
+
       carousel: {
         next: "Next",
         back: "Back",
         of: "{{current}} of {{total}}",
         empty: "No images",
       },
+
       errors: {
         genericTitle: "Something went wrong",
         genericDesc: "An unexpected error occurred.",
@@ -349,13 +379,16 @@ const resources = {
         back: "Go back",
         errorWithStatus: "Error {{status}}",
       },
+
       auth: {
         entering: "Signing in...",
         checkingSession: "Checking session...",
       },
+
       gallery: {
         title: "Gallery",
       },
+
       login: {
         title: "Admin Login",
         seoTitle: "Login — HOSTLY",
@@ -386,6 +419,7 @@ const resources = {
           genericWithCode: "Error: {{code}}",
         },
       },
+
       register: {
         haveAccount: "I already have an account (login)",
         title: {
@@ -433,33 +467,49 @@ const resources = {
           hostelCreateGeneric: "Error creating hostel (Firestore). Check rules/permissions.",
         },
       },
-      tenant: {
-        loadingTitle: "Loading hostel…",
-        loadingSubtitle: "Checking site availability…",
-        notFoundTitle: "Hostel not found",
-        notFoundDesc: 'The link "{{slug}}" does not exist. Check the slug or try another one.',
-        actions: {
-          search: "Find hostel",
-          adminLogin: "Admin login",
-        },
-      },
-      admin: {
 
+      admin: {
         rooms: {
+          title: "Room Management",
+          subtitle: "Choose your room and book in minutes.",
+          defaultDesc: "Comfortable, bright, and ready for your stay.",
+          noImageTitle: "No image",
+          noImageSubtitle: "This room doesn’t have photos yet.",
+
+          messages: {
+            loadingPermissions: "Loading permissions/hostel… (prevents upload errors)",
+            waitHostel: "Loading your hostel... try again in 1 second.",
+            waitHostelToast: "Loading permissions… try again in a moment.",
+            savedOk: "Saved ✅",
+            saveError: "Error saving the room",
+            currentImages: "Current images",
+            imagesSelected: "{{n}} image(s) selected",
+            imagesHelp: "Up to {{max}} images. JPG/PNG/WebP. Final <= {{mb}}MB (compressed).",
+            invalidFile: "Invalid file",
+            invalidFormat: "Invalid format. Use JPG, PNG or WebP.",
+            tooLargePre: "Image is too large ({{mb}}MB). Try another one.",
+            tooLargeAfter: "An image is still too large after compressing ({{mb}}MB). Try another one.",
+            invalidImage: "Invalid image",
+            compressFailed: "Error compressing image",
+          },
 
           modal: {
             editTitle: "Edit room",
             createTitle: "Create room",
           },
+
           form: {
+            uploadImages: "Upload images (up to 6)",
+            remove: "Remove",
             name: "Name",
             price: "Price",
             capacity: "Capacity",
             description: "Description",
             imageUrl: "Image URL (optional)",
-            imageUrlHelp: "E.g. https://.../photo.jpg",
+            imageUrlHelp: "e.g. https://.../photo.jpg",
             selectedFile: "Selected: {{name}}",
           },
+
           errors: {
             nameRequired: "Name is required",
             priceRequired: "Price is required",
@@ -467,17 +517,15 @@ const resources = {
             capacityRequired: "Capacity is required",
             capacityMin: "Minimum 1 person",
             imageUrlInvalid: "Must be a valid URL (http/https)",
-
           },
+
           common: {
             save: "Save",
             saving: "Saving...",
             cancel: "Cancel",
+            close: "Close",
           },
 
-
-
-          title: "Room Management",
           columns: {
             name: "Name",
             price: "Price",
@@ -485,6 +533,7 @@ const resources = {
             actions: "Actions",
           },
           actions: {
+            create: "Create",
             edit: "Edit",
             delete: "Delete",
           },
@@ -492,17 +541,6 @@ const resources = {
 
         reservations: {
           title: "Reservations",
-          guest: "Guest",
-          room: "Room",
-          email: "Email",
-          checkIn: "Check-in",
-          checkOut: "Check-out",
-          total: "Total",
-          status: "Status",
-          actions: "Actions",
-          pending: "Pending",
-          confirmed: "Confirmed",
-          cancelled: "Cancelled",
           empty: "No reservations yet.",
           seoTitle: "Reservations — HOSTLY",
           seoDescription: "Admin reservations",
@@ -521,8 +559,11 @@ const resources = {
             confirmed: "Confirmed",
             cancelled: "Cancelled",
           },
-
-
+          actions: {
+            view: "View",
+            edit: "Edit",
+            cancel: "Cancel",
+          },
         },
 
         shell: {
@@ -534,9 +575,7 @@ const resources = {
             reservations: "Reservations",
             rooms: "Rooms",
           },
-
         },
-
 
         dashboard: {
           title: "Dashboard",
@@ -558,40 +597,40 @@ const resources = {
             pt: "Portuguese (PT)",
           },
         },
-
-
-
-
       },
+
       nav: {
         rooms: "ROOMS",
         contact: "CONTACT",
-        book: "BOOK YOUR STAY",
+        book: "BOOK",
         admin: "Admin",
       },
+
       home: {
         heroLine1: "More than a stay, an experience.",
         heroLine2: "Book easy. Live authentic.",
         title1: "Independent hostel",
         title2: "in the heart of the city",
         aboutTitle: "About our hostel",
-        aboutP1:
-          "Located in the vibrant center of the city, our hostel blends comfort, design and community.",
-        aboutP2:
-          "From cozy shared rooms to private suites, every detail is crafted to inspire.",
+        aboutP1: "Located in the vibrant city center, our hostel blends comfort, design and community.",
+        aboutP2: "From cozy shared rooms to private suites, every detail is crafted to inspire.",
         learnMore: "LEARN MORE",
       },
+
       seo: {
         homeTitle: "HOSTLY — Book your stay",
         homeTitleWithHostel: "{{hostel}} — Book your stay",
         homeDesc: "Book rooms and manage your hostel with HOSTLY.",
         homeDescWithHostel: "Book rooms at {{hostel}}. Fast and simple.",
       },
+
       footer: {
         rights: "All rights reserved.",
         terms: "Terms",
         privacy: "Privacy",
+        poweredBy: "Powered by HOSTLY",
       },
+
       roomDetail: {
         loading: "Loading room...",
         notFound: "Room not found",
@@ -599,6 +638,7 @@ const resources = {
         fromPerNight: "From ${{price}} / night",
         bookThisRoom: "BOOK THIS ROOM",
       },
+
       rooms: {
         title: "Our rooms",
         fromPerNight: "From ${{price}} / night",
@@ -606,6 +646,7 @@ const resources = {
         noRooms: "No rooms available yet.",
         loading: "Loading rooms...",
       },
+
       booking: {
         back: "Back",
         title: "Book your stay",
@@ -626,26 +667,51 @@ const resources = {
         summaryNights: "{{n}} nights",
         summaryTotal: "Total: ${{total}}",
       },
-      common: {
-        language: "Language",
+
+      tenant: {
+        loadingTitle: "Loading hostel…",
+        loadingSubtitle: "Checking site availability…",
+        notFoundTitle: "Hostel not found",
+        notFoundDesc: 'The link "{{slug}}" does not exist. Check the slug or try another one.',
+        actions: {
+          search: "Find hostel",
+          adminLogin: "Admin login",
+        },
       },
+
       loading: {
         title: "Loading...",
         subtitle: "Getting everything ready…",
       },
     },
   },
+
   pt: {
     translation: {
+      // --- Global / shared ---
+      common: {
+        language: "Idioma",
+        save: "Salvar",
+        saving: "Salvando...",
+        loading: "Carregando...",
+        cancel: "Cancelar",
+        close: "Fechar",
+        back: "Voltar",
+        remove: "Remover",
+        uploadImages: "Enviar imagens (até 6)",
+      },
+
       uploadImages: "Enviar imagens (até 6)",
       remove: "Remover",
       maxImagesHelp: "Até 6 imagens. Recomendado: JPG/PNG, até ~2MB.",
+
       carousel: {
         next: "Próxima",
         back: "Anterior",
         of: "{{current}} de {{total}}",
         empty: "Sem imagens",
       },
+
       errors: {
         genericTitle: "Algo deu errado",
         genericDesc: "Ocorreu um erro inesperado.",
@@ -655,13 +721,16 @@ const resources = {
         back: "Voltar",
         errorWithStatus: "Erro {{status}}",
       },
+
       auth: {
         entering: "Entrando...",
         checkingSession: "Verificando sessão...",
       },
+
       gallery: {
         title: "Galeria",
       },
+
       login: {
         title: "Admin Login",
         seoTitle: "Login — HOSTLY",
@@ -692,6 +761,7 @@ const resources = {
           genericWithCode: "Erro: {{code}}",
         },
       },
+
       register: {
         haveAccount: "Já tenho conta (login)",
         title: {
@@ -739,15 +809,40 @@ const resources = {
           hostelCreateGeneric: "Erro ao criar hostel (Firestore). Verifique regras/permissões.",
         },
       },
-      admin: {
 
+      admin: {
         rooms: {
+          title: "Gestão de Quartos",
+          subtitle: "Escolha seu quarto e reserve em minutos.",
+          defaultDesc: "Confortável, iluminado e pronto para a sua estadia.",
+          noImageTitle: "Sem imagem",
+          noImageSubtitle: "Este quarto ainda não tem fotos.",
+
+          messages: {
+            loadingPermissions: "Carregando permissões/hostel… (evita erros ao enviar imagens)",
+            waitHostel: "Carregando seu hostel... tente novamente em 1 segundo.",
+            waitHostelToast: "Carregando permissões… tente novamente em instantes.",
+            savedOk: "Salvo ✅",
+            saveError: "Erro ao salvar o quarto",
+            currentImages: "Imagens atuais",
+            imagesSelected: "{{n}} imagem(ns) selecionada(s)",
+            imagesHelp: "Até {{max}} imagens. JPG/PNG/WebP. Final <= {{mb}}MB (comprimidas).",
+            invalidFile: "Arquivo inválido",
+            invalidFormat: "Formato inválido. Use JPG, PNG ou WebP.",
+            tooLargePre: "A imagem é muito grande ({{mb}}MB). Tente outra.",
+            tooLargeAfter: "Uma imagem ainda ficou grande após comprimir ({{mb}}MB). Tente outra.",
+            invalidImage: "Imagem inválida",
+            compressFailed: "Erro ao comprimir imagem",
+          },
 
           modal: {
             editTitle: "Editar quarto",
             createTitle: "Criar quarto",
           },
+
           form: {
+            uploadImages: "Enviar imagens (até 6)",
+            remove: "Remover",
             name: "Nome",
             price: "Preço",
             capacity: "Capacidade",
@@ -756,6 +851,7 @@ const resources = {
             imageUrlHelp: "Ex: https://.../foto.jpg",
             selectedFile: "Selecionado: {{name}}",
           },
+
           errors: {
             nameRequired: "O nome é obrigatório",
             priceRequired: "Preço obrigatório",
@@ -763,15 +859,15 @@ const resources = {
             capacityRequired: "Capacidade obrigatória",
             capacityMin: "Mínimo 1 pessoa",
             imageUrlInvalid: "Deve ser uma URL válida (http/https)",
-
           },
+
           common: {
             save: "Salvar",
             saving: "Salvando...",
             cancel: "Cancelar",
+            close: "Fechar",
           },
 
-          title: "Gestão de Quartos",
           columns: {
             name: "Nome",
             price: "Preço",
@@ -779,6 +875,7 @@ const resources = {
             actions: "Ações",
           },
           actions: {
+            create: "Criar",
             edit: "Editar",
             delete: "Excluir",
           },
@@ -786,20 +883,7 @@ const resources = {
 
         reservations: {
           title: "Reservas",
-          guest: "Hóspede",
-          room: "Quarto",
-          email: "Email",
-          checkIn: "Check-in",
-          checkOut: "Check-out",
-          total: "Total",
-          status: "Status",
-          actions: "Ações",
-          pending: "Pendente",
-          confirmed: "Confirmada",
-          cancelled: "Cancelada",
           empty: "Ainda não há reservas.",
-
-
           seoTitle: "Reservas — HOSTLY",
           seoDescription: "Admin reservas",
           columns: {
@@ -817,7 +901,11 @@ const resources = {
             confirmed: "Confirmada",
             cancelled: "Cancelada",
           },
-
+          actions: {
+            view: "Ver",
+            edit: "Editar",
+            cancel: "Cancelar",
+          },
         },
 
         shell: {
@@ -851,43 +939,40 @@ const resources = {
             pt: "Português (PT)",
           },
         },
+      },
 
-      },
-      loading: {
-        title: "Carregando...",
-        subtitle: "Preparando tudo para você…",
-      },
       nav: {
         rooms: "QUARTOS",
         contact: "CONTATO",
         book: "RESERVAR",
         admin: "Admin",
       },
+
       home: {
         heroLine1: "Mais que uma estadia, uma experiência.",
         heroLine2: "Reserve fácil. Viva o autêntico.",
         title1: "Hostel independente",
         title2: "no coração da cidade",
         aboutTitle: "Sobre o nosso hostel",
-        aboutP1:
-          "Localizado no centro vibrante da cidade, nosso hostel combina conforto, design e comunidade.",
-        aboutP2:
-          "De dormitórios aconchegantes a suítes privadas, cada detalhe foi pensado para inspirar.",
+        aboutP1: "Localizado no centro vibrante da cidade, nosso hostel combina conforto, design e comunidade.",
+        aboutP2: "De dormitórios aconchegantes a suítes privadas, cada detalhe foi pensado para inspirar.",
         learnMore: "SAIBA MAIS",
       },
+
       seo: {
         homeTitle: "HOSTLY — Reserve sua estadia",
         homeTitleWithHostel: "{{hostel}} — Reserve sua estadia",
         homeDesc: "Reserve quartos e gerencie seu hostel com a HOSTLY.",
         homeDescWithHostel: "Reserve quartos em {{hostel}}. Rápido e simples.",
       },
+
       footer: {
         rights: "Todos os direitos reservados.",
-
         terms: "Termos",
-
         privacy: "Privacidade",
+        poweredBy: "Powered by HOSTLY",
       },
+
       roomDetail: {
         loading: "Carregando quarto...",
         notFound: "Quarto não encontrado",
@@ -895,6 +980,7 @@ const resources = {
         fromPerNight: "A partir de ${{price}} / noite",
         bookThisRoom: "RESERVAR ESTE QUARTO",
       },
+
       rooms: {
         title: "Nossos quartos",
         fromPerNight: "A partir de ${{price}} / noite",
@@ -902,6 +988,7 @@ const resources = {
         noRooms: "Ainda não há quartos disponíveis.",
         loading: "Carregando quartos...",
       },
+
       booking: {
         back: "Voltar",
         title: "Reserve sua estadia",
@@ -922,9 +1009,7 @@ const resources = {
         summaryNights: "{{n}} noites",
         summaryTotal: "Total: ${{total}}",
       },
-      common: {
-        language: "Idioma",
-      },
+
       tenant: {
         loadingTitle: "Carregando hostel…",
         loadingSubtitle: "Verificando disponibilidade do site…",
@@ -935,9 +1020,14 @@ const resources = {
           adminLogin: "Admin login",
         },
       },
+
+      loading: {
+        title: "Carregando...",
+        subtitle: "Preparando tudo para você…",
+      },
     },
   },
-};
+} as const;
 
 i18n
   .use(LanguageDetector)

@@ -150,13 +150,13 @@ export default function DashboardSection() {
 
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6} md={4}>
-            <Stat title={t("admin.dashboard.stats.revenue")} value={money.format(totalRevenue)} />
+            <Stat title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Stat title={t("admin.dashboard.stats.reservations")} value={totalReservations} />
+           <Stat title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
           </Grid>
           <Grid item xs={12} sm={6} md={4}>
-            <Stat title={t("admin.dashboard.stats.rooms")} value={totalRooms} />
+        <Stat title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
           </Grid>
         </Grid>
 

@@ -85,8 +85,16 @@ function RoomPreviewCard({
   const cover = urls[0];
 
   return (
-    <Card sx={{ borderRadius: 4, overflow: "hidden", height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Imagen / placeholder mantiene mismo alto siempre */}
+    <Card
+      sx={{
+        borderRadius: 4,
+        overflow: "hidden",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* MISMO ALTO SIEMPRE */}
       <Box
         sx={{
           height: 210,
@@ -133,8 +141,7 @@ function RoomPreviewCard({
           </>
         )}
 
-        {/* chips flotantes */}
-        <Stack direction="row" spacing={1} sx={{ position: "absolute", top: 10, left: 10 }}>
+        <Stack direction="row" spacing={1} sx={{ position: "absolute", top: 10, left: 10, flexWrap: "wrap" }}>
           <Chip
             size="small"
             label={`${room.capacity} pax`}
@@ -150,12 +157,26 @@ function RoomPreviewCard({
         </Stack>
       </Box>
 
+      {/* Contenido: MISMA ALTURA gracias a flex + clamp */}
       <CardContent sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
         <Typography sx={{ fontWeight: 900, mb: 0.5 }}>{room.name}</Typography>
-        <Typography sx={{ color: "text.secondary", fontSize: 13, lineHeight: 1.6, flex: 1 }}>
+
+        <Typography
+          sx={{
+            color: "text.secondary",
+            fontSize: 13,
+            lineHeight: 1.6,
+            flex: 1,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
           {room.description?.trim() ? room.description : fallbackDesc}
         </Typography>
 
+        {/* Botón siempre abajo, todas iguales */}
         <Button
           component={RouterLink}
           to={`/${hostelSlug}/rooms/${room.id}`}
@@ -175,7 +196,6 @@ function RoomPreviewCard({
     </Card>
   );
 }
-
 export const HomePage = () => {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { hostel } = useHostelPublic(hostelSlug);

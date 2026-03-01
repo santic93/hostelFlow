@@ -22,7 +22,7 @@ import dayjs from "dayjs";
 import { collection, getDocs, orderBy, query, where } from "firebase/firestore";
 import { db } from "../../../services/firebase";
 import { setReservationStatus, type ReservationStatus } from "../../../services/reservations";
-
+import { esES, enUS, ptBR } from "@mui/x-data-grid/locales";
 
 type ReservationRow = {
   id: string;
@@ -38,7 +38,7 @@ type ReservationRow = {
 
 export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
- const { t, i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
 
   const [rows, setRows] = useState<ReservationRow[]>([]);
@@ -140,64 +140,67 @@ export default function ReservationsSection() {
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredRows, isMobile]);
 
-const columns = useMemo<GridColDef[]>(() => {
-  return [
-    { field: "fullName", headerName: t("admin.reservations.columns.guest"), flex: 1, minWidth: 160 },
-    { field: "roomName", headerName: t("admin.reservations.columns.room"), flex: 1, minWidth: 140 },
-    { field: "email", headerName: t("admin.reservations.columns.email"), flex: 1, minWidth: 200 },
-    {
-      field: "checkIn",
-      headerName: t("admin.reservations.columns.checkIn"),
-      width: 130,
-      valueGetter: (_, row) => (row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-"),
-    },
-    {
-      field: "checkOut",
-      headerName: t("admin.reservations.columns.checkOut"),
-      width: 130,
-      valueGetter: (_, row) => (row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-"),
-    },
-    {
-      field: "total",
-      headerName: t("admin.reservations.columns.total"),
-      width: 120,
-      valueGetter: (_, row) => `$${row.total}`,
-    },
-    {
-      field: "status",
-      headerName: t("admin.reservations.columns.status"),
-      width: 150,
-      renderCell: (params) => {
-        const v = params.row.status as ReservationStatus;
-        const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
-        return <Chip size="small" label={statusLabel(v)} color={color as any} />;
+  const columns = useMemo<GridColDef[]>(() => {
+    return [
+      { field: "fullName", headerName: t("admin.reservations.columns.guest"), flex: 1, minWidth: 160 },
+      { field: "roomName", headerName: t("admin.reservations.columns.room"), flex: 1, minWidth: 140 },
+      { field: "email", headerName: t("admin.reservations.columns.email"), flex: 1, minWidth: 200 },
+      {
+        field: "checkIn",
+        headerName: t("admin.reservations.columns.checkIn"),
+        width: 130,
+        valueGetter: (_, row) => (row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-"),
       },
-    },
-    {
-      field: "actions",
-      headerName: t("admin.reservations.columns.actions"),
-      width: 190,
-      sortable: false,
-      renderCell: (params) => {
-        const saving = !!savingById[params.row.id];
-        if (saving) return <CircularProgress size={18} />;
+      {
+        field: "checkOut",
+        headerName: t("admin.reservations.columns.checkOut"),
+        width: 130,
+        valueGetter: (_, row) => (row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-"),
+      },
+      {
+        field: "total",
+        headerName: t("admin.reservations.columns.total"),
+        width: 120,
+        valueGetter: (_, row) => `$${row.total}`,
+      },
+      {
+        field: "status",
+        headerName: t("admin.reservations.columns.status"),
+        width: 150,
+        renderCell: (params) => {
+          const v = params.row.status as ReservationStatus;
+          const color = v === "confirmed" ? "success" : v === "cancelled" ? "error" : "warning";
+          return <Chip size="small" label={statusLabel(v)} color={color as any} />;
+        },
+      },
+      {
+        field: "actions",
+        headerName: t("admin.reservations.columns.actions"),
+        width: 190,
+        sortable: false,
+        renderCell: (params) => {
+          const saving = !!savingById[params.row.id];
+          if (saving) return <CircularProgress size={18} />;
 
-        return (
-          <Select
-            size="small"
-            value={params.row.status}
-            onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
-            sx={{ minWidth: 170 }}
-          >
-            <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
-            <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
-            <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
-          </Select>
-        );
+          return (
+            <Select
+              size="small"
+              value={params.row.status}
+              onChange={(e) => updateStatus(params.row.id, e.target.value as ReservationStatus)}
+              sx={{ minWidth: 170 }}
+            >
+              <MenuItem value="pending">{t("admin.reservations.pending")}</MenuItem>
+              <MenuItem value="confirmed">{t("admin.reservations.confirmed")}</MenuItem>
+              <MenuItem value="cancelled">{t("admin.reservations.cancelled")}</MenuItem>
+            </Select>
+          );
+        },
       },
-    },
-  ];
-}, [i18n.language, savingById]);
+    ];
+  }, [i18n.language, savingById]);
+  const localeText =
+    (i18n.language?.startsWith("es") ? esES : i18n.language?.startsWith("pt") ? ptBR : enUS).components
+      .MuiDataGrid.defaultProps.localeText;
   return (
     <Box sx={{ p: { xs: 2, md: 3 } }}>
       <Stack spacing={1.5} sx={{ mb: 2 }}>
@@ -284,8 +287,8 @@ const columns = useMemo<GridColDef[]>(() => {
                               (r.status === "confirmed"
                                 ? "success"
                                 : r.status === "cancelled"
-                                ? "error"
-                                : "warning") as any
+                                  ? "error"
+                                  : "warning") as any
                             }
                           />
                         </Stack>
@@ -334,7 +337,10 @@ const columns = useMemo<GridColDef[]>(() => {
         </Stack>
       ) : (
         <Box sx={{ height: 620, width: "100%" }}>
-          <DataGrid rows={filteredRows} columns={columns} disableRowSelectionOnClick />
+          <DataGrid rows={filteredRows}
+            columns={columns}
+            disableRowSelectionOnClick
+            localeText={localeText} />
         </Box>
       )}
     </Box>

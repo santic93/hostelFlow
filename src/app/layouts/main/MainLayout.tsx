@@ -32,7 +32,7 @@ export const MainLayout = () => {
   const links = useMemo(
     () => [
       { label: t("nav.rooms"), to: `${base}/rooms` },
-      { label: t("nav.book"), to: `${base}#book` },
+      { label: t("nav.book"), to: `${base}/rooms` },
     ],
     [t, base]
   );

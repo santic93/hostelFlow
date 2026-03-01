@@ -289,6 +289,20 @@ export const resources = {
       },
 
       home: {
+        badge: "Reserva directa",
+        badge2: "Sin comisiones",
+        visualTitle: "Tu próxima estadía empieza acá.",
+        visualSubtitle: "Elegí habitación, confirmá fechas y listo.",
+        previewTitle: "Habitaciones destacadas",
+        previewSubtitle: "Un vistazo rápido para elegir más fácil.",
+        previewCta: "Ver todas",
+        previewEmptyTitle: "Todavía no hay habitaciones publicadas",
+        previewEmptyDesc: "Si estás en modo admin, cargá la primera habitación para que la gente pueda reservar.",
+        features: {
+          a: { eyebrow: "DIRECTO", title: "Reserva sin vueltas", desc: "Elegís habitación, confirmás fechas y listo. Sin pasos raros." },
+          b: { eyebrow: "CLARO", title: "Precios transparentes", desc: "Ves el total antes de enviar la solicitud. Sin sorpresas." },
+          c: { eyebrow: "MULTI-IDIOMA", title: "Tu sitio, en 1 click", desc: "Español, English, Português. El huésped entra y entiende." },
+        },
         heroLine1: "Más que una estadía, una experiencia.",
         heroLine2: "Reservá fácil. Viví auténtico.",
         title1: "Hostel independiente",
@@ -642,6 +656,20 @@ export const resources = {
       },
 
       home: {
+        badge: "Book direct",
+        badge2: "No fees",
+        visualTitle: "Your next stay starts here.",
+        visualSubtitle: "Pick a room, choose dates, done.",
+        previewTitle: "Featured rooms",
+        previewSubtitle: "A quick look to choose faster.",
+        previewCta: "View all",
+        previewEmptyTitle: "No rooms published yet",
+        previewEmptyDesc: "If you’re in admin mode, create your first room so guests can book.",
+        features: {
+          a: { eyebrow: "DIRECT", title: "Book without friction", desc: "Choose a room, confirm dates, done. No weird steps." },
+          b: { eyebrow: "CLEAR", title: "Transparent pricing", desc: "See the total before sending the request. No surprises." },
+          c: { eyebrow: "MULTI-LANG", title: "Your site, one click", desc: "Spanish, English, Portuguese. Guests understand instantly." },
+        },
         heroLine1: "More than a stay, an experience.",
         heroLine2: "Book easy. Live authentic.",
         title1: "Independent hostel",
@@ -1011,6 +1039,20 @@ export const resources = {
       },
 
       home: {
+        badge: "Reserva direta",
+        badge2: "Sem taxas",
+        visualTitle: "Sua próxima estadia começa aqui.",
+        visualSubtitle: "Escolha o quarto, selecione as datas e pronto.",
+        previewTitle: "Quartos em destaque",
+        previewSubtitle: "Um olhar rápido para escolher melhor.",
+        previewCta: "Ver todos",
+        previewEmptyTitle: "Ainda não há quartos publicados",
+        previewEmptyDesc: "Se você estiver no modo admin, crie o primeiro quarto para que os hóspedes possam reservar.",
+        features: {
+          a: { eyebrow: "DIRETO", title: "Reserve sem atrito", desc: "Escolha o quarto, confirme as datas e pronto." },
+          b: { eyebrow: "CLARO", title: "Preços transparentes", desc: "Veja o total antes de enviar. Sem surpresas." },
+          c: { eyebrow: "MULTI-IDIOMA", title: "Seu site, 1 clique", desc: "Espanhol, English, Português. O hóspede entende." },
+        },
         heroLine1: "Mais que uma estadia, uma experiência.",
         heroLine2: "Reserve fácil. Viva o autêntico.",
         title1: "Hostel independente",

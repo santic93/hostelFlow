@@ -73,7 +73,14 @@ export const RoomsPage = () => {
             const urls = (room.imageUrls ?? []).filter(Boolean);
             return (
               <Grid item key={room.id} xs={12} sm={6} md={4}>
-                <Card sx={{ overflow: "hidden" }}>
+                <Card
+                  sx={{
+                    overflow: "hidden",
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
                   <Box sx={{ position: "relative" }}>
                     <RoomCardCarousel urls={urls} alt={room.name} />
                     <Chip
@@ -88,23 +95,39 @@ export const RoomsPage = () => {
                     />
                   </Box>
 
-                  <CardContent>
+                  <CardContent
+                    sx={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
                     <Typography sx={{ fontWeight: 900, mb: 0.5 }}>{room.name}</Typography>
-                    <Typography sx={{ color: "text.secondary", fontSize: 13, mb: 1 }}>
-                      {room.description || t("rooms.defaultDesc", "Cómoda, luminosa y lista para tu estadía.")}
+
+                    <Typography
+                      sx={{
+                        color: "text.secondary",
+                        fontSize: 13,
+                        mb: 1,
+                        minHeight: 40, // asegura altura parecida aunque sea corta
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {room.description || t("rooms.defaultDesc")}
                     </Typography>
+
+                    <Box sx={{ flex: 1 }} />
 
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography sx={{ fontWeight: 900 }}>
-                        ${room.price} <span style={{ fontWeight: 600, opacity: 0.7 }}>{t("rooms.perNight")}</span>
+                        ${room.price}{" "}
+                        <span style={{ fontWeight: 600, opacity: 0.7 }}>{t("rooms.perNight")}</span>
                       </Typography>
 
-                      <Button
-                        component={RouterLink}
-                        to={`/${hostelSlug}/rooms/${room.id}`}
-                        variant="contained"
-                        size="small"
-                      >
+                      <Button component={RouterLink} to={`/${hostelSlug}/rooms/${room.id}`} variant="contained" size="small">
                         {t("rooms.viewRoom")}
                       </Button>
                     </Stack>

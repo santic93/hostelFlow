@@ -24,6 +24,8 @@ export const resources = {
       },
       // --- Global / shared ---
       common: {
+        showPassword: "Mostrar contraseña",
+        hidePassword: "Ocultar contraseña",
         language: "Idioma",
         save: "Guardar",
         saving: "Guardando...",
@@ -99,6 +101,17 @@ export const resources = {
       },
 
       register: {
+        password: {
+          help: "Mínimo 10 caracteres, con mayúscula, minúscula, número y símbolo.",
+          ok: "Contraseña segura ✅",
+          rules: {
+            minLength: "10+ caracteres",
+            upper: "1 mayúscula",
+            lower: "1 minúscula",
+            number: "1 número",
+            symbol: "1 símbolo",
+          },
+        },
         haveAccount: "Ya tengo cuenta (login)",
         title: {
           step1: "Crear cuenta de administrador",
@@ -132,6 +145,7 @@ export const resources = {
           hostelCreatedRedirecting: "Hostel creado ✅ Redirigiendo al panel...",
         },
         errors: {
+          passwordWeak: "La contraseña es débil. Usá mínimo 10 caracteres con mayúscula, minúscula, número y símbolo.",
           emailRequired: "Ingresá un email",
           passwordMin: "Password mínimo 6 caracteres",
           emailInUse: "Ese email ya está en uso. Probá iniciar sesión en Admin Login.",
@@ -433,6 +447,8 @@ export const resources = {
       visualSubtitle: "Pick a room, choose dates, done.",
       // --- Global / shared ---
       common: {
+        showPassword: "Show password",
+        hidePassword: "Hide password",
         language: "Language",
         save: "Save",
         saving: "Saving...",
@@ -508,6 +524,17 @@ export const resources = {
       },
 
       register: {
+        password: {
+          help: "At least 10 characters with uppercase, lowercase, number and symbol.",
+          ok: "Strong password ✅",
+          rules: {
+            minLength: "10+ characters",
+            upper: "1 uppercase",
+            lower: "1 lowercase",
+            number: "1 number",
+            symbol: "1 symbol",
+          },
+        },
         haveAccount: "I already have an account (login)",
         title: {
           step1: "Create admin account",
@@ -541,6 +568,7 @@ export const resources = {
           hostelCreatedRedirecting: "Hostel created ✅ Redirecting to dashboard...",
         },
         errors: {
+          passwordWeak: "Password is weak. Use at least 10 characters with uppercase, lowercase, number and symbol.",
           emailRequired: "Enter an email",
           passwordMin: "Password must be at least 6 characters",
           emailInUse: "That email is already in use. Try logging in on Admin Login.",
@@ -852,6 +880,8 @@ export const resources = {
       visualSubtitle: "Escolha o quarto, selecione as datas e pronto.",
       // --- Global / shared ---
       common: {
+        showPassword: "Mostrar senha",
+        hidePassword: "Ocultar senha",
         language: "Idioma",
         save: "Salvar",
         saving: "Salvando...",
@@ -927,6 +957,17 @@ export const resources = {
       },
 
       register: {
+        password: {
+          help: "Mínimo 10 caracteres, com maiúscula, minúscula, número e símbolo.",
+          ok: "Senha forte ✅",
+          rules: {
+            minLength: "10+ caracteres",
+            upper: "1 maiúscula",
+            lower: "1 minúscula",
+            number: "1 número",
+            symbol: "1 símbolo",
+          },
+        },
         haveAccount: "Já tenho conta (login)",
         title: {
           step1: "Criar conta de administrador",
@@ -960,6 +1001,7 @@ export const resources = {
           hostelCreatedRedirecting: "Hostel criado ✅ Redirecionando para o painel...",
         },
         errors: {
+          passwordWeak: "Senha fraca. Use pelo menos 10 caracteres com maiúscula, minúscula, número e símbolo.",
           emailRequired: "Digite um email",
           passwordMin: "A senha deve ter no mínimo 6 caracteres",
           emailInUse: "Esse email já está em uso. Tente fazer login em Admin Login.",

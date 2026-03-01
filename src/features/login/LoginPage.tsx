@@ -1,17 +1,31 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, Link as RouterLink } from "react-router-dom";
-import { Container, Typography, TextField, Button, Alert, Stack } from "@mui/material";
-import { signInWithEmailAndPassword, } from "firebase/auth";
-import { auth } from "../../services/firebase";
-import { Seo } from "../../components/Seo";
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import {
+  Alert,
+  Button,
+  Container,
+  Stack,
+  TextField,
+  Typography,
+  IconButton,
+  InputAdornment,
+} from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../../services/firebase"; // ajustá path si difiere
+import { Seo } from "../../components/Seo";
+// ajustá path si difiere
 
 export default function LoginPage() {
   const { t } = useTranslation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -25,6 +39,7 @@ export default function LoginPage() {
   }, [searchParams, t]);
 
   const handleLogin = async () => {
+    if (loading) return;
     setMsg(null);
 
     if (!email.trim()) {
@@ -38,11 +53,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
-      await signInWithEmailAndPassword(
-        auth,
-        email.trim().toLowerCase(),
-        password
-      );
+      await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 
       navigate("/admin", { replace: true });
     } catch (err: any) {
@@ -67,14 +78,9 @@ export default function LoginPage() {
     }
   };
 
-
   return (
     <>
-      <Seo
-        title={t("login.seoTitle")}
-        description={t("login.seoDescription")}
-        noindex
-      />
+      <Seo title={t("login.seoTitle")} description={t("login.seoDescription")} noindex />
 
       <Container sx={{ py: 12, maxWidth: 420 }}>
         <Typography variant="h4" gutterBottom>
@@ -87,18 +93,34 @@ export default function LoginPage() {
           </Alert>
         )}
 
-        <Stack spacing={2.5} sx={{ mt: 3 }}>
-          <TextField
-            label={t("login.fields.email")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+        <Stack
+          spacing={2.5}
+          sx={{ mt: 3 }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleLogin();
+          }}
+        >
+          <TextField label={t("login.fields.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
 
           <TextField
             label={t("login.fields.password")}
-            type="password"
+            type={showPass ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPass ? t("common.hidePassword") : t("common.showPassword")}
+                    onClick={() => setShowPass((s) => !s)}
+                    edge="end"
+                  >
+                    {showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
 
           <Button variant="contained" onClick={handleLogin} disabled={loading}>

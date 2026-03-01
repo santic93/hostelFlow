@@ -1,13 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Link as RouterLink } from "react-router-dom";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { Box, Button, Container, TextField, Typography, Collapse, Alert, Chip, Paper } from "@mui/material";
-import { auth, functions } from "../../services/firebase";
-import HotelLoading from "../../components/HotelLoading";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { httpsCallable } from "firebase/functions";
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  Container,
+  Paper,
+  TextField,
+  Typography,
+  IconButton,
+  InputAdornment,
+} from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
+import { auth, functions } from "../../services/firebase"; // ajustá path si difiere
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { httpsCallable } from "firebase/functions";
+import HotelLoading from "../../components/HotelLoading"; // ajustá path si difiere
 
 function slugify(input: string) {
   return input
@@ -17,6 +30,17 @@ function slugify(input: string) {
     .replace(/(^-|-$)+/g, "");
 }
 
+function validatePasswordStrong(pass: string) {
+  // Reglas: 10+ chars, 1 mayus, 1 minus, 1 numero, 1 simbolo
+  const errors: string[] = [];
+  if (pass.length < 10) errors.push("minLength");
+  if (!/[A-Z]/.test(pass)) errors.push("upper");
+  if (!/[a-z]/.test(pass)) errors.push("lower");
+  if (!/[0-9]/.test(pass)) errors.push("number");
+  if (!/[^\w\s]/.test(pass)) errors.push("symbol"); // simbolo
+  return errors;
+}
+
 export default function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -24,6 +48,7 @@ export default function RegisterPage() {
   // Step 1
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
 
   // Step 2
   const [hostelName, setHostelName] = useState("");
@@ -47,6 +72,17 @@ export default function RegisterPage() {
     }
   }, [createdUser]);
 
+  const passwordErrors = useMemo(() => validatePasswordStrong(password), [password]);
+  const passwordOk = passwordErrors.length === 0;
+
+  const passwordHelper = useMemo(() => {
+    if (!password) return t("register.password.help");
+    if (passwordOk) return t("register.password.ok");
+    // mostrar 1 sola línea con bullets (más limpio)
+    const parts = passwordErrors.map((k) => t(`register.password.rules.${k}`));
+    return parts.join(" · ");
+  }, [password, passwordOk, passwordErrors, t]);
+
   const handleCreateAccount = async () => {
     if (loading) return;
     setMessage(null);
@@ -55,7 +91,11 @@ export default function RegisterPage() {
     const cleanPass = password;
 
     if (!cleanEmail) return setMessage({ type: "error", text: t("register.errors.emailRequired") });
-    if (cleanPass.length < 6) return setMessage({ type: "error", text: t("register.errors.passwordMin") });
+
+    // 🔒 nuevo: password fuerte
+    if (!passwordOk) {
+      return setMessage({ type: "error", text: t("register.errors.passwordWeak") });
+    }
 
     try {
       setLoading(true);
@@ -73,6 +113,9 @@ export default function RegisterPage() {
         setMessage({ type: "error", text: t("register.errors.emailInUse") });
       } else if (err?.code === "auth/invalid-email") {
         setMessage({ type: "error", text: t("register.errors.emailInvalid") });
+      } else if (err?.code === "auth/weak-password") {
+        // por si Firebase lo detecta también
+        setMessage({ type: "error", text: t("register.errors.passwordWeak") });
       } else {
         setMessage({
           type: "error",
@@ -83,6 +126,7 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
   const handleCreateHostel = async () => {
     if (loading) return;
     setMessage(null);
@@ -109,11 +153,8 @@ export default function RegisterPage() {
     } catch (err: any) {
       console.error(err);
 
-      // ❌ NO borramos el usuario por fallas de backend (AppCheck / funciones / red).
-      // Lo dejamos logueado para que pueda reintentar.
       setCreatedUser(auth.currentUser ?? createdUser);
 
-      // Firebase functions errors suelen venir como err.code
       if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
         setMessage({ type: "error", text: t("register.errors.slugTaken") });
       } else {
@@ -123,6 +164,7 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
   if (loading) {
     return (
       <HotelLoading
@@ -161,21 +203,44 @@ export default function RegisterPage() {
       )}
 
       <Collapse in={step === 1}>
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}>
+        <Box
+          sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleCreateAccount();
+          }}
+        >
           <TextField
             label={t("register.fields.email")}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
+            inputMode="email"
           />
+
           <TextField
             label={t("register.fields.password")}
-            type="password"
+            type={showPass ? "text" : "password"}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
+            helperText={passwordHelper}
+            error={Boolean(password) && !passwordOk}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    aria-label={showPass ? t("common.hidePassword") : t("common.showPassword")}
+                    onClick={() => setShowPass((s) => !s)}
+                    edge="end"
+                  >
+                    {showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
           />
-          <Button variant="contained" onClick={handleCreateAccount}>
+
+          <Button variant="contained" onClick={handleCreateAccount} disabled={!email.trim() || !passwordOk}>
             {t("register.actions.continue")}
           </Button>
         </Box>
@@ -184,15 +249,22 @@ export default function RegisterPage() {
       <Collapse in={step === 2}>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            {t("register.messages.accountCreatedLabel")} <b>{(auth.currentUser?.email ?? email).trim().toLowerCase()}</b>
+            {t("register.messages.accountCreatedLabel")}{" "}
+            <b>{(auth.currentUser?.email ?? email).trim().toLowerCase()}</b>
           </Alert>
 
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <Box
+            sx={{ display: "flex", flexDirection: "column", gap: 3 }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateHostel();
+            }}
+          >
             <TextField
               label={t("register.fields.hostelName")}
               value={hostelName}
               onChange={(e) => setHostelName(e.target.value)}
             />
+
             <TextField
               label={t("register.fields.slug")}
               value={hostelSlug}
@@ -203,7 +275,12 @@ export default function RegisterPage() {
                   : t("register.helpers.slugExample")
               }
             />
-            <Button variant="contained" onClick={handleCreateHostel}>
+
+            <Button
+              variant="contained"
+              onClick={handleCreateHostel}
+              disabled={!hostelName.trim() || !normalizedSlug}
+            >
               {t("register.actions.createHostel")}
             </Button>
           </Box>

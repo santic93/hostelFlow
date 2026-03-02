@@ -4,26 +4,20 @@
   "version": "0.0.0",
   "type": "module",
  
+ 
   "scripts": {
     "dev": "vite",
+    "dev:all": "firebase emulators:start --only firestore,functions,storage",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-
-    "emulators": "firebase emulators:start",
-    "emulators:ui": "firebase emulators:start --import=./.emulator-data --export-on-exit=./.emulator-data",
-
-    "functions:build": "cd functions && npm run build",
-    "functions:serve": "firebase emulators:start --only functions",
+    "deploy:all": "firebase deploy",
     "deploy:functions": "firebase deploy --only functions",
-
     "deploy:rules": "firebase deploy --only firestore:rules,storage",
-    "deploy:firestore:rules": "firebase deploy --only firestore:rules",
-    "deploy:storage:rules": "firebase deploy --only storage",
+    "deploy:firestore": "firebase deploy --only firestore:rules,firestore:indexes",
+    "deploy:storage": "firebase deploy --only storage"
+  },
 
-    "deploy:all": "firebase deploy"
-  }
-,
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

@@ -26,6 +26,7 @@ import { theme } from "../theme/theme";
 import DateI18nProvider from "../features/providers/DateI18nProvider";
 import MembersSection from "../features/admin/sections/MembersSection";
 import EmailLogsSection from "../features/admin/sections/EmailLogSection";
+import { ErrorBoundary } from "@sentry/react";
 
 export const router = createBrowserRouter([
   {
@@ -85,12 +86,16 @@ export const router = createBrowserRouter([
 
 function App() {
   return (
+
+    <ErrorBoundary fallback={<div style={{ padding: 16 }}>Algo salió mal.</div>}>
+      
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <DateI18nProvider>
         <RouterProvider router={router} />
       </DateI18nProvider>
     </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

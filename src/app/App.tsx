@@ -28,6 +28,9 @@ import MembersSection from "../features/admin/sections/MembersSection";
 import EmailLogsSection from "../features/admin/sections/EmailLogSection";
 import { ErrorBoundary } from "@sentry/react";
 
+// ✅ ESTE IMPORT ES EL QUE TE FALTA EN TU APP
+import { AuthProvider } from "./providers/AuthContext";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -86,15 +89,16 @@ export const router = createBrowserRouter([
 
 function App() {
   return (
-
     <ErrorBoundary fallback={<div style={{ padding: 16 }}>Algo salió mal.</div>}>
-
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <DateI18nProvider>
-          <RouterProvider router={router} />
-        </DateI18nProvider>
-      </ThemeProvider>
+      {/* ✅ ENVOLVÉS TODO CON AuthProvider */}
+      <AuthProvider>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <DateI18nProvider>
+            <RouterProvider router={router} />
+          </DateI18nProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

@@ -1,11 +1,11 @@
+// functions/src/index.ts
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import axios from "axios";
 import type { CallableRequest } from "firebase-functions/v2/https";
 
-// ✅ Sentry (backend)
-import * as Sentry from "@sentry/node";
+import { SENTRY_DSN, initSentryOnce, captureToSentry } from "./monitoring/sentry";
 
 function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any>["auth"]> {
   if (!req.auth) throw new HttpsError("unauthenticated", "Requiere login");
@@ -19,15 +19,9 @@ const db = admin.firestore();
 const MAIL_FROM_EMAIL = defineString("MAIL_FROM_EMAIL", { default: "no-reply@hostly.app" });
 const MAIL_FROM_NAME = defineString("MAIL_FROM_NAME", { default: "Hostly" });
 
-/**
- * ✅ Secrets
- */
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
-const SENTRY_DSN = defineSecret("SENTRY_DSN");
 
-/**
- * ✅ RID helper (para rastrear errores de punta a punta)
- */
+// -------------------- Helpers
 function createRid(prefix = "rid") {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
@@ -37,39 +31,6 @@ function logRid(rid: string, step: string, data?: Record<string, any>) {
   else console.log("[RID]", rid, step);
 }
 
-/**
- * ✅ Sentry init lazy (se inicializa 1 vez cuando hay DSN disponible)
- */
-let sentryInited = false;
-function ensureSentry() {
-  if (sentryInited) return;
-  const dsn = SENTRY_DSN.value();
-  if (!dsn) return;
-
-  Sentry.init({
-    dsn,
-    environment: process.env.GCLOUD_PROJECT,
-    tracesSampleRate: 0.2,
-  });
-
-  sentryInited = true;
-}
-
-function captureToSentry(err: any, context: { rid: string; fn: string; extra?: Record<string, any> }) {
-  try {
-    ensureSentry();
-    if (!sentryInited) return; // si no hay DSN, no rompe
-
-    Sentry.captureException(err, {
-      tags: { rid: context.rid, fn: context.fn },
-      extra: context.extra ?? {},
-    });
-  } catch {
-    // nunca romper por Sentry
-  }
-}
-
-// ✅ helper antes de usarse
 function isNonEmptyString(v: any, minLen: number) {
   return typeof v === "string" && v.trim().length >= minLen;
 }
@@ -84,7 +45,6 @@ function isValidMemberRole(r: string): r is MemberRole {
 }
 
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
-
 function isValidStatus(s: string): s is ReservationStatus {
   return s === "pending" || s === "confirmed" || s === "cancelled";
 }
@@ -119,7 +79,11 @@ function lockDocId(roomId: string, yyyyMMdd: string) {
 }
 
 // -------------------- Membership (RBAC)
-async function requireMemberRole(uid: string, hostelSlug: string, allowed: MemberRole[]): Promise<{ role: MemberRole }> {
+async function requireMemberRole(
+  uid: string,
+  hostelSlug: string,
+  allowed: MemberRole[]
+): Promise<{ role: MemberRole }> {
   const ref = db.doc(`hostels/${hostelSlug}/members/${uid}`);
   const snap = await ref.get();
   assert(snap.exists, "permission-denied", "No sos miembro de este hostel");
@@ -220,7 +184,13 @@ async function sendEmailBrevoSafe(args: {
   meta?: Record<string, any>;
 }) {
   try {
-    const r = await sendEmailBrevo({ to: args.to, toName: args.toName, subject: args.subject, html: args.html });
+    const r = await sendEmailBrevo({
+      to: args.to,
+      toName: args.toName,
+      subject: args.subject,
+      html: args.html,
+    });
+
     await logEmail({
       hostelSlug: args.hostelSlug,
       kind: args.kind,
@@ -237,6 +207,7 @@ async function sendEmailBrevoSafe(args: {
       status: err?.response?.status,
       data: err?.response?.data,
     });
+
     await logEmail({
       hostelSlug: args.hostelSlug,
       kind: args.kind,
@@ -251,53 +222,13 @@ async function sendEmailBrevoSafe(args: {
   }
 }
 
-/**
- * ✅ Rate limit helper (dentro de TX para que sea atómico)
- * - 3 intentos cada 5 minutos por email+hostel
- */
-function safeRateKey(email: string) {
-  // Firestore docId permite '@' '.' etc, pero esto lo hace ultra seguro.
-  return encodeURIComponent(email.toLowerCase().trim());
-}
-
-async function rateLimitReservationTx(tx: FirebaseFirestore.Transaction, hostelSlug: string, email: string) {
-  const key = safeRateKey(email);
-  const rateRef = db.doc(`hostels/${hostelSlug}/rate_limits/${key}`);
-
-  const WINDOW_MS = 5 * 60 * 1000;
-  const MAX_ATTEMPTS = 3;
-  const now = Date.now();
-
-  const snap = await tx.get(rateRef);
-  if (snap.exists) {
-    const r = snap.data() as any;
-    const lastAttempt = Number(r?.lastAttempt ?? 0);
-    const count = Number(r?.count ?? 0);
-
-    if (now - lastAttempt < WINDOW_MS && count >= MAX_ATTEMPTS) {
-      throw new HttpsError("resource-exhausted", "Demasiados intentos. Probá de nuevo en unos minutos.");
-    }
-
-    // si pasó la ventana, reiniciamos
-    if (now - lastAttempt >= WINDOW_MS) {
-      tx.set(rateRef, { lastAttempt: now, count: 1 }, { merge: true });
-      return;
-    }
-
-    // seguimos en ventana: sumamos
-    tx.set(rateRef, { lastAttempt: now, count: count + 1 }, { merge: true });
-    return;
-  }
-
-  // primera vez
-  tx.set(rateRef, { lastAttempt: now, count: 1 }, { merge: true });
-}
-
 // -------------------- FUNCTIONS
 
 export const createHostel = onCall(
   { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
   async (req) => {
+    initSentryOnce();
+
     const rid = createRid("createHostel");
     logRid(rid, "start", { hasAuth: !!req.auth });
 
@@ -359,8 +290,7 @@ export const createHostel = onCall(
       return { ok: true, slug, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "createHostel", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "createHostel" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);
@@ -370,10 +300,13 @@ export const createHostel = onCall(
 
 /**
  * inviteMember (MANAGER+)
+ * data: { hostelSlug, email, role }
  */
 export const inviteMember = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (req) => {
+    initSentryOnce();
+
     const rid = createRid("inviteMember");
     logRid(rid, "start", { hasAuth: !!req.auth });
 
@@ -437,8 +370,7 @@ export const inviteMember = onCall(
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "inviteMember", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "inviteMember" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);
@@ -448,10 +380,13 @@ export const inviteMember = onCall(
 
 /**
  * createReservation (PUBLIC)
+ * data: { hostelSlug, roomId, checkInISO, checkOutISO, fullName, email }
  */
 export const createReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (request) => {
+    initSentryOnce();
+
     const rid = createRid("createReservation");
     logRid(rid, "start");
 
@@ -487,10 +422,6 @@ export const createReservation = onCall(
       const reservationRef = reservationsCol.doc();
 
       const result = await db.runTransaction(async (tx) => {
-        // ✅ 0) RATE LIMIT (anti-spam) dentro de la TX
-        await rateLimitReservationTx(tx, hostelSlug, email);
-
-        // ✅ 1) reads
         const hostelSnap = await tx.get(hostelRef);
         assert(hostelSnap.exists, "not-found", "Hostel no existe");
         const hostelData = hostelSnap.data() as any;
@@ -503,14 +434,11 @@ export const createReservation = onCall(
         const pricePerNight = Number(roomData?.price || 0);
         assert(Number.isFinite(pricePerNight) && pricePerNight >= 0, "failed-precondition", "Precio inválido");
 
-        // locks: primero chequeamos
         for (const yyyyMMdd of nightsArr) {
           const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
           const lockSnap = await tx.get(lockRef);
           if (lockSnap.exists) throw new HttpsError("already-exists", "Fechas no disponibles");
         }
-
-        // locks: después escribimos
         for (const yyyyMMdd of nightsArr) {
           const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
           tx.set(lockRef, {
@@ -544,7 +472,6 @@ export const createReservation = onCall(
         return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
       });
 
-      // email best-effort
       const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
       const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOut));
 
@@ -572,8 +499,7 @@ export const createReservation = onCall(
       return { ok: true, reservationId: result.reservationId, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "createReservation", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "createReservation" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);
@@ -583,10 +509,13 @@ export const createReservation = onCall(
 
 /**
  * setReservationStatus (STAFF+)
+ * data: { hostelSlug, reservationId, newStatus }
  */
 export const setReservationStatus = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (req) => {
+    initSentryOnce();
+
     const rid = createRid("setReservationStatus");
     logRid(rid, "start", { hasAuth: !!req.auth });
 
@@ -658,8 +587,7 @@ export const setReservationStatus = onCall(
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "setReservationStatus", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "setReservationStatus" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);
@@ -669,10 +597,13 @@ export const setReservationStatus = onCall(
 
 /**
  * cancelReservation (MANAGER+)
+ * data: { hostelSlug, reservationId }
  */
 export const cancelReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (request) => {
+    initSentryOnce();
+
     const rid = createRid("cancelReservation");
     logRid(rid, "start", { hasAuth: !!request.auth });
 
@@ -762,8 +693,7 @@ export const cancelReservation = onCall(
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "cancelReservation", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "cancelReservation" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);
@@ -773,10 +703,13 @@ export const cancelReservation = onCall(
 
 /**
  * removeMember (MANAGER+)
+ * data: { hostelSlug, targetUid }
  */
 export const removeMember = onCall(
   { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
   async (req) => {
+    initSentryOnce();
+
     const rid = createRid("removeMember");
     logRid(rid, "start", { hasAuth: !!req.auth });
 
@@ -804,8 +737,7 @@ export const removeMember = onCall(
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
-
-      captureToSentry(err, { rid, fn: "removeMember", extra: { code: err?.code } });
+      captureToSentry(err, { rid, fn: "removeMember" });
 
       if (err instanceof HttpsError) throw err;
       throw new HttpsError("internal", `Error interno (RID: ${rid})`);

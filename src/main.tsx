@@ -1,11 +1,10 @@
+// src/main.tsx
 import React from "react";
 import ReactDOM from "react-dom/client";
 
-
-// ✅ Sentry
-
 import App from "./app/App";
 import { initSentry } from "./monitoring/monitoring";
+
 initSentry();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

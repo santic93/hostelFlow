@@ -88,13 +88,13 @@ function App() {
   return (
 
     <ErrorBoundary fallback={<div style={{ padding: 16 }}>Algo salió mal.</div>}>
-      
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <DateI18nProvider>
-        <RouterProvider router={router} />
-      </DateI18nProvider>
-    </ThemeProvider>
+
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <DateI18nProvider>
+          <RouterProvider router={router} />
+        </DateI18nProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

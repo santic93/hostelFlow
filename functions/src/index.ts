@@ -1,4 +1,3 @@
-
 import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
@@ -10,8 +9,6 @@ function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any
   return req.auth;
 }
 
-
-
 admin.initializeApp();
 const db = admin.firestore();
 
@@ -19,6 +16,21 @@ const db = admin.firestore();
 const MAIL_FROM_EMAIL = defineString("MAIL_FROM_EMAIL", { default: "no-reply@hostly.app" });
 const MAIL_FROM_NAME = defineString("MAIL_FROM_NAME", { default: "Hostly" });
 
+/**
+ * ✅ RID helper (para rastrear errores de punta a punta)
+ * - Cada request genera un rid.
+ * - Se loguea en consola con prefijo [RID]
+ * - Se devuelve al front en respuestas OK
+ * - En errores "internal" se adjunta al mensaje
+ */
+function createRid(prefix = "rid") {
+  return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function logRid(rid: string, step: string, data?: Record<string, any>) {
+  if (data) console.log("[RID]", rid, step, data);
+  else console.log("[RID]", rid, step);
+}
 
 // ✅ helper antes de usarse (así no te tira “isNonEmptyString no existe”)
 function isNonEmptyString(v: any, minLen: number) {
@@ -34,80 +46,9 @@ function isValidMemberRole(r: string): r is MemberRole {
   return r === "owner" || r === "manager" || r === "staff";
 }
 
-// (…dejás TODO tu resto de funciones tal cual…)
-
-export const createHostel = onCall(
-  { region: "us-central1", enforceAppCheck: true },
-  async (req) => {
-    // ✅ req.auth puede ser undefined -> lo cortamos acá
-    if (!req.auth) {
-      throw new HttpsError("unauthenticated", "Requiere login");
-    }
-
-    const uid = req.auth.uid;
-
-    const name = String(req.data?.name || "").trim();
-    const slug = String(req.data?.slug || "").trim();
-
-    assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
-    assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
-    assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
-
-    // email lo podés leer fuera de la tx
-    const userRecord = await admin.auth().getUser(uid);
-    const email = String(userRecord.email || "").toLowerCase();
-
-    const hostelRef = db.doc(`hostels/${slug}`);
-    const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
-    const userRef = db.doc(`users/${uid}`);
-
-    await db.runTransaction(async (tx) => {
-      // ✅ 1) TODOS LOS READS primero
-      const hostelSnap = await tx.get(hostelRef);
-      const userSnap = await tx.get(userRef);
-
-      assert(!hostelSnap.exists, "already-exists", "Ese slug ya existe");
-
-      // ✅ 2) DESPUÉS los WRITES
-      tx.set(hostelRef, {
-        name,
-        slug,
-        ownerUid: uid,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      // ✅ ESTE ES EL DOC QUE TE DA PERMISOS EN EL FRONT
-      tx.set(memberRef, {
-        role: "owner",
-        email,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdBy: uid,
-      });
-
-      if (!userSnap.exists) {
-        tx.set(userRef, {
-          email,
-          activeHostelSlug: slug,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      } else {
-        tx.set(userRef, { activeHostelSlug: slug, email }, { merge: true });
-      }
-    });
-
-    return { ok: true, slug };
-  }
-);
-
-/**
- * SECRET (Brevo API Key)
- * firebase functions:secrets:set BREVO_API_KEY
- */
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
-
 type ReservationStatus = "pending" | "confirmed" | "cancelled";
-
 
 function isValidStatus(s: string): s is ReservationStatus {
   return s === "pending" || s === "confirmed" || s === "cancelled";
@@ -281,6 +222,87 @@ async function sendEmailBrevoSafe(args: {
 
 // -------------------- FUNCTIONS
 
+export const createHostel = onCall(
+  { region: "us-central1", enforceAppCheck: true },
+  async (req) => {
+    const rid = createRid("createHostel");
+    logRid(rid, "start", { hasAuth: !!req.auth });
+
+    try {
+      // ✅ req.auth puede ser undefined -> lo cortamos acá
+      if (!req.auth) {
+        throw new HttpsError("unauthenticated", "Requiere login");
+      }
+
+      const uid = req.auth.uid;
+
+      const name = String(req.data?.name || "").trim();
+      const slug = String(req.data?.slug || "").trim();
+
+      logRid(rid, "payload", { uid, slug, nameLen: name.length });
+
+      assert(isNonEmptyString(name, 2), "invalid-argument", "name requerido");
+      assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
+      assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido (solo a-z 0-9 y guiones)");
+
+      // email lo podés leer fuera de la tx
+      const userRecord = await admin.auth().getUser(uid);
+      const email = String(userRecord.email || "").toLowerCase();
+
+      const hostelRef = db.doc(`hostels/${slug}`);
+      const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
+      const userRef = db.doc(`users/${uid}`);
+
+      await db.runTransaction(async (tx) => {
+        // ✅ 1) TODOS LOS READS primero
+        const hostelSnap = await tx.get(hostelRef);
+        const userSnap = await tx.get(userRef);
+
+        assert(!hostelSnap.exists, "already-exists", "Ese slug ya existe");
+
+        // ✅ 2) DESPUÉS los WRITES
+        tx.set(hostelRef, {
+          name,
+          slug,
+          ownerUid: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // ✅ ESTE ES EL DOC QUE TE DA PERMISOS EN EL FRONT
+        tx.set(memberRef, {
+          role: "owner",
+          email,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: uid,
+        });
+
+        if (!userSnap.exists) {
+          tx.set(userRef, {
+            email,
+            activeHostelSlug: slug,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        } else {
+          tx.set(userRef, { activeHostelSlug: slug, email }, { merge: true });
+        }
+      });
+
+      logRid(rid, "ok", { slug });
+      return { ok: true, slug, rid };
+    } catch (err: any) {
+      logRid(rid, "error", {
+        code: err?.code,
+        message: err?.message,
+      });
+
+      // Si ya es HttpsError, no lo tocamos.
+      if (err instanceof HttpsError) throw err;
+
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
+  }
+);
+
 /**
  * inviteMember (MANAGER+)
  * data: { hostelSlug, email, role }
@@ -288,62 +310,75 @@ async function sendEmailBrevoSafe(args: {
 export const inviteMember = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (req) => {
-    const auth = requireAuth(req);
-    const uid = auth.uid;
+    const rid = createRid("inviteMember");
+    logRid(rid, "start", { hasAuth: !!req.auth });
 
-    const hostelSlug = String(req.data?.hostelSlug || "").trim();
-    const email = String(req.data?.email || "").trim().toLowerCase();
-    const roleRaw = String(req.data?.role || "").trim();
+    try {
+      const auth = requireAuth(req);
+      const uid = auth.uid;
 
-    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
-    assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
-    assert(isValidMemberRole(roleRaw), "invalid-argument", "role inválido");
+      const hostelSlug = String(req.data?.hostelSlug || "").trim();
+      const email = String(req.data?.email || "").trim().toLowerCase();
+      const roleRaw = String(req.data?.role || "").trim();
 
-    await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      logRid(rid, "payload", { uid, hostelSlug, email, roleRaw });
 
-    const targetUser = await admin.auth().getUserByEmail(email).catch(() => null);
-    assert(targetUser, "not-found", "No existe usuario con ese email (primero debe registrarse)");
+      assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+      assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
+      assert(isValidMemberRole(roleRaw), "invalid-argument", "role inválido");
 
-    const targetUid = targetUser!.uid;
+      await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
 
-    const memberRef = db.doc(`hostels/${hostelSlug}/members/${targetUid}`);
-    await memberRef.set(
-      {
-        role: roleRaw,
-        email,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdBy: uid,
-      },
-      { merge: true }
-    );
+      const targetUser = await admin.auth().getUserByEmail(email).catch(() => null);
+      assert(targetUser, "not-found", "No existe usuario con ese email (primero debe registrarse)");
 
-    // Bootstrap user doc mínimo (si no existe)
-    const userRef = db.doc(`users/${targetUid}`);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) {
-      await userRef.set({
-        email,
-        activeHostelSlug: hostelSlug,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    } else {
-      // si no tenía activeHostelSlug, setearlo (no pisar si ya tiene)
-      const data = userSnap.data() as any;
-      if (!data?.activeHostelSlug && !data?.hostelSlug) {
-        await userRef.set({ activeHostelSlug: hostelSlug }, { merge: true });
+      const targetUid = targetUser!.uid;
+
+      const memberRef = db.doc(`hostels/${hostelSlug}/members/${targetUid}`);
+      await memberRef.set(
+        {
+          role: roleRaw,
+          email,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdBy: uid,
+        },
+        { merge: true }
+      );
+
+      // Bootstrap user doc mínimo (si no existe)
+      const userRef = db.doc(`users/${targetUid}`);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        await userRef.set({
+          email,
+          activeHostelSlug: hostelSlug,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else {
+        // si no tenía activeHostelSlug, setearlo (no pisar si ya tiene)
+        const data = userSnap.data() as any;
+        if (!data?.activeHostelSlug && !data?.hostelSlug) {
+          await userRef.set({ activeHostelSlug: hostelSlug }, { merge: true });
+        }
       }
+
+      await sendEmailBrevoSafe({
+        hostelSlug,
+        kind: "invite_member",
+        to: email,
+        subject: `Te invitaron a colaborar en ${hostelSlug}`,
+        html: `<p>Te agregaron como <b>${roleRaw}</b> en el hostel <b>${hostelSlug}</b>.</p><p>Entrá y andá a /${hostelSlug}/admin</p>`,
+        meta: { rid, role: roleRaw, invitedUid: targetUid },
+      });
+
+      logRid(rid, "ok", { invitedUid: targetUid });
+      return { ok: true, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
     }
-
-    await sendEmailBrevoSafe({
-      hostelSlug,
-      kind: "invite_member",
-      to: email,
-      subject: `Te invitaron a colaborar en ${hostelSlug}`,
-      html: `<p>Te agregaron como <b>${roleRaw}</b> en el hostel <b>${hostelSlug}</b>.</p><p>Entrá y andá a /${hostelSlug}/admin</p>`,
-      meta: { role: roleRaw, invitedUid: targetUid },
-    });
-
-    return { ok: true };
   }
 );
 
@@ -354,111 +389,124 @@ export const inviteMember = onCall(
 export const createReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (request) => {
-    const data = request.data as any;
+    const rid = createRid("createReservation");
+    logRid(rid, "start");
 
-    const hostelSlug = String(data?.hostelSlug || "").trim();
-    const roomId = String(data?.roomId || "").trim();
-    const fullName = String(data?.fullName || "").trim();
-    const email = String(data?.email || "").trim().toLowerCase();
-    const checkInISO = String(data?.checkInISO || "");
-    const checkOutISO = String(data?.checkOutISO || "");
+    try {
+      const data = request.data as any;
 
-    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
-    assert(roomId, "invalid-argument", "roomId requerido");
-    assert(fullName.length >= 3, "invalid-argument", "fullName inválido");
-    assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
-    assert(checkInISO && checkOutISO, "invalid-argument", "fechas requeridas");
+      const hostelSlug = String(data?.hostelSlug || "").trim();
+      const roomId = String(data?.roomId || "").trim();
+      const fullName = String(data?.fullName || "").trim();
+      const email = String(data?.email || "").trim().toLowerCase();
+      const checkInISO = String(data?.checkInISO || "");
+      const checkOutISO = String(data?.checkOutISO || "");
 
-    const checkIn = new Date(checkInISO);
-    const checkOut = new Date(checkOutISO);
-    assert(!isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()), "invalid-argument", "fechas inválidas");
+      logRid(rid, "payload", { hostelSlug, roomId, fullNameLen: fullName.length, email });
 
-    const nightsArr = buildNights(checkIn, checkOut);
-    assert(nightsArr.length > 0, "failed-precondition", "La estadía debe ser al menos 1 noche");
+      assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+      assert(roomId, "invalid-argument", "roomId requerido");
+      assert(fullName.length >= 3, "invalid-argument", "fullName inválido");
+      assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
+      assert(checkInISO && checkOutISO, "invalid-argument", "fechas requeridas");
 
-    const hostelRef = db.doc(`hostels/${hostelSlug}`);
-    const roomRef = db.doc(`hostels/${hostelSlug}/rooms/${roomId}`);
-    const reservationsCol = db.collection(`hostels/${hostelSlug}/reservations`);
-    const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
-    const reservationRef = reservationsCol.doc();
+      const checkIn = new Date(checkInISO);
+      const checkOut = new Date(checkOutISO);
+      assert(!isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()), "invalid-argument", "fechas inválidas");
 
-    const result = await db.runTransaction(async (tx) => {
-      const hostelSnap = await tx.get(hostelRef);
-      assert(hostelSnap.exists, "not-found", "Hostel no existe");
-      const hostelData = hostelSnap.data() as any;
-      const hostelName = String(hostelData?.name || hostelSlug);
+      const nightsArr = buildNights(checkIn, checkOut);
+      assert(nightsArr.length > 0, "failed-precondition", "La estadía debe ser al menos 1 noche");
 
-      const roomSnap = await tx.get(roomRef);
-      assert(roomSnap.exists, "not-found", "Habitación no existe");
-      const roomData = roomSnap.data() as any;
-      const roomName = String(roomData?.name || "Room");
-      const pricePerNight = Number(roomData?.price || 0);
-      assert(Number.isFinite(pricePerNight) && pricePerNight >= 0, "failed-precondition", "Precio inválido");
+      const hostelRef = db.doc(`hostels/${hostelSlug}`);
+      const roomRef = db.doc(`hostels/${hostelSlug}/rooms/${roomId}`);
+      const reservationsCol = db.collection(`hostels/${hostelSlug}/reservations`);
+      const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
+      const reservationRef = reservationsCol.doc();
 
-      // locks
-      for (const yyyyMMdd of nightsArr) {
-        const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
-        const lockSnap = await tx.get(lockRef);
-        if (lockSnap.exists) throw new HttpsError("already-exists", "Fechas no disponibles");
-      }
-      for (const yyyyMMdd of nightsArr) {
-        const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
-        tx.set(lockRef, {
-          hostelSlug,
+      const result = await db.runTransaction(async (tx) => {
+        const hostelSnap = await tx.get(hostelRef);
+        assert(hostelSnap.exists, "not-found", "Hostel no existe");
+        const hostelData = hostelSnap.data() as any;
+        const hostelName = String(hostelData?.name || hostelSlug);
+
+        const roomSnap = await tx.get(roomRef);
+        assert(roomSnap.exists, "not-found", "Habitación no existe");
+        const roomData = roomSnap.data() as any;
+        const roomName = String(roomData?.name || "Room");
+        const pricePerNight = Number(roomData?.price || 0);
+        assert(Number.isFinite(pricePerNight) && pricePerNight >= 0, "failed-precondition", "Precio inválido");
+
+        // locks
+        for (const yyyyMMdd of nightsArr) {
+          const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+          const lockSnap = await tx.get(lockRef);
+          if (lockSnap.exists) throw new HttpsError("already-exists", "Fechas no disponibles");
+        }
+        for (const yyyyMMdd of nightsArr) {
+          const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+          tx.set(lockRef, {
+            hostelSlug,
+            roomId,
+            date: yyyyMMdd,
+            reservationId: reservationRef.id,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+
+        const nights = nightsArr.length;
+        const total = pricePerNight * nights;
+
+        tx.set(reservationRef, {
           roomId,
-          date: yyyyMMdd,
-          reservationId: reservationRef.id,
+          roomName,
+          pricePerNight,
+          checkIn: admin.firestore.Timestamp.fromDate(checkIn),
+          checkOut: admin.firestore.Timestamp.fromDate(checkOut),
+          nights,
+          total,
+          fullName,
+          email,
+          status: "pending" as ReservationStatus,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: "PUBLIC_WEB",
         });
-      }
 
-      const nights = nightsArr.length;
-      const total = pricePerNight * nights;
-
-      tx.set(reservationRef, {
-        roomId,
-        roomName,
-        pricePerNight,
-        checkIn: admin.firestore.Timestamp.fromDate(checkIn),
-        checkOut: admin.firestore.Timestamp.fromDate(checkOut),
-        nights,
-        total,
-        fullName,
-        email,
-        status: "pending" as ReservationStatus,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        source: "PUBLIC_WEB",
+        return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
       });
 
-      return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
-    });
+      // email best-effort
+      const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
+      const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOut));
 
-    // email best-effort
-    const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
-    const checkOutStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkOut));
+      await sendEmailBrevoSafe({
+        hostelSlug,
+        kind: "reservation_created",
+        to: email,
+        toName: fullName,
+        subject: `Recibimos tu reserva - ${result.hostelName}`,
+        html: reservationEmailHtml({
+          title: "Reserva recibida",
+          hostelName: result.hostelName,
+          roomName: result.roomName,
+          fullName,
+          checkIn: checkInStr,
+          checkOut: checkOutStr,
+          nights: result.nights,
+          total: result.total,
+          status: "RECIBIDA",
+        }),
+        meta: { rid, reservationId: result.reservationId },
+      });
 
-    await sendEmailBrevoSafe({
-      hostelSlug,
-      kind: "reservation_created",
-      to: email,
-      toName: fullName,
-      subject: `Recibimos tu reserva - ${result.hostelName}`,
-      html: reservationEmailHtml({
-        title: "Reserva recibida",
-        hostelName: result.hostelName,
-        roomName: result.roomName,
-        fullName,
-        checkIn: checkInStr,
-        checkOut: checkOutStr,
-        nights: result.nights,
-        total: result.total,
-        status: "RECIBIDA",
-      }),
-      meta: { reservationId: result.reservationId },
-    });
+      logRid(rid, "ok", { reservationId: result.reservationId });
+      return { ok: true, reservationId: result.reservationId, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
 
-    return { ok: true, reservationId: result.reservationId };
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
   }
 );
 
@@ -469,69 +517,82 @@ export const createReservation = onCall(
 export const setReservationStatus = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (req) => {
-    const auth = requireAuth(req);
-    const uid = auth.uid;
+    const rid = createRid("setReservationStatus");
+    logRid(rid, "start", { hasAuth: !!req.auth });
 
-    const hostelSlug = String(req.data?.hostelSlug || "").trim();
-    const reservationId = String(req.data?.reservationId || "").trim();
-    const newStatusRaw = String(req.data?.newStatus || "").trim();
+    try {
+      const auth = requireAuth(req);
+      const uid = auth.uid;
 
-    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
-    assert(reservationId, "invalid-argument", "reservationId requerido");
-    assert(isValidStatus(newStatusRaw), "invalid-argument", "newStatus inválido");
+      const hostelSlug = String(req.data?.hostelSlug || "").trim();
+      const reservationId = String(req.data?.reservationId || "").trim();
+      const newStatusRaw = String(req.data?.newStatus || "").trim();
 
-    const newStatus = newStatusRaw as ReservationStatus;
+      logRid(rid, "payload", { uid, hostelSlug, reservationId, newStatusRaw });
 
-    await requireMemberRole(uid, hostelSlug, ["owner", "manager", "staff"]);
+      assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+      assert(reservationId, "invalid-argument", "reservationId requerido");
+      assert(isValidStatus(newStatusRaw), "invalid-argument", "newStatus inválido");
 
-    const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
-    const snap = await resRef.get();
-    assert(snap.exists, "not-found", "Reserva no existe");
+      const newStatus = newStatusRaw as ReservationStatus;
 
-    const current = (snap.data()?.status ?? "pending") as ReservationStatus;
-    assert(canTransition(current, newStatus), "failed-precondition", `No se puede pasar de ${current} a ${newStatus}`);
+      await requireMemberRole(uid, hostelSlug, ["owner", "manager", "staff"]);
 
-    await resRef.update({
-      status: newStatus,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedBy: uid,
-    });
+      const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
+      const snap = await resRef.get();
+      assert(snap.exists, "not-found", "Reserva no existe");
 
-    // email best-effort
-    const email = String(snap.data()?.email || "");
-    const fullName = String(snap.data()?.fullName || "");
-    const roomName = String(snap.data()?.roomName || "");
-    const nights = Number(snap.data()?.nights || 0);
-    const total = Number(snap.data()?.total || 0);
-    const checkInDate = snap.data()?.checkIn?.toDate?.();
-    const checkOutDate = snap.data()?.checkOut?.toDate?.();
+      const current = (snap.data()?.status ?? "pending") as ReservationStatus;
+      assert(canTransition(current, newStatus), "failed-precondition", `No se puede pasar de ${current} a ${newStatus}`);
 
-    if (email) {
-      const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
-      const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
-
-      await sendEmailBrevoSafe({
-        hostelSlug,
-        kind: "reservation_status",
-        to: email,
-        toName: fullName,
-        subject: `Estado de tu reserva - ${hostelSlug}`,
-        html: reservationEmailHtml({
-          title: "Actualización de reserva",
-          hostelName: hostelSlug,
-          roomName,
-          fullName,
-          checkIn: checkInStr,
-          checkOut: checkOutStr,
-          nights,
-          total,
-          status: newStatus.toUpperCase(),
-        }),
-        meta: { reservationId, from: current, to: newStatus },
+      await resRef.update({
+        status: newStatus,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedBy: uid,
       });
-    }
 
-    return { ok: true };
+      // email best-effort
+      const email = String(snap.data()?.email || "");
+      const fullName = String(snap.data()?.fullName || "");
+      const roomName = String(snap.data()?.roomName || "");
+      const nights = Number(snap.data()?.nights || 0);
+      const total = Number(snap.data()?.total || 0);
+      const checkInDate = snap.data()?.checkIn?.toDate?.();
+      const checkOutDate = snap.data()?.checkOut?.toDate?.();
+
+      if (email) {
+        const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
+        const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
+
+        await sendEmailBrevoSafe({
+          hostelSlug,
+          kind: "reservation_status",
+          to: email,
+          toName: fullName,
+          subject: `Estado de tu reserva - ${hostelSlug}`,
+          html: reservationEmailHtml({
+            title: "Actualización de reserva",
+            hostelName: hostelSlug,
+            roomName,
+            fullName,
+            checkIn: checkInStr,
+            checkOut: checkOutStr,
+            nights,
+            total,
+            status: newStatus.toUpperCase(),
+          }),
+          meta: { rid, reservationId, from: current, to: newStatus },
+        });
+      }
+
+      logRid(rid, "ok", { reservationId, newStatus });
+      return { ok: true, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
   }
 );
 
@@ -542,86 +603,99 @@ export const setReservationStatus = onCall(
 export const cancelReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY], enforceAppCheck: true },
   async (request) => {
-    assert(request.auth, "unauthenticated", "Requiere login");
-    const uid = request.auth!.uid;
+    const rid = createRid("cancelReservation");
+    logRid(rid, "start", { hasAuth: !!request.auth });
 
-    const hostelSlug = String(request.data?.hostelSlug || "").trim();
-    const reservationId = String(request.data?.reservationId || "").trim();
+    try {
+      assert(request.auth, "unauthenticated", "Requiere login");
+      const uid = request.auth!.uid;
 
-    assert(hostelSlug && reservationId, "invalid-argument", "Parámetros requeridos");
+      const hostelSlug = String(request.data?.hostelSlug || "").trim();
+      const reservationId = String(request.data?.reservationId || "").trim();
 
-    await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      logRid(rid, "payload", { uid, hostelSlug, reservationId });
 
-    const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
-    const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
+      assert(hostelSlug && reservationId, "invalid-argument", "Parámetros requeridos");
 
-    const result = await db.runTransaction(async (tx) => {
-      const resSnap = await tx.get(resRef);
-      assert(resSnap.exists, "not-found", "Reserva no existe");
-      const res = resSnap.data() as any;
+      await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
 
-      const currentStatus = String(res?.status || "pending") as ReservationStatus;
-      if (currentStatus === "cancelled") return res;
+      const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
+      const roomNightsCol = db.collection(`hostels/${hostelSlug}/room_nights`);
 
-      const roomId = String(res?.roomId || "");
-      const checkInDate = res?.checkIn?.toDate?.();
-      const checkOutDate = res?.checkOut?.toDate?.();
+      const result = await db.runTransaction(async (tx) => {
+        const resSnap = await tx.get(resRef);
+        assert(resSnap.exists, "not-found", "Reserva no existe");
+        const res = resSnap.data() as any;
 
-      if (roomId && checkInDate && checkOutDate) {
-        const nightsArr = buildNights(checkInDate as Date, checkOutDate as Date);
-        for (const yyyyMMdd of nightsArr) {
-          const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
-          tx.delete(lockRef);
+        const currentStatus = String(res?.status || "pending") as ReservationStatus;
+        if (currentStatus === "cancelled") return res;
+
+        const roomId = String(res?.roomId || "");
+        const checkInDate = res?.checkIn?.toDate?.();
+        const checkOutDate = res?.checkOut?.toDate?.();
+
+        if (roomId && checkInDate && checkOutDate) {
+          const nightsArr = buildNights(checkInDate as Date, checkOutDate as Date);
+          for (const yyyyMMdd of nightsArr) {
+            const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+            tx.delete(lockRef);
+          }
         }
+
+        tx.set(
+          resRef,
+          {
+            status: "cancelled" as ReservationStatus,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedBy: uid,
+          },
+          { merge: true }
+        );
+
+        return res;
+      });
+
+      const email = String(result?.email || "");
+      const fullName = String(result?.fullName || "");
+      const roomName = String(result?.roomName || "");
+      const nights = Number(result?.nights || 0);
+      const total = Number(result?.total || 0);
+      const checkInDate = result?.checkIn?.toDate?.();
+      const checkOutDate = result?.checkOut?.toDate?.();
+
+      if (email) {
+        const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
+        const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
+
+        await sendEmailBrevoSafe({
+          hostelSlug,
+          kind: "reservation_cancelled",
+          to: email,
+          toName: fullName,
+          subject: `Reserva cancelada - ${hostelSlug}`,
+          html: reservationEmailHtml({
+            title: "Reserva cancelada",
+            hostelName: hostelSlug,
+            roomName,
+            fullName,
+            checkIn: checkInStr,
+            checkOut: checkOutStr,
+            nights,
+            total,
+            status: "CANCELADA",
+          }),
+          meta: { rid, reservationId },
+        });
       }
 
-      tx.set(
-        resRef,
-        {
-          status: "cancelled" as ReservationStatus,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedBy: uid,
-        },
-        { merge: true }
-      );
+      logRid(rid, "ok", { reservationId });
+      return { ok: true, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
 
-      return res;
-    });
-
-    const email = String(result?.email || "");
-    const fullName = String(result?.fullName || "");
-    const roomName = String(result?.roomName || "");
-    const nights = Number(result?.nights || 0);
-    const total = Number(result?.total || 0);
-    const checkInDate = result?.checkIn?.toDate?.();
-    const checkOutDate = result?.checkOut?.toDate?.();
-
-    if (email) {
-      const checkInStr = checkInDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkInDate)) : "—";
-      const checkOutStr = checkOutDate ? formatYYYYMMDD_UTC(toUTCDateOnly(checkOutDate)) : "—";
-
-      await sendEmailBrevoSafe({
-        hostelSlug,
-        kind: "reservation_cancelled",
-        to: email,
-        toName: fullName,
-        subject: `Reserva cancelada - ${hostelSlug}`,
-        html: reservationEmailHtml({
-          title: "Reserva cancelada",
-          hostelName: hostelSlug,
-          roomName,
-          fullName,
-          checkIn: checkInStr,
-          checkOut: checkOutStr,
-          nights,
-          total,
-          status: "CANCELADA",
-        }),
-        meta: { reservationId },
-      });
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
     }
-
-    return { ok: true };
   }
 );
 
@@ -632,23 +706,36 @@ export const cancelReservation = onCall(
 export const removeMember = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (req) => {
-    const auth = requireAuth(req);
-    const uid = auth.uid;
+    const rid = createRid("removeMember");
+    logRid(rid, "start", { hasAuth: !!req.auth });
 
-    const hostelSlug = String(req.data?.hostelSlug || "").trim();
-    const targetUid = String(req.data?.targetUid || "").trim();
+    try {
+      const auth = requireAuth(req);
+      const uid = auth.uid;
 
-    assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
-    assert(targetUid, "invalid-argument", "targetUid requerido");
+      const hostelSlug = String(req.data?.hostelSlug || "").trim();
+      const targetUid = String(req.data?.targetUid || "").trim();
 
-    await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      logRid(rid, "payload", { uid, hostelSlug, targetUid });
 
-    if (uid === targetUid) {
-      throw new HttpsError("failed-precondition", "No podés eliminarte a vos mismo");
+      assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+      assert(targetUid, "invalid-argument", "targetUid requerido");
+
+      await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+
+      if (uid === targetUid) {
+        throw new HttpsError("failed-precondition", "No podés eliminarte a vos mismo");
+      }
+
+      await db.doc(`hostels/${hostelSlug}/members/${targetUid}`).delete();
+
+      logRid(rid, "ok", { targetUid });
+      return { ok: true, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
     }
-
-    await db.doc(`hostels/${hostelSlug}/members/${targetUid}`).delete();
-
-    return { ok: true };
   }
 );

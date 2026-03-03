@@ -11,7 +11,7 @@ import {
   Snackbar,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
+import { addDoc, collection, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { db, storage } from "../../../services/firebase";
@@ -119,12 +119,11 @@ export default function RoomFormModal({
       setPathsToDelete([]);
     }
 
-    // limpiar selección local
     previews.forEach((p) => URL.revokeObjectURL(p));
     setFiles([]);
     setPreviews([]);
-
     setFormError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, reset, open]);
 
   useEffect(() => {
@@ -244,13 +243,14 @@ export default function RoomFormModal({
           ...payloadBase,
           imageUrls: [],
           imagePaths: [],
-          createdAt: new Date(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
         roomId = newRef.id;
       } else {
         await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
           ...payloadBase,
-          updatedAt: new Date(),
+          updatedAt: serverTimestamp(),
         });
       }
 
@@ -271,10 +271,9 @@ export default function RoomFormModal({
       await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
         imageUrls: finalUrls,
         imagePaths: finalPaths,
-        updatedAt: new Date(),
+        updatedAt: serverTimestamp(),
       });
 
-      // limpiar selección local
       previews.forEach((p) => URL.revokeObjectURL(p));
       setFiles([]);
       setPreviews([]);
@@ -295,11 +294,16 @@ export default function RoomFormModal({
 
   return (
     <>
-      <Dialog open={open} onClose={(reason) => {
-        (saving) ? undefined : onClose;
-        // evita cerrar al clickear el backdrop
-        if (reason === "backdropClick") return;
-      }} fullWidth maxWidth="sm">
+      <Dialog
+        open={open}
+        onClose={(_, reason) => {
+          if (saving) return;
+          if (reason === "backdropClick") return; // no cierres tocando fondo
+          onClose();
+        }}
+        fullWidth
+        maxWidth="sm"
+      >
         <DialogTitle>
           {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
         </DialogTitle>
@@ -499,7 +503,6 @@ export default function RoomFormModal({
         </DialogActions>
       </Dialog>
 
-      {/* Toast moderno minimalista */}
       <Snackbar
         open={toast.open}
         autoHideDuration={3200}

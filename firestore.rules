@@ -22,15 +22,6 @@ service cloud.firestore {
       return get(userDocPath());
     }
 
-    // Compat: antes usabas users.hostelSlug, ahora activeHostelSlug
-    function activeHostelSlug() {
-      return hasUserDoc()
-        ? (userDoc().data.activeHostelSlug != null
-            ? userDoc().data.activeHostelSlug
-            : userDoc().data.hostelSlug)
-        : null;
-    }
-
     function isNonEmptyString(v, minLen) {
       return v is string && v.size() >= minLen;
     }
@@ -47,7 +38,6 @@ service cloud.firestore {
       return isMember(hostelSlug) ? get(memberPath(hostelSlug)).data.role : "guest";
     }
 
-    // ✅ “ADMIN” para vos = owner
     function isOwner(hostelSlug) {
       return isMember(hostelSlug) && memberRole(hostelSlug) == "owner";
     }
@@ -66,7 +56,6 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
 
-      // crear doc solo propio, con keys controladas
       allow create: if isSignedIn()
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
@@ -74,7 +63,6 @@ service cloud.firestore {
             || request.resource.data.activeHostelSlug == null
             || isNonEmptyString(request.resource.data.activeHostelSlug, 2) );
 
-      // ✅ Solo permitir cambiar activeHostelSlug (y mantener createdAt/email intactos)
       allow update: if isSignedIn()
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
@@ -93,14 +81,10 @@ service cloud.firestore {
       // público
       allow read: if true;
 
-// 🔒 modo bunker: nadie escribe rooms desde cliente
-allow create, update, delete: if false;
-
-      // Crear hostel: SOLO backend (Functions/Admin SDK)
+      // 🔒 El doc /hostels/{hostelSlug} NO se crea desde cliente
       allow create: if false;
 
-      // Actualizar hostel: manager+ pero SIN poder tocar ownerUid/slug
-      // (ya lo tenías, lo dejo y lo refuerzo con keys)
+      // Actualizar hostel: manager+ sin tocar ownerUid/slug
       allow update: if isManagerPlus(hostelSlug)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.slug == resource.data.slug;
@@ -111,11 +95,10 @@ allow create, update, delete: if false;
       // MEMBERS
       // -------------------------
       match /members/{memberUid} {
-        // Cada miembro puede leer su doc; manager+ puede listar/ver miembros
         allow read: if (isSignedIn() && request.auth.uid == memberUid)
           || isManagerPlus(hostelSlug);
 
-        // 🔒 Nadie escribe desde cliente (evita “me hago admin”)
+        // 🔒 Nadie escribe membresía desde cliente
         allow create, update, delete: if false;
       }
 
@@ -138,7 +121,7 @@ allow create, update, delete: if false;
             && (!("description" in request.resource.data) || request.resource.data.description is string)
             && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
             && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            // ✅ timestamps “tipo serverTimestamp”
+            // ✅ serverTimestamp() llega como request.time
             && request.resource.data.createdAt == request.time
             && request.resource.data.updatedAt == request.time;
         }
@@ -157,27 +140,26 @@ allow create, update, delete: if false;
             && (!("description" in request.resource.data) || request.resource.data.description is string)
             && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
             && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            // ✅ createdAt NO se toca nunca
+            // ✅ createdAt NO se toca
             && request.resource.data.createdAt == resource.data.createdAt
-            // ✅ updatedAt siempre server time
+            // ✅ updatedAt server time
             && request.resource.data.updatedAt == request.time;
         }
 
         allow read: if true;
 
-        // ✅ SOLO ADMIN (owner)
+        // ✅ SOLO OWNER
         allow create: if isOwner(hostelSlug) && validRoomCreate();
         allow update: if isOwner(hostelSlug) && validRoomUpdate();
         allow delete: if isOwner(hostelSlug);
       }
 
       // -------------------------
-      // RESERVATIONS (solo admin panel)
+      // RESERVATIONS
       // -------------------------
       match /reservations/{reservationId} {
         allow read: if isStaffPlus(hostelSlug);
-        // 🔒 creación/cambios solo backend (callable functions)
-        allow create, update, delete: if false;
+        allow create, update, delete: if false; // solo backend
       }
 
       // -------------------------

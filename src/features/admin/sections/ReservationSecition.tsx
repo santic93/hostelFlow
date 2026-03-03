@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { Menu } from "@mui/material";
+import * as XLSX from "xlsx";
 import {
   Alert,
   Box,
@@ -126,87 +125,144 @@ export default function ReservationsSection() {
     fetchReservations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hostelSlug, status, from, to]);
-  const exportCSV = async (mode: "excel" | "raw" = "excel") => {
-    if (!hostelSlug) return;
 
-    try {
-      setErr(null);
-      setLoading(true);
-
-      const fromDate = dayjs(from).startOf("day").toDate();
-      const toDate = dayjs(to).endOf("day").toDate();
-
-      const base = collection(db, "hostels", hostelSlug, "reservations");
-
-      const clauses: any[] = [
-        where("checkIn", ">=", fromDate),
-        where("checkIn", "<=", toDate),
-      ];
-
-      if (status !== "all") clauses.push(where("status", "==", status));
-
-      const q = query(base, ...clauses, orderBy("checkIn", "asc"));
-      const snapshot = await getDocs(q);
-
-      let data: ReservationRow[] = snapshot.docs.map((docu) => {
-        const raw = docu.data() as any;
-        return {
-          id: docu.id,
-          fullName: raw.fullName ?? "",
-          roomName: raw.roomName ?? "",
-          email: raw.email ?? "",
-          total: raw.total ?? 0,
-          status: (raw.status ?? "pending") as ReservationStatus,
-          checkIn: raw.checkIn?.toDate?.() ?? null,
-          checkOut: raw.checkOut?.toDate?.() ?? null,
-          createdAt: raw.createdAt?.toDate?.() ?? null,
-        };
-      });
-
-      // 🔎 filtro texto (igual que UI)
-      const qLower = qText.trim().toLowerCase();
-      if (qLower) {
-        data = data.filter((r) =>
-          (r.fullName || "").toLowerCase().includes(qLower) ||
-          (r.email || "").toLowerCase().includes(qLower) ||
-          (r.roomName || "").toLowerCase().includes(qLower)
-        );
-      }
-
-      if (!data.length) {
-        setErr(t("admin.reservations.noDataToExport", "No hay reservas para exportar con los filtros actuales."));
-        return;
-      }
-
-      // ✅ Excel en ES/PT suele abrir mejor con ';'
-      const lang = (i18n.language || "es").slice(0, 2);
-      const delimiter: "," | ";" =
-        mode === "raw" ? "," : (lang === "es" || lang === "pt" ? ";" : ",");
-
-      const includeMetaRows = mode === "excel"; // “pro”: agrega filtros arriba
-
-      const csv = buildCsv({ data, delimiter, includeMetaRows });
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-
-      const safeSlug = String(hostelSlug).replace(/[^a-z0-9-_]/gi, "_");
-      const fileName =
-        mode === "raw"
-          ? `reservas_${safeSlug}_${from}_a_${to}_raw.csv`
-          : `reservas_${safeSlug}_${from}_a_${to}.csv`;
-
-      downloadBlob(blob, fileName);
-    } catch (e: any) {
-      setErr(e?.message ?? t("admin.reservations.exportError", "Error exportando CSV"));
-    } finally {
-      setLoading(false);
-    }
-  };
   const statusLabel = (s: ReservationStatus) => {
     if (s === "confirmed") return t("admin.reservations.statusValues.confirmed", "Confirmada");
     if (s === "cancelled") return t("admin.reservations.statusValues.cancelled", "Cancelada");
     return t("admin.reservations.statusValues.pending", "Pendiente");
   };
+  function downloadBlob(blob: Blob, fileName: string) {
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = fileName;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+  }
 
+  function buildXlsxAndDownload(args: {
+    hostelSlug: string;
+    from: string;
+    to: string;
+    statusLabelText: string;
+    searchText: string;
+    rows: ReservationRow[];
+    moneyFmt: Intl.NumberFormat;
+    statusLabelFn: (s: ReservationStatus) => string;
+  }) {
+    const { hostelSlug, from, to, statusLabelText, searchText, rows, moneyFmt, statusLabelFn } = args;
+
+    // -------------------------
+    // Sheet 1: Reservations
+    // -------------------------
+    const reservationsAoA: any[][] = [
+      ["ID", "Huésped", "Habitación", "Email", "Check In", "Check Out", "Noches", "Total", "Estado", "Creada"],
+    ];
+
+    for (const r of rows) {
+      const checkInStr = r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "";
+      const checkOutStr = r.checkOut ? dayjs(r.checkOut).format("YYYY-MM-DD") : "";
+      const nights =
+        r.checkIn && r.checkOut ? Math.max(0, dayjs(r.checkOut).diff(dayjs(r.checkIn), "day")) : "";
+
+      reservationsAoA.push([
+        r.id,
+        r.fullName || "—",
+        r.roomName || "—",
+        r.email || "—",
+        checkInStr,
+        checkOutStr,
+        nights,
+        Number(r.total ?? 0),
+        statusLabelFn(r.status),
+        r.createdAt ? dayjs(r.createdAt).format("YYYY-MM-DD HH:mm") : "",
+      ]);
+    }
+
+    const wsReservations = XLSX.utils.aoa_to_sheet(reservationsAoA);
+
+    // Formato numérico (Total) como número con 0 decimales (Excel)
+    // Columna Total = índice 7 (H)
+    for (let r = 2; r <= reservationsAoA.length; r++) {
+      const cellAddr = XLSX.utils.encode_cell({ r: r - 1, c: 7 });
+      const cell = wsReservations[cellAddr];
+      if (cell && typeof cell.v === "number") {
+        cell.t = "n";
+        cell.z = "#,##0"; // formato numérico (si querés USD con símbolo, lo hacemos después)
+      }
+    }
+
+    wsReservations["!cols"] = [
+      { wch: 24 }, // ID
+      { wch: 22 }, // Huésped
+      { wch: 20 }, // Habitación
+      { wch: 28 }, // Email
+      { wch: 12 }, // CheckIn
+      { wch: 12 }, // CheckOut
+      { wch: 8 },  // Noches
+      { wch: 12 }, // Total
+      { wch: 14 }, // Estado
+      { wch: 18 }, // Creada
+    ];
+
+    // -------------------------
+    // Sheet 2: Summary
+    // -------------------------
+    const total = rows.reduce((acc, r) => acc + Number(r.total ?? 0), 0);
+    const byStatus = {
+      pending: rows.filter((r) => r.status === "pending").length,
+      confirmed: rows.filter((r) => r.status === "confirmed").length,
+      cancelled: rows.filter((r) => r.status === "cancelled").length,
+    };
+
+    const summaryAoA: any[][] = [
+      ["Reporte de Reservas"],
+      [""],
+      ["Hostel", hostelSlug],
+      ["Desde", from],
+      ["Hasta", to],
+      ["Estado", statusLabelText],
+      ["Búsqueda", searchText || "—"],
+      ["Generado", dayjs().format("YYYY-MM-DD HH:mm")],
+      [""],
+      ["Totales"],
+      ["Total reservas", rows.length],
+      ["Pendientes", byStatus.pending],
+      ["Confirmadas", byStatus.confirmed],
+      ["Canceladas", byStatus.cancelled],
+      ["Revenue", total],
+      [""],
+      ["Revenue (formateado)", moneyFmt.format(total)],
+    ];
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoA);
+    wsSummary["!cols"] = [{ wch: 26 }, { wch: 40 }];
+
+    // Revenue numérico (fila donde está "Revenue")
+    // Ojo: depende del índice exacto (acá es la fila 15 en 1-based AoA)
+    // Lo dejamos como número (ya lo pusimos como number en AoA).
+    const revenueCell = XLSX.utils.encode_cell({ r: 14, c: 1 }); // (0-based) fila 15, col B
+    if (wsSummary[revenueCell]) {
+      wsSummary[revenueCell].t = "n";
+      wsSummary[revenueCell].z = "#,##0";
+    }
+
+    // -------------------------
+    // Workbook + download
+    // -------------------------
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsReservations, "Reservations");
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
+
+    const out = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([out], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const safeSlug = String(hostelSlug).replace(/[^a-z0-9-_]/gi, "_");
+    const fileName = `reservas_${safeSlug}_${from}_a_${to}.xlsx`;
+
+    downloadBlob(blob, fileName);
+  }
   const updateStatus = async (reservationId: string, newStatus: ReservationStatus) => {
     if (!hostelSlug) return;
     if (savingById[reservationId]) return;
@@ -263,81 +319,76 @@ export default function ReservationsSection() {
     });
   }, [i18n.language]);
 
-  function csvEscape(value: any) {
-    // Excel/CSV: escapamos comillas y normalizamos saltos
-    const s = String(value ?? "")
-      .replace(/\r\n/g, "\n")
-      .replace(/\r/g, "\n")
-      .replace(/"/g, '""');
-    return `"${s}"`;
-  }
+  const exportXLSX = async () => {
+    if (!hostelSlug) return;
 
-  function downloadBlob(blob: Blob, fileName: string) {
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = fileName;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1500);
-  }
+    try {
+      setErr(null);
+      setLoading(true);
 
-  function buildCsv(opts: {
-    data: ReservationRow[];
-    delimiter: "," | ";";
-    includeMetaRows: boolean;
-  }) {
-    const { data, delimiter, includeMetaRows } = opts;
+      const fromDate = dayjs(from).startOf("day").toDate();
+      const toDate = dayjs(to).endOf("day").toDate();
 
-    const headers = [
-      "ID",
-      "Huésped",
-      "Habitación",
-      "Email",
-      "Check In",
-      "Check Out",
-      "Total",
-      "Estado",
-      "Creada",
-    ];
+      const base = collection(db, "hostels", hostelSlug, "reservations");
 
-    const lines: string[] = [];
-
-    // ✅ BOM para Excel
-    lines.push("\uFEFF" + headers.map(csvEscape).join(delimiter));
-
-    if (includeMetaRows) {
-      const nowStr = dayjs().format("YYYY-MM-DD HH:mm");
-      const statusStr = status === "all" ? "all" : statusLabel(status as ReservationStatus);
-      const queryStr = qText?.trim() ? qText.trim() : "—";
-
-      // filas “metadata” (Excel las lee perfecto)
-      lines.push([csvEscape("Generado"), csvEscape(nowStr)].join(delimiter));
-      lines.push([csvEscape("Hostel"), csvEscape(hostelSlug ?? "—")].join(delimiter));
-      lines.push([csvEscape("Desde"), csvEscape(from)].join(delimiter));
-      lines.push([csvEscape("Hasta"), csvEscape(to)].join(delimiter));
-      lines.push([csvEscape("Estado"), csvEscape(statusStr)].join(delimiter));
-      lines.push([csvEscape("Búsqueda"), csvEscape(queryStr)].join(delimiter));
-      lines.push(""); // línea en blanco
-      lines.push(headers.map(csvEscape).join(delimiter)); // repetimos headers después de meta
-    }
-
-    for (const r of data) {
-      const row = [
-        r.id,
-        r.fullName || "—",
-        r.roomName || "—",
-        r.email || "—",
-        r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "",
-        r.checkOut ? dayjs(r.checkOut).format("YYYY-MM-DD") : "",
-        money.format(Number(r.total ?? 0)),
-        statusLabel(r.status),
-        r.createdAt ? dayjs(r.createdAt).format("YYYY-MM-DD HH:mm") : "",
+      const clauses: any[] = [
+        where("checkIn", ">=", fromDate),
+        where("checkIn", "<=", toDate),
       ];
+      if (status !== "all") clauses.push(where("status", "==", status));
 
-      lines.push(row.map(csvEscape).join(delimiter));
+      const q = query(base, ...clauses, orderBy("checkIn", "asc"));
+      const snapshot = await getDocs(q);
+
+      let data: ReservationRow[] = snapshot.docs.map((docu) => {
+        const raw = docu.data() as any;
+        return {
+          id: docu.id,
+          fullName: raw.fullName ?? "",
+          roomName: raw.roomName ?? "",
+          email: raw.email ?? "",
+          total: raw.total ?? 0,
+          status: (raw.status ?? "pending") as ReservationStatus,
+          checkIn: raw.checkIn?.toDate?.() ?? null,
+          checkOut: raw.checkOut?.toDate?.() ?? null,
+          createdAt: raw.createdAt?.toDate?.() ?? null,
+        };
+      });
+
+      // aplica búsqueda texto igual que UI
+      const qLower = qText.trim().toLowerCase();
+      if (qLower) {
+        data = data.filter((r) =>
+          (r.fullName || "").toLowerCase().includes(qLower) ||
+          (r.email || "").toLowerCase().includes(qLower) ||
+          (r.roomName || "").toLowerCase().includes(qLower)
+        );
+      }
+
+      if (!data.length) {
+        setErr(t("admin.reservations.noDataToExport", "No hay reservas para exportar con los filtros actuales."));
+        return;
+      }
+
+      const statusText =
+        status === "all" ? t("admin.reservations.filterAll", "Todos los estados") : statusLabel(status as ReservationStatus);
+
+      buildXlsxAndDownload({
+        hostelSlug,
+        from,
+        to,
+        statusLabelText: statusText,
+        searchText: qText.trim(),
+        rows: data,
+        moneyFmt: money,
+        statusLabelFn: statusLabel,
+      });
+    } catch (e: any) {
+      setErr(e?.message ?? t("admin.reservations.exportError", "Error exportando XLSX"));
+    } finally {
+      setLoading(false);
     }
-
-    return lines.join("\n");
-  }
+  };
   const localeText =
     (i18n.language?.startsWith("es") ? esES : i18n.language?.startsWith("pt") ? ptBR : enUS).components
       .MuiDataGrid.defaultProps.localeText;
@@ -444,12 +495,11 @@ export default function ReservationsSection() {
       },
     ];
   }, [savingById, t, i18n.language]);
-  const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
-  const exportOpen = Boolean(exportAnchor);
   return (
     <>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={1.5} sx={{ mb: 2 }}>
+
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={1.5}
@@ -488,51 +538,15 @@ export default function ReservationsSection() {
                 <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
                 <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
               </Select>
-              {/* <Button
+              <Button
                 variant="outlined"
-                onClick={exportCSV}
-                sx={{ borderRadius: 999, fontWeight: 800 }}
+                onClick={exportXLSX}
+                sx={{ borderRadius: 999, fontWeight: 900, whiteSpace: "nowrap" }}
+                disabled={loading || !hostelSlug}
               >
-                Exportar CSV
-              </Button> */}
+                Exportar XLSX
+              </Button>
             </Stack>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
-            {/* ...tus filtros actuales... */}
-
-            <Button
-              variant="outlined"
-              onClick={(e) => setExportAnchor(e.currentTarget)}
-              sx={{ borderRadius: 999, fontWeight: 800, whiteSpace: "nowrap" }}
-              startIcon={<MoreVertIcon />}
-              disabled={loading}
-            >
-              Exportar
-            </Button>
-
-            <Menu
-              anchorEl={exportAnchor}
-              open={exportOpen}
-              onClose={() => setExportAnchor(null)}
-            >
-              <MenuItem
-                onClick={() => {
-                  setExportAnchor(null);
-                  exportCSV("excel");
-                }}
-              >
-                Exportar CSV (Excel)
-              </MenuItem>
-
-              <MenuItem
-                onClick={() => {
-                  setExportAnchor(null);
-                  exportCSV("raw");
-                }}
-              >
-                Exportar CSV (Raw / Comas)
-              </MenuItem>
-            </Menu>
           </Stack>
           <TextField
             size="small"

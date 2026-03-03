@@ -285,6 +285,12 @@ export const createHostel = onCall(
         }
       });
 
+      // ✅ NUEVO: claims para Storage (evita firestore.get() en rules)
+      await admin.auth().setCustomUserClaims(uid, {
+        role: "owner",
+        activeHostelSlug: slug,
+      });
+
       logRid(rid, "ok", { slug });
       return { ok: true, slug, rid };
     } catch (err: any) {
@@ -296,7 +302,6 @@ export const createHostel = onCall(
     }
   }
 );
-
 /**
  * inviteMember (MANAGER+)
  * data: { hostelSlug, email, role }

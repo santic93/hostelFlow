@@ -7,8 +7,11 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    // ✅ CAMBIO: usar (default) literal en Storage rules
     function memberDoc(hostelSlug) {
-      return firestore.get(/databases/(default)/documents/hostels/$(hostelSlug)/members/$(request.auth.uid));
+      return firestore.get(
+        /databases/(default)/documents/hostels/$(hostelSlug)/members/$(request.auth.uid)
+      );
     }
 
     function isOwner(hostelSlug) {
@@ -27,21 +30,12 @@ service firebase.storage {
       return request.resource != null && request.resource.size < 5 * 1024 * 1024;
     }
 
-    // ✅ SOLO guardamos imágenes de rooms acá:
-    // hostels/{hostelSlug}/rooms/{roomId}/{fileName}
     match /hostels/{hostelSlug}/rooms/{roomId}/{fileName} {
-
-      // público (para poder mostrar imágenes de rooms en la web pública)
       allow read: if true;
-
-      // ✅ Crear/actualizar SOLO owner, SOLO imagen, SOLO <5MB
       allow write: if isOwner(hostelSlug) && isAllowedImageType() && under5MB();
-
-      // ✅ delete: también solo owner (delete no tiene request.resource)
       allow delete: if isOwner(hostelSlug);
     }
 
-    // 🔒 Todo lo demás DENY (evita que suban “cualquier cosa” en paths random)
     match /{allPaths=**} {
       allow read, write: if false;
     }

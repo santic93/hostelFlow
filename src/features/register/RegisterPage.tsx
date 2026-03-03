@@ -147,7 +147,7 @@ export default function RegisterPage() {
         name: hostelName.trim(),
         slug: normalizedSlug,
       });
-
+      await current.getIdToken(true);
       setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
       navigate(`/${normalizedSlug}/admin`, { replace: true });
     } catch (err: any) {

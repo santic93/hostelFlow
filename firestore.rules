@@ -93,6 +93,9 @@ service cloud.firestore {
       // público
       allow read: if true;
 
+// 🔒 modo bunker: nadie escribe rooms desde cliente
+allow create, update, delete: if false;
+
       // Crear hostel: SOLO backend (Functions/Admin SDK)
       allow create: if false;
 

@@ -4,7 +4,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
 import axios from "axios";
 import type { CallableRequest } from "firebase-functions/v2/https";
-
+import { adminCreateRoom, adminUpdateRoom, adminDeleteRoom } from "./adminRooms";
 import { SENTRY_DSN, initSentryOnce, captureToSentry } from "./monitoring/sentry";
 
 function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any>["auth"]> {
@@ -744,3 +744,4 @@ export const removeMember = onCall(
     }
   }
 );
+export { adminCreateRoom, adminUpdateRoom, adminDeleteRoom };

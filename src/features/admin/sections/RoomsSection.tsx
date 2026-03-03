@@ -27,8 +27,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import ImageIcon from "@mui/icons-material/Image";
 import RefreshIcon from "@mui/icons-material/Refresh";
 
-import { collection, getDocs, deleteDoc, doc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { deleteObject, ref } from "firebase/storage";
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 import { db, storage } from "../../../services/firebase";
 import RoomFormModal from "../components/RoomFormModal";
@@ -118,8 +119,8 @@ export default function RoomsSection() {
 
   const closeToast = () => setToast((p) => ({ ...p, open: false }));
 
-  const canEditRooms = isOwner; // SOLO owner crea/edita
-  const canDeleteRooms = isOwner; // SOLO owner borra
+  const canEditRooms = isOwner; // SOLO owner
+  const canDeleteRooms = isOwner; // SOLO owner
 
   const fetchRooms = async () => {
     if (!hostelSlug) return;
@@ -197,14 +198,14 @@ export default function RoomsSection() {
   const handleDeleteConfirmed = async () => {
     if (!hostelSlug || !deleteTarget) return;
 
-    const id = deleteTarget.id;
+    const roomId = deleteTarget.id;
     setConfirmOpen(false);
-    setDeletingId(id);
+    setDeletingId(roomId);
     setPageError(null);
 
     try {
-      // 1) leer doc para imagePaths
-      const roomRef = doc(db, "hostels", hostelSlug, "rooms", id);
+      // 1) leer doc para imagePaths (para borrar storage)
+      const roomRef = doc(db, "hostels", hostelSlug, "rooms", roomId);
       const snap = await getDoc(roomRef);
 
       if (snap.exists()) {
@@ -215,15 +216,17 @@ export default function RoomsSection() {
         }
       }
 
-      // 2) borrar doc
-      await deleteDoc(roomRef);
+      // 2) borrar room por Cloud Function (NO deleteDoc directo)
+      const fn = httpsCallable(getFunctions(), "adminDeleteRoom");
+      await fn({ hostelSlug, roomId });
 
       // 3) update state
-      setRooms((prev) => prev.filter((r) => r.id !== id));
+      setRooms((prev) => prev.filter((r) => r.id !== roomId));
       openToast("success", t("admin.rooms.messages.deletedOk", "Habitación eliminada ✅"));
     } catch (e: any) {
-      setPageError(e?.message ?? t("admin.rooms.messages.deleteError", "No se pudo eliminar la habitación"));
-      openToast("error", e?.message ?? t("admin.rooms.messages.deleteErrorShort", "No se pudo eliminar"));
+      const msg = e?.message ?? t("admin.rooms.messages.deleteError", "No se pudo eliminar la habitación");
+      setPageError(msg);
+      openToast("error", msg);
     } finally {
       setDeletingId(null);
       setDeleteTarget(null);
@@ -317,7 +320,6 @@ export default function RoomsSection() {
   return (
     <Container disableGutters>
       <Stack spacing={2}>
-        {/* Header */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
@@ -333,15 +335,8 @@ export default function RoomsSection() {
             </Typography>
 
             <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap" }}>
-              <Chip
-                label={`${total} ${t("admin.rooms.badges.total", "habitaciones")}`}
-                sx={{ borderRadius: 999, fontWeight: 900 }}
-              />
-              <Chip
-                icon={<ImageIcon />}
-                label={`${withImages}/${total} ${t("admin.rooms.badges.withImages", "con fotos")}`}
-                sx={{ borderRadius: 999, fontWeight: 900 }}
-              />
+              <Chip label={`${total} ${t("admin.rooms.badges.total", "habitaciones")}`} sx={{ borderRadius: 999, fontWeight: 900 }} />
+              <Chip icon={<ImageIcon />} label={`${withImages}/${total} ${t("admin.rooms.badges.withImages", "con fotos")}`} sx={{ borderRadius: 999, fontWeight: 900 }} />
             </Stack>
           </Box>
 
@@ -372,10 +367,7 @@ export default function RoomsSection() {
 
         {!canEditRooms && (
           <Alert severity="info">
-            {t(
-              "admin.rooms.messages.onlyOwnerCanEdit",
-              "Solo el owner puede crear/editar habitaciones. (Esto coincide con tu política.)"
-            )}
+            {t("admin.rooms.messages.onlyOwnerCanEdit", "Solo el owner puede crear/editar habitaciones.")}
           </Alert>
         )}
 
@@ -383,7 +375,6 @@ export default function RoomsSection() {
 
         <Divider />
 
-        {/* Body */}
         {loadingRooms ? (
           <Box sx={{ py: 6, display: "flex", justifyContent: "center" }}>
             <CircularProgress />
@@ -412,11 +403,7 @@ export default function RoomsSection() {
                         </Typography>
                         <Chip
                           size="small"
-                          label={
-                            imgCount > 0
-                              ? t("admin.rooms.badges.photosCount", "{{n}} fotos", { n: imgCount })
-                              : t("admin.rooms.badges.noPhotos", "Sin fotos")
-                          }
+                          label={imgCount > 0 ? t("admin.rooms.badges.photosCount", "{{n}} fotos", { n: imgCount }) : t("admin.rooms.badges.noPhotos", "Sin fotos")}
                           color={imgCount > 0 ? "success" : "default"}
                           sx={{ borderRadius: 999, fontWeight: 900 }}
                         />
@@ -428,10 +415,7 @@ export default function RoomsSection() {
 
                       <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Typography sx={{ fontWeight: 900 }}>
-                          ${r.price}{" "}
-                          <span style={{ fontWeight: 600, opacity: 0.7 }}>
-                            {t("admin.rooms.perNight", "/ noche")}
-                          </span>
+                          ${r.price} <span style={{ fontWeight: 600, opacity: 0.7 }}>{t("admin.rooms.perNight", "/ noche")}</span>
                         </Typography>
                         <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
                           {t("admin.rooms.labels.capacityShort", "Cap:")} {r.capacity}
@@ -484,7 +468,6 @@ export default function RoomsSection() {
           </Box>
         )}
 
-        {/* Modal */}
         <RoomFormModal
           open={openModal}
           onClose={() => setOpenModal(false)}
@@ -496,41 +479,23 @@ export default function RoomsSection() {
           hostelSlug={hostelSlug}
         />
 
-        {/* Confirm delete */}
         <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)} fullWidth maxWidth="xs">
-          <DialogTitle sx={{ fontWeight: 900 }}>
-            {t("admin.rooms.confirmDelete.title", "Eliminar habitación")}
-          </DialogTitle>
+          <DialogTitle sx={{ fontWeight: 900 }}>{t("admin.rooms.confirmDelete.title", "Eliminar habitación")}</DialogTitle>
           <DialogContent>
             <Typography sx={{ color: "text.secondary" }}>
-              {t(
-                "admin.rooms.confirmDelete.desc",
-                "Vas a borrar la habitación y sus imágenes. Esta acción no se puede deshacer."
-              )}
+              {t("admin.rooms.confirmDelete.desc", "Vas a borrar la habitación y sus imágenes. Esta acción no se puede deshacer.")}
             </Typography>
-            {deleteTarget?.name ? (
-              <Typography sx={{ mt: 1, fontWeight: 900 }}>
-                {deleteTarget.name}
-              </Typography>
-            ) : null}
+            {deleteTarget?.name ? <Typography sx={{ mt: 1, fontWeight: 900 }}>{deleteTarget.name}</Typography> : null}
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setConfirmOpen(false)}>
-              {t("common.cancel", "Cancelar")}
-            </Button>
+            <Button onClick={() => setConfirmOpen(false)}>{t("common.cancel", "Cancelar")}</Button>
             <Button variant="contained" color="error" onClick={handleDeleteConfirmed}>
               {t("common.delete", "Eliminar")}
             </Button>
           </DialogActions>
         </Dialog>
 
-        {/* Toast */}
-        <Snackbar
-          open={toast.open}
-          autoHideDuration={2800}
-          onClose={closeToast}
-          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        >
+        <Snackbar open={toast.open} autoHideDuration={2800} onClose={closeToast} anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
           <Alert onClose={closeToast} severity={toast.severity} variant="filled" sx={{ borderRadius: 3 }}>
             {toast.message}
           </Alert>

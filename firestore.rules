@@ -47,6 +47,11 @@ service cloud.firestore {
       return isMember(hostelSlug) ? get(memberPath(hostelSlug)).data.role : "guest";
     }
 
+    // ✅ “ADMIN” para vos = owner
+    function isOwner(hostelSlug) {
+      return isMember(hostelSlug) && memberRole(hostelSlug) == "owner";
+    }
+
     function isStaffPlus(hostelSlug) {
       return isMember(hostelSlug) && memberRole(hostelSlug) in ["owner", "manager", "staff"];
     }
@@ -58,37 +63,41 @@ service cloud.firestore {
     // -------------------------
     // USERS
     // -------------------------
-   match /users/{uid} {
-  allow read: if isSignedIn() && request.auth.uid == uid;
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
 
-  allow create: if isSignedIn()
-    && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
-    && ( !("activeHostelSlug" in request.resource.data)
-         || request.resource.data.activeHostelSlug == null
-         || isNonEmptyString(request.resource.data.activeHostelSlug, 2) );
+      // crear doc solo propio, con keys controladas
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
+        && ( !("activeHostelSlug" in request.resource.data)
+            || request.resource.data.activeHostelSlug == null
+            || isNonEmptyString(request.resource.data.activeHostelSlug, 2) );
 
-  // ✅ Solo permitir cambiar activeHostelSlug (y mantener createdAt intacto)
-  allow update: if isSignedIn()
-    && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
-    && resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
-    && request.resource.data.createdAt == resource.data.createdAt
-    && request.resource.data.email == resource.data.email;
-  
-  allow delete: if false;
-}
+      // ✅ Solo permitir cambiar activeHostelSlug (y mantener createdAt/email intactos)
+      allow update: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
+        && resource.data.keys().hasOnly(["activeHostelSlug", "createdAt", "email"])
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.email == resource.data.email;
+
+      allow delete: if false;
+    }
+
     // -------------------------
     // HOSTELS
     // -------------------------
     match /hostels/{hostelSlug} {
+
       // público
       allow read: if true;
 
-     // Crear hostel: SOLO backend (Functions/Admin SDK)
-allow create: if false;
+      // Crear hostel: SOLO backend (Functions/Admin SDK)
+      allow create: if false;
 
-      // Actualizar hostel: manager+
+      // Actualizar hostel: manager+ pero SIN poder tocar ownerUid/slug
+      // (ya lo tenías, lo dejo y lo refuerzo con keys)
       allow update: if isManagerPlus(hostelSlug)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.slug == resource.data.slug;
@@ -103,42 +112,69 @@ allow create: if false;
         allow read: if (isSignedIn() && request.auth.uid == memberUid)
           || isManagerPlus(hostelSlug);
 
-        // Nadie escribe desde cliente (solo Functions Admin SDK)
+        // 🔒 Nadie escribe desde cliente (evita “me hago admin”)
         allow create, update, delete: if false;
       }
 
       // -------------------------
       // ROOMS
       // -------------------------
-     match /rooms/{roomId} {
-  function validRoom() {
-    // Permitimos solo estas keys, con algunas opcionales
-    return request.resource.data.keys().hasOnly([
-        "name", "price", "capacity", "description", "imageUrls", "imagePaths", "updatedAt", "createdAt"
-      ])
-      && isNonEmptyString(request.resource.data.name, 2)
-      && (request.resource.data.price is int || request.resource.data.price is number)
-      && request.resource.data.price > 0
-      && (request.resource.data.capacity is int || request.resource.data.capacity is number)
-      && request.resource.data.capacity >= 1
-      && (!("description" in request.resource.data) || request.resource.data.description is string)
-      && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
-      && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list);
-  }
+      match /rooms/{roomId} {
 
-  allow read: if true;
+        function validRoomCreate() {
+          return request.resource.data.keys().hasOnly([
+              "name", "price", "capacity", "description",
+              "imageUrls", "imagePaths",
+              "createdAt", "updatedAt"
+            ])
+            && isNonEmptyString(request.resource.data.name, 2)
+            && (request.resource.data.price is int || request.resource.data.price is number)
+            && request.resource.data.price > 0
+            && (request.resource.data.capacity is int || request.resource.data.capacity is number)
+            && request.resource.data.capacity >= 1
+            && (!("description" in request.resource.data) || request.resource.data.description is string)
+            && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
+            && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
+            // ✅ timestamps “tipo serverTimestamp”
+            && request.resource.data.createdAt == request.time
+            && request.resource.data.updatedAt == request.time;
+        }
 
-  // ✅ SOLO owner (consistente con tu UI actual)
-  allow create: if isMember(hostelSlug) && memberRole(hostelSlug) == "owner" && validRoom();
-  allow update: if isMember(hostelSlug) && memberRole(hostelSlug) == "owner" && validRoom();
-  allow delete: if isMember(hostelSlug) && memberRole(hostelSlug) == "owner";
-}
+        function validRoomUpdate() {
+          return request.resource.data.keys().hasOnly([
+              "name", "price", "capacity", "description",
+              "imageUrls", "imagePaths",
+              "createdAt", "updatedAt"
+            ])
+            && isNonEmptyString(request.resource.data.name, 2)
+            && (request.resource.data.price is int || request.resource.data.price is number)
+            && request.resource.data.price > 0
+            && (request.resource.data.capacity is int || request.resource.data.capacity is number)
+            && request.resource.data.capacity >= 1
+            && (!("description" in request.resource.data) || request.resource.data.description is string)
+            && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
+            && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
+            // ✅ createdAt NO se toca nunca
+            && request.resource.data.createdAt == resource.data.createdAt
+            // ✅ updatedAt siempre server time
+            && request.resource.data.updatedAt == request.time;
+        }
+
+        allow read: if true;
+
+        // ✅ SOLO ADMIN (owner)
+        allow create: if isOwner(hostelSlug) && validRoomCreate();
+        allow update: if isOwner(hostelSlug) && validRoomUpdate();
+        allow delete: if isOwner(hostelSlug);
+      }
+
       // -------------------------
       // RESERVATIONS (solo admin panel)
       // -------------------------
       match /reservations/{reservationId} {
         allow read: if isStaffPlus(hostelSlug);
-        allow create, update, delete: if false; // solo backend
+        // 🔒 creación/cambios solo backend (callable functions)
+        allow create, update, delete: if false;
       }
 
       // -------------------------
@@ -146,7 +182,7 @@ allow create: if false;
       // -------------------------
       match /email_logs/{logId} {
         allow read: if isManagerPlus(hostelSlug);
-        allow create, update, delete: if false; // solo backend
+        allow create, update, delete: if false;
       }
 
       // -------------------------

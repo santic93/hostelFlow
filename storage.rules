@@ -1,26 +1,47 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
 
-    function isImage() {
-      return request.resource.contentType.matches('image/.*');
+    function isSignedIn() {
+      return request.auth != null;
     }
 
-    function under5MB() {
-      return request.resource.size < 5 * 1024 * 1024;
+    function memberDoc(hostelSlug) {
+      return firestore.get(/databases/(default)/documents/hostels/$(hostelSlug)/members/$(request.auth.uid));
     }
 
     function isOwner(hostelSlug) {
-      return request.auth != null
-        && firestore.get(/databases/(default)/documents/hostels/$(hostelSlug)).data.ownerUid
-          == request.auth.uid;
+      return isSignedIn()
+        && memberDoc(hostelSlug).exists()
+        && memberDoc(hostelSlug).data.role == "owner";
     }
 
-    match /hostels/{hostelSlug}/{allPaths=**} {
+    function isAllowedImageType() {
+      return request.resource != null
+        && request.resource.contentType != null
+        && request.resource.contentType.matches('image/(jpeg|jpg|png|webp)');
+    }
+
+    function under5MB() {
+      return request.resource != null && request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // ✅ SOLO guardamos imágenes de rooms acá:
+    // hostels/{hostelSlug}/rooms/{roomId}/{fileName}
+    match /hostels/{hostelSlug}/rooms/{roomId}/{fileName} {
+
+      // público (para poder mostrar imágenes de rooms en la web pública)
       allow read: if true;
-      allow write: if isOwner(hostelSlug) && isImage() && under5MB();
+
+      // ✅ Crear/actualizar SOLO owner, SOLO imagen, SOLO <5MB
+      allow write: if isOwner(hostelSlug) && isAllowedImageType() && under5MB();
+
+      // ✅ delete: también solo owner (delete no tiene request.resource)
+      allow delete: if isOwner(hostelSlug);
     }
 
+    // 🔒 Todo lo demás DENY (evita que suban “cualquier cosa” en paths random)
     match /{allPaths=**} {
       allow read, write: if false;
     }

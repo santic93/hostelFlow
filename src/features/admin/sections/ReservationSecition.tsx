@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { Menu } from "@mui/material";
 import {
   Alert,
   Box,
@@ -124,7 +126,81 @@ export default function ReservationsSection() {
     fetchReservations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hostelSlug, status, from, to]);
+  const exportCSV = async (mode: "excel" | "raw" = "excel") => {
+  if (!hostelSlug) return;
 
+  try {
+    setErr(null);
+    setLoading(true);
+
+    const fromDate = dayjs(from).startOf("day").toDate();
+    const toDate = dayjs(to).endOf("day").toDate();
+
+    const base = collection(db, "hostels", hostelSlug, "reservations");
+
+    const clauses: any[] = [
+      where("checkIn", ">=", fromDate),
+      where("checkIn", "<=", toDate),
+    ];
+
+    if (status !== "all") clauses.push(where("status", "==", status));
+
+    const q = query(base, ...clauses, orderBy("checkIn", "asc"));
+    const snapshot = await getDocs(q);
+
+    let data: ReservationRow[] = snapshot.docs.map((docu) => {
+      const raw = docu.data() as any;
+      return {
+        id: docu.id,
+        fullName: raw.fullName ?? "",
+        roomName: raw.roomName ?? "",
+        email: raw.email ?? "",
+        total: raw.total ?? 0,
+        status: (raw.status ?? "pending") as ReservationStatus,
+        checkIn: raw.checkIn?.toDate?.() ?? null,
+        checkOut: raw.checkOut?.toDate?.() ?? null,
+        createdAt: raw.createdAt?.toDate?.() ?? null,
+      };
+    });
+
+    // 🔎 filtro texto (igual que UI)
+    const qLower = qText.trim().toLowerCase();
+    if (qLower) {
+      data = data.filter((r) =>
+        (r.fullName || "").toLowerCase().includes(qLower) ||
+        (r.email || "").toLowerCase().includes(qLower) ||
+        (r.roomName || "").toLowerCase().includes(qLower)
+      );
+    }
+
+    if (!data.length) {
+      setErr(t("admin.reservations.noDataToExport", "No hay reservas para exportar con los filtros actuales."));
+      return;
+    }
+
+    // ✅ Excel en ES/PT suele abrir mejor con ';'
+    const lang = (i18n.language || "es").slice(0, 2);
+    const delimiter: "," | ";" =
+      mode === "raw" ? "," : (lang === "es" || lang === "pt" ? ";" : ",");
+
+    const includeMetaRows = mode === "excel"; // “pro”: agrega filtros arriba
+
+    const csv = buildCsv({ data, delimiter, includeMetaRows });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+    const safeSlug = String(hostelSlug).replace(/[^a-z0-9-_]/gi, "_");
+    const fileName =
+      mode === "raw"
+        ? `reservas_${safeSlug}_${from}_a_${to}_raw.csv`
+        : `reservas_${safeSlug}_${from}_a_${to}.csv`;
+
+    downloadBlob(blob, fileName);
+  } catch (e: any) {
+    setErr(e?.message ?? t("admin.reservations.exportError", "Error exportando CSV"));
+  } finally {
+    setLoading(false);
+  }
+};
   const statusLabel = (s: ReservationStatus) => {
     if (s === "confirmed") return t("admin.reservations.statusValues.confirmed", "Confirmada");
     if (s === "cancelled") return t("admin.reservations.statusValues.cancelled", "Cancelada");
@@ -177,7 +253,91 @@ export default function ReservationsSection() {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredRows, isMobile]);
+const money = useMemo(() => {
+  const lang = (i18n.language || "es").slice(0, 2);
+  // si después querés moneda por hostel, acá lo cambiás
+  return new Intl.NumberFormat(lang, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+}, [i18n.language]);
 
+function csvEscape(value: any) {
+  // Excel/CSV: escapamos comillas y normalizamos saltos
+  const s = String(value ?? "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/"/g, '""');
+  return `"${s}"`;
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+}
+
+function buildCsv(opts: {
+  data: ReservationRow[];
+  delimiter: "," | ";";
+  includeMetaRows: boolean;
+}) {
+  const { data, delimiter, includeMetaRows } = opts;
+
+  const headers = [
+    "ID",
+    "Huésped",
+    "Habitación",
+    "Email",
+    "Check In",
+    "Check Out",
+    "Total",
+    "Estado",
+    "Creada",
+  ];
+
+  const lines: string[] = [];
+
+  // ✅ BOM para Excel
+  lines.push("\uFEFF" + headers.map(csvEscape).join(delimiter));
+
+  if (includeMetaRows) {
+    const nowStr = dayjs().format("YYYY-MM-DD HH:mm");
+    const statusStr = status === "all" ? "all" : statusLabel(status as ReservationStatus);
+    const queryStr = qText?.trim() ? qText.trim() : "—";
+
+    // filas “metadata” (Excel las lee perfecto)
+    lines.push([csvEscape("Generado"), csvEscape(nowStr)].join(delimiter));
+    lines.push([csvEscape("Hostel"), csvEscape(hostelSlug ?? "—")].join(delimiter));
+    lines.push([csvEscape("Desde"), csvEscape(from)].join(delimiter));
+    lines.push([csvEscape("Hasta"), csvEscape(to)].join(delimiter));
+    lines.push([csvEscape("Estado"), csvEscape(statusStr)].join(delimiter));
+    lines.push([csvEscape("Búsqueda"), csvEscape(queryStr)].join(delimiter));
+    lines.push(""); // línea en blanco
+    lines.push(headers.map(csvEscape).join(delimiter)); // repetimos headers después de meta
+  }
+
+  for (const r of data) {
+    const row = [
+      r.id,
+      r.fullName || "—",
+      r.roomName || "—",
+      r.email || "—",
+      r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "",
+      r.checkOut ? dayjs(r.checkOut).format("YYYY-MM-DD") : "",
+      money.format(Number(r.total ?? 0)),
+      statusLabel(r.status),
+      r.createdAt ? dayjs(r.createdAt).format("YYYY-MM-DD HH:mm") : "",
+    ];
+
+    lines.push(row.map(csvEscape).join(delimiter));
+  }
+
+  return lines.join("\n");
+}
   const localeText =
     (i18n.language?.startsWith("es") ? esES : i18n.language?.startsWith("pt") ? ptBR : enUS).components
       .MuiDataGrid.defaultProps.localeText;
@@ -284,7 +444,8 @@ export default function ReservationsSection() {
       },
     ];
   }, [savingById, t, i18n.language]);
-
+const [exportAnchor, setExportAnchor] = useState<null | HTMLElement>(null);
+const exportOpen = Boolean(exportAnchor);
   return (
     <>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
@@ -298,7 +459,43 @@ export default function ReservationsSection() {
             <Typography variant="h5" sx={{ fontWeight: 900 }}>
               {t("admin.reservations.title", "Reservas")}
             </Typography>
+<Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+  {/* ...tus filtros actuales... */}
 
+  <Button
+    variant="outlined"
+    onClick={(e) => setExportAnchor(e.currentTarget)}
+    sx={{ borderRadius: 999, fontWeight: 800, whiteSpace: "nowrap" }}
+    startIcon={<MoreVertIcon />}
+    disabled={loading}
+  >
+    Exportar
+  </Button>
+
+  <Menu
+    anchorEl={exportAnchor}
+    open={exportOpen}
+    onClose={() => setExportAnchor(null)}
+  >
+    <MenuItem
+      onClick={() => {
+        setExportAnchor(null);
+        exportCSV("excel");
+      }}
+    >
+      Exportar CSV (Excel)
+    </MenuItem>
+
+    <MenuItem
+      onClick={() => {
+        setExportAnchor(null);
+        exportCSV("raw");
+      }}
+    >
+      Exportar CSV (Raw / Comas)
+    </MenuItem>
+  </Menu>
+</Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
               <TextField
                 size="small"
@@ -327,6 +524,13 @@ export default function ReservationsSection() {
                 <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
                 <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
               </Select>
+              {/* <Button
+                variant="outlined"
+                onClick={exportCSV}
+                sx={{ borderRadius: 999, fontWeight: 800 }}
+              >
+                Exportar CSV
+              </Button> */}
             </Stack>
           </Stack>
 

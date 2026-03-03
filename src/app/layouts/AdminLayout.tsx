@@ -24,12 +24,10 @@ import { signOut } from "firebase/auth";
 import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../providers/AuthContext";
 import { auth } from "../../services/firebase";
-
-
-
+import { useEnsureActiveHostelClaim } from "../../hooks/useEnsureActiveHostelClaim";
 export const AdminLayout = () => {
-  const [open, setOpen] = useState(false); // hover desktop
-  const [mobileOpen, setMobileOpen] = useState(false); // drawer mobile
+  const [open, setOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const isMobile = useMediaQuery("(max-width:900px)");
   const drawerWidth = open ? 240 : 76;
@@ -38,9 +36,12 @@ export const AdminLayout = () => {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { user } = useAuth();
 
+  // ✅ NUEVO: esto asegura que el claim activeHostelSlug sea el de la URL
+  useEnsureActiveHostelClaim();
+
   const menu = useMemo(
     () => [
-      { to: "", label: "Dashboard", icon: <DashboardIcon /> },           // index
+      { to: "", label: "Dashboard", icon: <DashboardIcon /> },
       { to: "reservations", label: "Reservations", icon: <BookIcon /> },
       { to: "rooms", label: "Rooms", icon: <MeetingRoomIcon /> },
     ],
@@ -64,7 +65,7 @@ export const AdminLayout = () => {
           key={item.label}
           component={NavLink}
           to={item.to}
-          end={item.to === ""} // para que "Dashboard" solo sea active en /admin (no en /admin/rooms)
+          end={item.to === ""}
           onClick={() => setMobileOpen(false)}
           sx={{
             mx: 1,
@@ -82,7 +83,6 @@ export const AdminLayout = () => {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      {/* TOP BAR */}
       <AppBar
         position="fixed"
         elevation={0}
@@ -126,7 +126,6 @@ export const AdminLayout = () => {
         </Toolbar>
       </AppBar>
 
-      {/* SIDEBAR */}
       {isMobile ? (
         <Drawer
           open={mobileOpen}
@@ -160,7 +159,6 @@ export const AdminLayout = () => {
         </Drawer>
       )}
 
-      {/* CONTENT */}
       <Box component="main" sx={{ flexGrow: 1, pt: 10 }}>
         <Container maxWidth="lg" sx={{ py: 4 }}>
           <Outlet />

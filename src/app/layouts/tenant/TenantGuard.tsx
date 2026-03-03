@@ -10,6 +10,8 @@ function safeSlug(input?: string) {
 }
 
 export default function TenantGuard() {
+
+  
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { hostel, loading } = useHostelPublic(hostelSlug);
   const { loading: authLoading } = useAuth();

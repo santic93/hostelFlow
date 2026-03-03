@@ -302,6 +302,53 @@ export const createHostel = onCall(
     }
   }
 );
+export const setActiveHostel = onCall(
+  { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
+  async (req) => {
+    initSentryOnce();
+
+    const rid = createRid("setActiveHostel");
+    logRid(rid, "start", { hasAuth: !!req.auth });
+
+    try {
+      if (!req.auth) throw new HttpsError("unauthenticated", "Requiere login");
+
+      const uid = req.auth.uid;
+      const slug = String(req.data?.slug || "").trim();
+
+      assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
+      assert(/^[a-z0-9-]+$/.test(slug), "invalid-argument", "slug inválido");
+
+      // ✅ Verifica membresía/rol en Firestore (acá sí podemos)
+      const memberRef = db.doc(`hostels/${slug}/members/${uid}`);
+      const memberSnap = await memberRef.get();
+
+      if (!memberSnap.exists) {
+        throw new HttpsError("permission-denied", "No sos miembro de este hostel");
+      }
+
+      const role = String(memberSnap.data()?.role || "");
+      if (!["owner", "manager", "staff"].includes(role)) {
+        throw new HttpsError("permission-denied", "Rol inválido");
+      }
+
+      // ✅ Setea claims coherentes
+      await admin.auth().setCustomUserClaims(uid, {
+        role,
+        activeHostelSlug: slug,
+      });
+
+      logRid(rid, "ok", { slug, role });
+      return { ok: true, slug, role, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+      captureToSentry(err, { rid, fn: "setActiveHostel" });
+
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
+  }
+);
 /**
  * inviteMember (MANAGER+)
  * data: { hostelSlug, email, role }

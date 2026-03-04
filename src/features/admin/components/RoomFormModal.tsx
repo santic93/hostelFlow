@@ -11,11 +11,13 @@ import {
   Snackbar,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { addDoc, collection, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { db, storage } from "../../../services/firebase";
+
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
+
+import { storage, functions } from "../../../services/firebase";
 import { useAuth } from "../../../app/providers/AuthContext";
 
 type RoomFormValues = {
@@ -138,11 +140,15 @@ export default function RoomFormModal({
 
   function validateFileBasics(file: File) {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      throw new Error(t("admin.rooms.messages.invalidFormat"));
+      throw new Error(t("admin.rooms.messages.invalidFormat", "Formato inválido (JPG/PNG/WebP)."));
     }
     const mb = file.size / (1024 * 1024);
     if (mb > MAX_MB * 3) {
-      throw new Error(t("admin.rooms.messages.tooLargePre", { mb: mb.toFixed(2) }));
+      throw new Error(
+        t("admin.rooms.messages.tooLargePre", {
+          mb: mb.toFixed(2),
+        }) || `Archivo demasiado grande (${mb.toFixed(2)}MB)`
+      );
     }
   }
 
@@ -153,7 +159,7 @@ export default function RoomFormModal({
     try {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
-        img.onerror = () => reject(new Error(t("admin.rooms.messages.invalidImage")));
+        img.onerror = () => reject(new Error(t("admin.rooms.messages.invalidImage", "Imagen inválida.")));
         img.src = url;
       });
 
@@ -173,7 +179,7 @@ export default function RoomFormModal({
 
       const blob: Blob = await new Promise((resolve, reject) => {
         canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error(t("admin.rooms.messages.compressFailed")))),
+          (b) => (b ? resolve(b) : reject(new Error(t("admin.rooms.messages.compressFailed", "No se pudo comprimir.")))),
           "image/jpeg",
           0.82
         );
@@ -193,7 +199,11 @@ export default function RoomFormModal({
 
       const sizeMb = blob.size / (1024 * 1024);
       if (sizeMb > MAX_MB) {
-        throw new Error(t("admin.rooms.messages.tooLargeAfter", { mb: sizeMb.toFixed(2) }));
+        throw new Error(
+          t("admin.rooms.messages.tooLargeAfter", {
+            mb: sizeMb.toFixed(2),
+          }) || `La imagen quedó pesada (${sizeMb.toFixed(2)}MB)`
+        );
       }
 
       const safeName = `${Date.now()}_${file.name}`.replace(/\s+/g, "_");
@@ -217,8 +227,8 @@ export default function RoomFormModal({
 
   const onSubmit = async (data: RoomFormValues) => {
     if (!readyForWrite || !resolvedHostelSlug) {
-      setFormError(t("admin.rooms.messages.waitHostel"));
-      openToast("info", t("admin.rooms.messages.waitHostelToast"));
+      setFormError(t("admin.rooms.messages.waitHostel", "Esperá a que cargue tu hostel/permisos…"));
+      openToast("info", t("admin.rooms.messages.waitHostelToast", "Cargando permisos…"));
       return;
     }
 
@@ -226,65 +236,77 @@ export default function RoomFormModal({
     setSaving(true);
 
     try {
-      const hostelId = resolvedHostelSlug;
+      const hostelSlug = resolvedHostelSlug;
 
       const payloadBase = {
-        name: data.name,
+        name: String(data.name ?? "").trim(),
         price: Number(data.price),
         capacity: Number(data.capacity),
-        description: data.description ?? "",
+        description: String(data.description ?? ""),
       };
 
+      // 1) create/update BASE vía Functions (seguro)
       let roomId = initialData?.id;
 
-      // 1) crear o actualizar base
       if (!roomId) {
-        const newRef = await addDoc(collection(db, "hostels", hostelId, "rooms"), {
+        const createFn = httpsCallable(functions, "adminCreateRoom");
+        const res = await createFn({
+          hostelSlug,
           ...payloadBase,
           imageUrls: [],
           imagePaths: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
         });
-        roomId = newRef.id;
+        roomId = String((res.data as any)?.roomId ?? "");
+        if (!roomId) throw new Error("No se recibió roomId.");
       } else {
-        await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
+        const updateFn = httpsCallable(functions, "adminUpdateRoom");
+        await updateFn({
+          hostelSlug,
+          roomId,
           ...payloadBase,
-          updatedAt: serverTimestamp(),
+          // por ahora mandamos las actuales; luego las “finales” las volvemos a mandar
+          imageUrls: existingUrls,
+          imagePaths: existingPaths,
         });
       }
 
-      // 2) borrar marcadas
+      // 2) borrar imágenes marcadas (storage)
       if (pathsToDelete.length) {
         await Promise.allSettled(pathsToDelete.map((p) => deleteStorageByPath(p)));
       }
 
-      // 3) subir nuevas
-      const uploaded = files.length ? await uploadImages(hostelId, roomId, files) : [];
+      // 3) subir nuevas (storage)
+      const uploaded = files.length ? await uploadImages(hostelSlug, roomId, files) : [];
       const newUrls = uploaded.map((u) => u.url);
       const newPaths = uploaded.map((u) => u.path);
 
-      // 4) finales
+      // 4) calcular finales (máx 6)
       const finalUrls = [...existingUrls, ...newUrls].slice(0, MAX_IMAGES);
       const finalPaths = [...existingPaths, ...newPaths].slice(0, MAX_IMAGES);
 
-      await updateDoc(doc(db, "hostels", hostelId, "rooms", roomId), {
+      // 5) persistir finales vía Function (seguro)
+      const updateFinalFn = httpsCallable(functions, "adminUpdateRoom");
+      await updateFinalFn({
+        hostelSlug,
+        roomId,
+        ...payloadBase,
         imageUrls: finalUrls,
         imagePaths: finalPaths,
-        updatedAt: serverTimestamp(),
       });
 
+      // cleanup
       previews.forEach((p) => URL.revokeObjectURL(p));
       setFiles([]);
       setPreviews([]);
       setPathsToDelete([]);
 
-      openToast("success", t("admin.rooms.messages.savedOk"));
-
+      openToast("success", t("admin.rooms.messages.savedOk", "Guardado ✅"));
       onSuccess();
       onClose();
     } catch (e: any) {
-      const msg = e?.message || t("admin.rooms.messages.saveError");
+      const msg =
+        e?.message ||
+        t("admin.rooms.messages.saveError", "No se pudo guardar. Revisá permisos / logs.");
       setFormError(msg);
       openToast("error", msg);
     } finally {
@@ -298,36 +320,34 @@ export default function RoomFormModal({
         open={open}
         onClose={(_, reason) => {
           if (saving) return;
-          if (reason === "backdropClick") return; // no cierres tocando fondo
+          if (reason === "backdropClick") return;
           onClose();
         }}
         fullWidth
         maxWidth="sm"
       >
         <DialogTitle>
-          {initialData ? t("admin.rooms.modal.editTitle") : t("admin.rooms.modal.createTitle")}
+          {initialData ? t("admin.rooms.modal.editTitle", "Editar habitación") : t("admin.rooms.modal.createTitle", "Crear habitación")}
         </DialogTitle>
 
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            {!readyForWrite && (
-              <Alert severity="info">{t("admin.rooms.messages.loadingPermissions")}</Alert>
-            )}
+            {!readyForWrite && <Alert severity="info">{t("admin.rooms.messages.loadingPermissions", "Cargando permisos…")}</Alert>}
 
             <TextField
-              label={t("admin.rooms.form.name")}
-              {...register("name", { required: t("admin.rooms.errors.nameRequired") })}
+              label={t("admin.rooms.form.name", "Nombre")}
+              {...register("name", { required: t("admin.rooms.errors.nameRequired", "Nombre requerido") as any })}
               error={!!errors.name}
               helperText={errors.name?.message as any}
               disabled={saving}
             />
 
             <TextField
-              label={t("admin.rooms.form.price")}
+              label={t("admin.rooms.form.price", "Precio")}
               type="number"
               {...register("price", {
-                required: t("admin.rooms.errors.priceRequired"),
-                min: { value: 1, message: t("admin.rooms.errors.priceMin") },
+                required: t("admin.rooms.errors.priceRequired", "Precio requerido") as any,
+                min: { value: 1, message: t("admin.rooms.errors.priceMin", "Mínimo 1") as any },
               })}
               error={!!errors.price}
               helperText={errors.price?.message as any}
@@ -335,11 +355,11 @@ export default function RoomFormModal({
             />
 
             <TextField
-              label={t("admin.rooms.form.capacity")}
+              label={t("admin.rooms.form.capacity", "Capacidad")}
               type="number"
               {...register("capacity", {
-                required: t("admin.rooms.errors.capacityRequired"),
-                min: { value: 1, message: t("admin.rooms.errors.capacityMin") },
+                required: t("admin.rooms.errors.capacityRequired", "Capacidad requerida") as any,
+                min: { value: 1, message: t("admin.rooms.errors.capacityMin", "Mínimo 1") as any },
               })}
               error={!!errors.capacity}
               helperText={errors.capacity?.message as any}
@@ -347,24 +367,20 @@ export default function RoomFormModal({
             />
 
             <TextField
-              label={t("admin.rooms.form.description")}
+              label={t("admin.rooms.form.description", "Descripción")}
               multiline
               rows={3}
               {...register("description")}
               disabled={saving}
             />
 
-            {formError && (
-              <Alert severity="error" sx={{ mb: 1 }}>
-                {formError}
-              </Alert>
-            )}
+            {formError && <Alert severity="error">{formError}</Alert>}
 
             {/* EXISTENTES */}
             {existingUrls.length > 0 && (
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  {t("admin.rooms.messages.currentImages")}
+                  {t("admin.rooms.messages.currentImages", "Imágenes actuales")}
                 </Typography>
 
                 <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
@@ -384,7 +400,6 @@ export default function RoomFormModal({
                           display: "block",
                         }}
                       />
-
                       <Button
                         size="small"
                         color="error"
@@ -398,7 +413,7 @@ export default function RoomFormModal({
                         }}
                         sx={{ mt: 0.5 }}
                       >
-                        {t("admin.rooms.actions.delete")}
+                        {t("admin.rooms.actions.delete", "Eliminar")}
                       </Button>
                     </Box>
                   ))}
@@ -414,7 +429,7 @@ export default function RoomFormModal({
                 disabled={!readyForWrite || totalCount >= MAX_IMAGES || saving}
                 sx={{ borderRadius: 999, textTransform: "none" }}
               >
-                {t("admin.rooms.form.uploadImages")}
+                {t("admin.rooms.form.uploadImages", "Subir imágenes (hasta 6)")}
                 <input
                   hidden
                   type="file"
@@ -434,9 +449,9 @@ export default function RoomFormModal({
                       setFiles((prev) => [...prev, ...limited]);
                       setPreviews((prev) => [...prev, ...nextPreviews]);
 
-                      openToast("info", t("admin.rooms.messages.imagesSelected", { n: limited.length }));
+                      openToast("info", t("admin.rooms.messages.imagesSelected", { n: limited.length }) || `Imágenes: ${limited.length}`);
                     } catch (err: any) {
-                      const msg = err?.message ?? t("admin.rooms.messages.invalidFile");
+                      const msg = err?.message ?? t("admin.rooms.messages.invalidFile", "Archivo inválido");
                       setFormError(msg);
                       openToast("error", msg);
                     } finally {
@@ -447,7 +462,8 @@ export default function RoomFormModal({
               </Button>
 
               <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
-                {t("admin.rooms.messages.imagesHelp", { max: MAX_IMAGES, mb: MAX_MB })}
+                {t("admin.rooms.messages.imagesHelp", { max: MAX_IMAGES, mb: MAX_MB }) ||
+                  `Máximo ${MAX_IMAGES}. Recomendado JPG/PNG/WebP. Hasta ${MAX_MB}MB (post-compresión).`}
               </Typography>
 
               <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
@@ -478,7 +494,7 @@ export default function RoomFormModal({
                       }}
                       sx={{ mt: 0.5 }}
                     >
-                      {t("admin.rooms.form.remove")}
+                      {t("admin.rooms.form.remove", "Quitar")}
                     </Button>
                   </Box>
                 ))}
@@ -489,7 +505,7 @@ export default function RoomFormModal({
 
         <DialogActions>
           <Button onClick={onClose} disabled={saving}>
-            {t("admin.rooms.common.cancel")}
+            {t("admin.rooms.common.cancel", "Cancelar")}
           </Button>
 
           <Button
@@ -498,7 +514,7 @@ export default function RoomFormModal({
             disabled={!isValid || saving || !readyForWrite}
             sx={{ borderRadius: 999 }}
           >
-            {saving ? t("admin.rooms.common.saving") : t("admin.rooms.common.save")}
+            {saving ? t("admin.rooms.common.saving", "Guardando…") : t("admin.rooms.common.save", "Guardar")}
           </Button>
         </DialogActions>
       </Dialog>

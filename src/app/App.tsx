@@ -1,9 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { MainLayout } from "./layouts/main/MainLayout";
-
 import TenantGuard from "./layouts/tenant/TenantGuard";
-
 import AdminShell from "./layouts/admin/AdminShell";
 import AppErrorPage from "../features/AppErrorPage";
 import RootRedirect from "../routes/RootLanding";
@@ -27,26 +25,27 @@ import DateI18nProvider from "../features/providers/DateI18nProvider";
 import MembersSection from "../features/admin/sections/MembersSection";
 import EmailLogsSection from "../features/admin/sections/EmailLogSection";
 import { ErrorBoundary } from "@sentry/react";
-
-// ✅ ESTE IMPORT ES EL QUE TE FALTA EN TU APP
 import { AuthProvider } from "./providers/AuthContext";
+
+// ✅ NUEVO
+import SuperAdminInvitesPage from "../features/superadmin/SuperAdminInvitesPage"; 
 
 export const router = createBrowserRouter([
   {
     path: "/",
     errorElement: <AppErrorPage />,
     children: [
-      // ✅ GLOBAL
       { index: true, element: <RootRedirect /> },
       { path: "login", element: <LoginPage /> },
       { path: "register", element: <RegisterPage /> },
       { path: "admin", element: <AdminRedirect /> },
 
-      // ✅ PASSWORD RESET (GLOBAL)
+      // ✅ SUPERADMIN (GLOBAL)
+      { path: "superadmin/invites", element: <SuperAdminInvitesPage /> },
+
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },
 
-      // ✅ TENANT
       {
         path: ":hostelSlug",
         element: <TenantGuard />,
@@ -81,7 +80,6 @@ export const router = createBrowserRouter([
         ],
       },
 
-      // ✅ 404 catch-all
       { path: "*", element: <AppErrorPage /> },
     ],
   },
@@ -90,7 +88,6 @@ export const router = createBrowserRouter([
 function App() {
   return (
     <ErrorBoundary fallback={<div style={{ padding: 16 }}>Algo salió mal.</div>}>
-      {/* ✅ ENVOLVÉS TODO CON AuthProvider */}
       <AuthProvider>
         <ThemeProvider theme={theme}>
           <CssBaseline />

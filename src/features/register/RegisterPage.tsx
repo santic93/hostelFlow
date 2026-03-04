@@ -17,10 +17,10 @@ import {
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
-import { auth, functions } from "../../services/firebase"; // ajustá path si difiere
+import { auth, functions } from "../../services/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import HotelLoading from "../../components/HotelLoading"; // ajustá path si difiere
+import HotelLoading from "../../components/HotelLoading";
 
 function slugify(input: string) {
   return input
@@ -31,13 +31,12 @@ function slugify(input: string) {
 }
 
 function validatePasswordStrong(pass: string) {
-  // Reglas: 10+ chars, 1 mayus, 1 minus, 1 numero, 1 simbolo
   const errors: string[] = [];
   if (pass.length < 10) errors.push("minLength");
   if (!/[A-Z]/.test(pass)) errors.push("upper");
   if (!/[a-z]/.test(pass)) errors.push("lower");
   if (!/[0-9]/.test(pass)) errors.push("number");
-  if (!/[^\w\s]/.test(pass)) errors.push("symbol"); // simbolo
+  if (!/[^\w\s]/.test(pass)) errors.push("symbol");
   return errors;
 }
 
@@ -51,6 +50,7 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false);
 
   // Step 2
+  const [inviteCode, setInviteCode] = useState(""); // ✅ NUEVO
   const [hostelName, setHostelName] = useState("");
   const [hostelSlug, setHostelSlug] = useState("");
 
@@ -61,15 +61,11 @@ export default function RegisterPage() {
 
   const normalizedSlug = useMemo(() => slugify(hostelSlug), [hostelSlug]);
 
-  // ✅ fuente de verdad del flujo
   const effectiveUser = auth.currentUser ?? createdUser;
   const step: 1 | 2 = effectiveUser ? 2 : 1;
 
-  // ✅ si Auth se actualiza después, sincronizamos createdUser
   useEffect(() => {
-    if (auth.currentUser && !createdUser) {
-      setCreatedUser(auth.currentUser);
-    }
+    if (auth.currentUser && !createdUser) setCreatedUser(auth.currentUser);
   }, [createdUser]);
 
   const passwordErrors = useMemo(() => validatePasswordStrong(password), [password]);
@@ -78,7 +74,6 @@ export default function RegisterPage() {
   const passwordHelper = useMemo(() => {
     if (!password) return t("register.password.help");
     if (passwordOk) return t("register.password.ok");
-    // mostrar 1 sola línea con bullets (más limpio)
     const parts = passwordErrors.map((k) => t(`register.password.rules.${k}`));
     return parts.join(" · ");
   }, [password, passwordOk, passwordErrors, t]);
@@ -91,37 +86,20 @@ export default function RegisterPage() {
     const cleanPass = password;
 
     if (!cleanEmail) return setMessage({ type: "error", text: t("register.errors.emailRequired") });
-
-    // 🔒 nuevo: password fuerte
-    if (!passwordOk) {
-      return setMessage({ type: "error", text: t("register.errors.passwordWeak") });
-    }
+    if (!passwordOk) return setMessage({ type: "error", text: t("register.errors.passwordWeak") });
 
     try {
       setLoading(true);
-
       const cred = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPass);
-
       setCreatedUser(cred.user);
       await cred.user.getIdToken();
-
       setMessage({ type: "success", text: t("register.messages.accountCreated") });
     } catch (err: any) {
       console.error("REGISTER ERROR =>", err);
-
-      if (err?.code === "auth/email-already-in-use") {
-        setMessage({ type: "error", text: t("register.errors.emailInUse") });
-      } else if (err?.code === "auth/invalid-email") {
-        setMessage({ type: "error", text: t("register.errors.emailInvalid") });
-      } else if (err?.code === "auth/weak-password") {
-        // por si Firebase lo detecta también
-        setMessage({ type: "error", text: t("register.errors.passwordWeak") });
-      } else {
-        setMessage({
-          type: "error",
-          text: err?.code ? t("register.errors.genericWithCode", { code: err.code }) : t("register.errors.generic"),
-        });
-      }
+      if (err?.code === "auth/email-already-in-use") setMessage({ type: "error", text: t("register.errors.emailInUse") });
+      else if (err?.code === "auth/invalid-email") setMessage({ type: "error", text: t("register.errors.emailInvalid") });
+      else if (err?.code === "auth/weak-password") setMessage({ type: "error", text: t("register.errors.passwordWeak") });
+      else setMessage({ type: "error", text: err?.code ? t("register.errors.genericWithCode", { code: err.code }) : t("register.errors.generic") });
     } finally {
       setLoading(false);
     }
@@ -132,8 +110,12 @@ export default function RegisterPage() {
     setMessage(null);
 
     const current = auth.currentUser ?? createdUser;
-    await (auth.currentUser ?? createdUser)?.getIdToken(true);
+    await current?.getIdToken(true);
     if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
+
+    if (!inviteCode.trim()) {
+      return setMessage({ type: "error", text: "Necesitás un código de activación (Invite)." });
+    }
 
     if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
     if (!normalizedSlug) return setMessage({ type: "error", text: t("register.errors.slugInvalid") });
@@ -141,21 +123,32 @@ export default function RegisterPage() {
     try {
       setLoading(true);
 
-      const createHostel = httpsCallable(functions, "createHostel");
+      const createHostel = httpsCallable(functions, "createHostel"); // ✅ mismo nombre, pero ahora exige inviteCode
 
       await createHostel({
         name: hostelName.trim(),
         slug: normalizedSlug,
+        inviteCode: inviteCode.trim().toUpperCase(),
       });
+
+      // claims/members pueden tardar 1 refresh
       await current.getIdToken(true);
+
       setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
       navigate(`/${normalizedSlug}/admin`, { replace: true });
     } catch (err: any) {
       console.error(err);
-
       setCreatedUser(auth.currentUser ?? createdUser);
 
-      if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
+      // errores típicos de functions
+      const code = String(err?.code || "");
+      if (code === "functions/permission-denied") {
+        setMessage({ type: "error", text: "Invite inválido o no tenés permiso para activar un hostel." });
+      } else if (code === "functions/not-found") {
+        setMessage({ type: "error", text: "El Invite no existe." });
+      } else if (code === "functions/failed-precondition" || code === "functions/already-exists") {
+        setMessage({ type: "error", text: "Ese Invite ya fue usado o está inactivo." });
+      } else if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
         setMessage({ type: "error", text: t("register.errors.slugTaken") });
       } else {
         setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
@@ -166,11 +159,7 @@ export default function RegisterPage() {
   };
 
   if (loading) {
-    return (
-      <HotelLoading
-        text={step === 1 ? t("register.loading.creatingAccount") : t("register.loading.creatingHostel")}
-      />
-    );
+    return <HotelLoading text={step === 1 ? t("register.loading.creatingAccount") : t("register.loading.creatingHostel")} />;
   }
 
   return (
@@ -184,16 +173,8 @@ export default function RegisterPage() {
       </Typography>
 
       <Box sx={{ display: "flex", gap: 2, mb: 4 }}>
-        <Chip
-          label={t("register.steps.account")}
-          color={step === 1 ? "primary" : "default"}
-          variant={step === 1 ? "filled" : "outlined"}
-        />
-        <Chip
-          label={t("register.steps.hostel")}
-          color={step === 2 ? "primary" : "default"}
-          variant={step === 2 ? "filled" : "outlined"}
-        />
+        <Chip label={t("register.steps.account")} color={step === 1 ? "primary" : "default"} variant={step === 1 ? "filled" : "outlined"} />
+        <Chip label={t("register.steps.hostel")} color={step === 2 ? "primary" : "default"} variant={step === 2 ? "filled" : "outlined"} />
       </Box>
 
       {message && (
@@ -203,19 +184,8 @@ export default function RegisterPage() {
       )}
 
       <Collapse in={step === 1}>
-        <Box
-          sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreateAccount();
-          }}
-        >
-          <TextField
-            label={t("register.fields.email")}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            inputMode="email"
-          />
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 3, mt: 3 }} onKeyDown={(e) => e.key === "Enter" && handleCreateAccount()}>
+          <TextField label={t("register.fields.email")} value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" inputMode="email" />
 
           <TextField
             label={t("register.fields.password")}
@@ -228,11 +198,7 @@ export default function RegisterPage() {
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showPass ? t("common.hidePassword") : t("common.showPassword")}
-                    onClick={() => setShowPass((s) => !s)}
-                    edge="end"
-                  >
+                  <IconButton aria-label={showPass ? t("common.hidePassword") : t("common.showPassword")} onClick={() => setShowPass((s) => !s)} edge="end">
                     {showPass ? <VisibilityOffIcon /> : <VisibilityIcon />}
                   </IconButton>
                 </InputAdornment>
@@ -249,38 +215,30 @@ export default function RegisterPage() {
       <Collapse in={step === 2}>
         <Paper elevation={3} sx={{ p: 4, mt: 4 }}>
           <Alert severity="success" sx={{ mb: 2 }}>
-            {t("register.messages.accountCreatedLabel")}{" "}
-            <b>{(auth.currentUser?.email ?? email).trim().toLowerCase()}</b>
+            {t("register.messages.accountCreatedLabel")} <b>{(auth.currentUser?.email ?? email).trim().toLowerCase()}</b>
           </Alert>
 
-          <Box
-            sx={{ display: "flex", flexDirection: "column", gap: 3 }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleCreateHostel();
-            }}
-          >
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Para activar tu hostel necesitás un <b>código de activación</b> (Invite).
+          </Alert>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} onKeyDown={(e) => e.key === "Enter" && handleCreateHostel()}>
             <TextField
-              label={t("register.fields.hostelName")}
-              value={hostelName}
-              onChange={(e) => setHostelName(e.target.value)}
+              label="Código de activación (Invite)"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
             />
+
+            <TextField label={t("register.fields.hostelName")} value={hostelName} onChange={(e) => setHostelName(e.target.value)} />
 
             <TextField
               label={t("register.fields.slug")}
               value={hostelSlug}
               onChange={(e) => setHostelSlug(e.target.value)}
-              helperText={
-                normalizedSlug
-                  ? t("register.helpers.yourUrl", { slug: normalizedSlug })
-                  : t("register.helpers.slugExample")
-              }
+              helperText={normalizedSlug ? t("register.helpers.yourUrl", { slug: normalizedSlug }) : t("register.helpers.slugExample")}
             />
 
-            <Button
-              variant="contained"
-              onClick={handleCreateHostel}
-              disabled={!hostelName.trim() || !normalizedSlug}
-            >
+            <Button variant="contained" onClick={handleCreateHostel} disabled={!inviteCode.trim() || !hostelName.trim() || !normalizedSlug}>
               {t("register.actions.createHostel")}
             </Button>
           </Box>

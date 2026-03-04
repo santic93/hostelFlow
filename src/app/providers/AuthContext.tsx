@@ -1,28 +1,29 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { onAuthStateChanged, type User, getIdTokenResult } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 
-export type Role = "owner" | "manager" | "staff" | "guest";
+export type Role = "superadmin" | "owner" | "manager" | "staff" | "guest";
 
 export type AuthContextType = {
   user: User | null;
 
-  // ✅ nuevo modelo
   activeHostelSlug: string | null;
   role: Role;
 
-  // ✅ compat: para no romper pantallas viejas
   hostelSlug: string | null;
 
-  // ✅ helpers (dejan de existir comparaciones "admin")
+  isSuperAdmin: boolean;
   isOwner: boolean;
   isManager: boolean;
   isStaff: boolean;
   canAccessAdmin: boolean;
 
   loading: boolean;
+
+  // útil cuando setCustomUserClaims cambian
+  refreshTokenClaims: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -32,12 +33,14 @@ const AuthContext = createContext<AuthContextType>({
 
   hostelSlug: null,
 
+  isSuperAdmin: false,
   isOwner: false,
   isManager: false,
   isStaff: false,
   canAccessAdmin: false,
 
   loading: true,
+  refreshTokenClaims: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -46,17 +49,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [role, setRole] = useState<Role>("guest");
   const [loading, setLoading] = useState(true);
 
-  // loader mínimo para evitar “parpadeo”
   const MIN_LOADING_MS = 900;
   const [showLoading, setShowLoading] = useState(true);
 
+  const readClaimsRole = async (u: User): Promise<Role | null> => {
+    try {
+      const tok = await getIdTokenResult(u, true);
+      const r = String((tok.claims as any)?.role || "");
+      if (r === "superadmin") return "superadmin";
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const refreshTokenClaims = async () => {
+    if (!auth.currentUser) return;
+    // fuerza refresh del token y vuelve a disparar lectura del claim
+    await getIdTokenResult(auth.currentUser, true);
+    // no hacemos set directo acá porque el flujo principal lo recalcula
+  };
+
   useEffect(() => {
     let timer: number | undefined;
-    if (loading) {
-      setShowLoading(true);
-    } else {
-      timer = window.setTimeout(() => setShowLoading(false), MIN_LOADING_MS);
-    }
+    if (loading) setShowLoading(true);
+    else timer = window.setTimeout(() => setShowLoading(false), MIN_LOADING_MS);
     return () => {
       if (timer) window.clearTimeout(timer);
     };
@@ -66,7 +83,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     let unsubUserDoc: null | (() => void) = null;
     let unsubMemberDoc: null | (() => void) = null;
 
-    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (unsubUserDoc) unsubUserDoc();
       if (unsubMemberDoc) unsubMemberDoc();
       unsubUserDoc = null;
@@ -84,7 +101,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       setUser(firebaseUser);
 
-      // 1) user doc: solo para saber activeHostelSlug (compat con hostelSlug viejo)
+      // 0) si es superadmin por claim -> no dependemos de membresías
+      const claimRole = await readClaimsRole(firebaseUser);
+      if (claimRole === "superadmin") {
+        setActiveHostelSlug(null);
+        setRole("superadmin");
+        setLoading(false);
+        return;
+      }
+
+      // 1) user doc: activeHostelSlug
       const userRef = doc(db, "users", firebaseUser.uid);
       unsubUserDoc = onSnapshot(
         userRef,
@@ -101,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           setActiveHostelSlug(slug);
 
-          // 2) member doc del hostel activo (si hay)
+          // 2) member doc del hostel activo
           if (unsubMemberDoc) unsubMemberDoc();
           unsubMemberDoc = null;
 
@@ -145,11 +171,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  // ✅ helpers derivados
+  const isSuperAdmin = role === "superadmin";
   const isOwner = role === "owner";
   const isManager = role === "manager" || role === "owner";
   const isStaff = role === "staff" || role === "manager" || role === "owner";
-  const canAccessAdmin = Boolean(user) && Boolean(activeHostelSlug) && isStaff;
+  const canAccessAdmin = isSuperAdmin || (Boolean(user) && Boolean(activeHostelSlug) && isStaff);
 
   const value = useMemo<AuthContextType>(
     () => ({
@@ -157,17 +183,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       activeHostelSlug,
       role,
 
-      // compat
       hostelSlug: activeHostelSlug,
 
+      isSuperAdmin,
       isOwner,
       isManager,
       isStaff,
       canAccessAdmin,
 
       loading,
+      refreshTokenClaims,
     }),
-    [user, activeHostelSlug, role, isOwner, isManager, isStaff, canAccessAdmin, loading]
+    [user, activeHostelSlug, role, isSuperAdmin, isOwner, isManager, isStaff, canAccessAdmin, loading]
   );
 
   return (

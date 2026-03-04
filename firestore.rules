@@ -10,6 +10,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.role == "superadmin";
+    }
+
     function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
@@ -51,10 +55,18 @@ service cloud.firestore {
     }
 
     // -------------------------
+    // INVITES (NUEVO)
+    // -------------------------
+    match /invites/{code} {
+      allow read, create, update, delete: if isSuperAdmin();
+    }
+
+    // -------------------------
     // USERS
     // -------------------------
     match /users/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid;
+      // (opcional) superadmin puede leer users si querés auditar
+      allow read: if (isSignedIn() && request.auth.uid == uid) || isSuperAdmin();
 
       allow create: if isSignedIn()
         && request.auth.uid == uid
@@ -121,7 +133,6 @@ service cloud.firestore {
             && (!("description" in request.resource.data) || request.resource.data.description is string)
             && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
             && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            // ✅ serverTimestamp() llega como request.time
             && request.resource.data.createdAt == request.time
             && request.resource.data.updatedAt == request.time;
         }
@@ -140,15 +151,13 @@ service cloud.firestore {
             && (!("description" in request.resource.data) || request.resource.data.description is string)
             && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
             && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            // ✅ createdAt NO se toca
             && request.resource.data.createdAt == resource.data.createdAt
-            // ✅ updatedAt server time
             && request.resource.data.updatedAt == request.time;
         }
 
         allow read: if true;
 
-        // ✅ SOLO OWNER
+        // ✅ SOLO OWNER (vía members)
         allow create: if isOwner(hostelSlug) && validRoomCreate();
         allow update: if isOwner(hostelSlug) && validRoomUpdate();
         allow delete: if isOwner(hostelSlug);

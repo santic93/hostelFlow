@@ -22,6 +22,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../services/firebase";
 import { Seo } from "../../components/Seo";
+import { useAuth } from "../../app/providers/AuthContext";
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -36,6 +37,8 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  const { isSuperAdmin } = useAuth();
 
   useEffect(() => {
     if (searchParams.get("forbidden") === "1") {
@@ -60,13 +63,31 @@ export default function LoginPage() {
 
       await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 
-      // ✅ Volver a la ruta original si venías redirigido (superadmin, etc.)
+      // ✅ refrescar token para traer claims recién seteados
+      await auth.currentUser?.getIdToken(true);
+
+      // ✅ 1) si venías redirigido desde una ruta protegida (superadmin, etc), volvés ahí
       const fromPath =
         (location.state as any)?.from?.pathname ||
         (location.state as any)?.from ||
-        "/admin";
+        null;
 
-      navigate(fromPath, { replace: true });
+      if (fromPath) {
+        navigate(fromPath, { replace: true });
+        return;
+      }
+
+      // ✅ 2) si no venías de ningún lado: si sos superadmin → panel superadmin
+      // Nota: isSuperAdmin puede tardar 1 tick; por eso también usamos claims directas si hace falta
+      const token = await auth.currentUser?.getIdTokenResult?.();
+      const role = String((token?.claims as any)?.role || "");
+      const superadmin = role === "superadmin" || isSuperAdmin;
+
+      if (superadmin) {
+        navigate("/superadmin/invites", { replace: true });
+      } else {
+        navigate("/admin", { replace: true });
+      }
     } catch (err: any) {
       console.error("LOGIN ERROR =>", err);
 

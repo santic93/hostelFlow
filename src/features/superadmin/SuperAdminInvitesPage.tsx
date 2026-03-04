@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../services/firebase";
+import { functions, auth } from "../../services/firebase";
 import { useAuth } from "../../app/providers/AuthContext";
 import {
   Alert,
@@ -12,31 +12,40 @@ import {
   Typography,
   Stack,
   Divider,
+  Chip,
 } from "@mui/material";
+import { signOut } from "firebase/auth";
 
 function getCallableErrorText(e: any) {
   const code = String(e?.code || "");
   const message = String(e?.message || "Error desconocido");
   const details = e?.details ? String(e.details) : "";
 
-  // Firebase suele devolver: "functions/permission-denied"
   if (code.includes("permission-denied")) return "No autorizado (solo superadmin).";
   if (code.includes("unauthenticated")) return "Necesitás iniciar sesión.";
   if (code.includes("internal")) return "Error interno (revisá logs de Functions).";
-
-  // fallback
   return details ? `${message} (${details})` : message;
 }
 
 export default function SuperAdminInvitesPage() {
-  const { isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin, claimsRole } = useAuth();
 
   const [notes, setNotes] = useState("");
   const [code, setCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const canCreate = useMemo(() => isSuperAdmin && !loading, [isSuperAdmin, loading]);
+  const canCreate = useMemo(() => Boolean(user) && isSuperAdmin && !loading, [user, isSuperAdmin, loading]);
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setMsg({ type: "success", text: "Sesión cerrada." });
+      setCode(null);
+    } catch {
+      setMsg({ type: "error", text: "No se pudo cerrar sesión." });
+    }
+  };
 
   const createInvite = async () => {
     setMsg(null);
@@ -69,10 +78,14 @@ export default function SuperAdminInvitesPage() {
     }
   };
 
-  if (!isSuperAdmin) {
+  // ✅ Bloqueo duro: si no hay user o no es superadmin, NO existe pantalla funcional
+  if (!user || !isSuperAdmin) {
     return (
       <Container sx={{ py: 10, maxWidth: 520 }}>
         <Alert severity="error">No autorizado.</Alert>
+        <Box sx={{ mt: 2, fontSize: 13, opacity: 0.8 }}>
+          user: {user?.email ?? "null"} · claimsRole: {claimsRole || "—"}
+        </Box>
       </Container>
     );
   }
@@ -86,6 +99,14 @@ export default function SuperAdminInvitesPage() {
       <Typography sx={{ opacity: 0.8, mb: 2 }}>
         Generá un código para habilitar la creación de un hostel. El usuario lo ingresa en el registro.
       </Typography>
+
+      <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", alignItems: "center" }}>
+        <Chip label={`Logueado: ${user.email ?? "—"}`} />
+        <Chip label={`Claims: ${claimsRole || "—"}`} color="success" />
+        <Button variant="outlined" onClick={logout}>
+          Cerrar sesión
+        </Button>
+      </Stack>
 
       {msg && (
         <Alert severity={msg.type} sx={{ mb: 2 }}>

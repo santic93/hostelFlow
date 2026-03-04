@@ -42,9 +42,7 @@ type Room = {
 
 type Language = "es" | "en" | "pt";
 
-function dateKey(d: Date) {
-  return dayjs(d).format("YYYY-MM-DD");
-}
+
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();

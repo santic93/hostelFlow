@@ -241,33 +241,45 @@ function normalizeSlug(input: string) {
 }
 
 // -------------------- FUNCTIONS
+export const createInvite = onCall(
+  { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
+  async (req) => {
+    initSentryOnce();
+    const rid = createRid("createInvite");
+    logRid(rid, "start", { hasAuth: !!req.auth });
 
-/**
- * ✅ Superadmin crea invites (NUEVO)
- * Requiere custom claim: role = "superadmin"
- */
-export const createInvite = onCall(async (req) => {
-  const uid = req.auth?.uid;
-  const role = (req.auth?.token as any)?.role;
+    try {
+      const auth = requireAuth(req); // ✅ NO LOGIN -> unauthenticated
+      const uid = auth.uid;
 
-  if (!uid) throw new HttpsError("unauthenticated", "Debes estar logueado.");
-  if (role !== "superadmin") throw new HttpsError("permission-denied", "Solo superadmin.");
+      const role = String((auth.token as any)?.role || "");
+      if (role !== "superadmin") {
+        throw new HttpsError("permission-denied", "Solo superadmin.");
+      }
 
-  const notes = (req.data?.notes ?? null) as string | null;
+      const notes = (req.data?.notes ?? null) as string | null;
 
-  const code = randomCode(10);
-  await db.collection("invites").doc(code).set({
-    active: true,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    createdByUid: uid,
-    usedByUid: null,
-    usedAt: null,
-    notes: notes ?? null,
-  });
+      const code = randomCode(10);
+      await db.collection("invites").doc(code).set({
+        active: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdByUid: uid,
+        usedByUid: null,
+        usedAt: null,
+        notes: notes ?? null,
+      });
 
-  return { code };
-});
+      logRid(rid, "ok", { code });
+      return { code, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+      captureToSentry(err, { rid, fn: "createInvite" });
 
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
+  }
+);
 /**
  * ✅ createHostel (MODIFICADO)
  * - exige inviteCode

@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { onAuthStateChanged, type User, getIdTokenResult } from "firebase/auth";
+import { onAuthStateChanged, onIdTokenChanged, getIdTokenResult, type User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../../services/firebase";
 import HotelLoading from "../../components/HotelLoading";
 
-export type Role = "superadmin" | "owner" | "manager" | "staff" | "guest";
+export type Role = "owner" | "manager" | "staff" | "guest";
+export type ClaimsRole = "superadmin" | "owner" | "manager" | "staff" | "guest" | "";
 
 export type AuthContextType = {
   user: User | null;
@@ -12,18 +13,19 @@ export type AuthContextType = {
   activeHostelSlug: string | null;
   role: Role;
 
+  // ✅ custom claims
+  claimsRole: ClaimsRole;
+  isSuperAdmin: boolean;
+
+  // compat
   hostelSlug: string | null;
 
-  isSuperAdmin: boolean;
   isOwner: boolean;
   isManager: boolean;
   isStaff: boolean;
   canAccessAdmin: boolean;
 
   loading: boolean;
-
-  // útil cuando setCustomUserClaims cambian
-  refreshTokenClaims: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,44 +33,30 @@ const AuthContext = createContext<AuthContextType>({
   activeHostelSlug: null,
   role: "guest",
 
+  claimsRole: "",
+  isSuperAdmin: false,
+
   hostelSlug: null,
 
-  isSuperAdmin: false,
   isOwner: false,
   isManager: false,
   isStaff: false,
   canAccessAdmin: false,
 
   loading: true,
-  refreshTokenClaims: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [activeHostelSlug, setActiveHostelSlug] = useState<string | null>(null);
   const [role, setRole] = useState<Role>("guest");
+
+  const [claimsRole, setClaimsRole] = useState<ClaimsRole>("");
   const [loading, setLoading] = useState(true);
 
-  const MIN_LOADING_MS = 900;
+  // loader mínimo para evitar parpadeo
+  const MIN_LOADING_MS = 700;
   const [showLoading, setShowLoading] = useState(true);
-
-  const readClaimsRole = async (u: User): Promise<Role | null> => {
-    try {
-      const tok = await getIdTokenResult(u, true);
-      const r = String((tok.claims as any)?.role || "");
-      if (r === "superadmin") return "superadmin";
-      return null;
-    } catch {
-      return null;
-    }
-  };
-
-  const refreshTokenClaims = async () => {
-    if (!auth.currentUser) return;
-    // fuerza refresh del token y vuelve a disparar lectura del claim
-    await getIdTokenResult(auth.currentUser, true);
-    // no hacemos set directo acá porque el flujo principal lo recalcula
-  };
 
   useEffect(() => {
     let timer: number | undefined;
@@ -79,11 +67,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [loading]);
 
+  // ✅ 1) Auth state
   useEffect(() => {
     let unsubUserDoc: null | (() => void) = null;
     let unsubMemberDoc: null | (() => void) = null;
 
-    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (unsubUserDoc) unsubUserDoc();
       if (unsubMemberDoc) unsubMemberDoc();
       unsubUserDoc = null;
@@ -95,22 +84,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null);
         setActiveHostelSlug(null);
         setRole("guest");
+        setClaimsRole("");
         setLoading(false);
         return;
       }
 
       setUser(firebaseUser);
 
-      // 0) si es superadmin por claim -> no dependemos de membresías
-      const claimRole = await readClaimsRole(firebaseUser);
-      if (claimRole === "superadmin") {
-        setActiveHostelSlug(null);
-        setRole("superadmin");
-        setLoading(false);
-        return;
-      }
-
-      // 1) user doc: activeHostelSlug
+      // user doc: activeHostelSlug
       const userRef = doc(db, "users", firebaseUser.uid);
       unsubUserDoc = onSnapshot(
         userRef,
@@ -124,10 +105,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
           const data = snap.data() as any;
           const slug = (data?.activeHostelSlug ?? data?.hostelSlug ?? null) as string | null;
-
           setActiveHostelSlug(slug);
 
-          // 2) member doc del hostel activo
           if (unsubMemberDoc) unsubMemberDoc();
           unsubMemberDoc = null;
 
@@ -171,11 +150,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  const isSuperAdmin = role === "superadmin";
+  // ✅ 2) Claims (SUPERADMIN)
+  useEffect(() => {
+    const unsub = onIdTokenChanged(auth, async (u) => {
+      if (!u) {
+        setClaimsRole("");
+        return;
+      }
+      try {
+        const token = await getIdTokenResult(u, true);
+        const r = String((token.claims as any)?.role || "");
+        setClaimsRole(r as ClaimsRole);
+      } catch {
+        setClaimsRole("");
+      }
+    });
+    return unsub;
+  }, []);
+
+  const isSuperAdmin = claimsRole === "superadmin";
+
+  // roles de hostel
   const isOwner = role === "owner";
   const isManager = role === "manager" || role === "owner";
   const isStaff = role === "staff" || role === "manager" || role === "owner";
-  const canAccessAdmin = isSuperAdmin || (Boolean(user) && Boolean(activeHostelSlug) && isStaff);
+  const canAccessAdmin = Boolean(user) && Boolean(activeHostelSlug) && isStaff;
 
   const value = useMemo<AuthContextType>(
     () => ({
@@ -183,18 +182,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       activeHostelSlug,
       role,
 
+      claimsRole,
+      isSuperAdmin,
+
       hostelSlug: activeHostelSlug,
 
-      isSuperAdmin,
       isOwner,
       isManager,
       isStaff,
       canAccessAdmin,
 
       loading,
-      refreshTokenClaims,
     }),
-    [user, activeHostelSlug, role, isSuperAdmin, isOwner, isManager, isStaff, canAccessAdmin, loading]
+    [user, activeHostelSlug, role, claimsRole, isSuperAdmin, isOwner, isManager, isStaff, canAccessAdmin, loading]
   );
 
   return (

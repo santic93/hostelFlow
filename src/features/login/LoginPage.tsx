@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link as RouterLink, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Link as RouterLink,
+  useNavigate,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Alert,
@@ -15,9 +20,8 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../services/firebase"; // ajustá path si difiere
+import { auth } from "../../services/firebase";
 import { Seo } from "../../components/Seo";
-// ajustá path si difiere
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -30,6 +34,7 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -55,7 +60,13 @@ export default function LoginPage() {
 
       await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
 
-      navigate("/admin", { replace: true });
+      // ✅ Volver a la ruta original si venías redirigido (superadmin, etc.)
+      const fromPath =
+        (location.state as any)?.from?.pathname ||
+        (location.state as any)?.from ||
+        "/admin";
+
+      navigate(fromPath, { replace: true });
     } catch (err: any) {
       console.error("LOGIN ERROR =>", err);
 
@@ -65,12 +76,12 @@ export default function LoginPage() {
         code === "auth/invalid-credential"
           ? t("login.errors.invalidCredentials")
           : code === "auth/user-not-found"
-            ? t("login.errors.userNotFound")
-            : code === "auth/wrong-password"
-              ? t("login.errors.wrongPassword")
-              : code
-                ? t("login.errors.genericWithCode", { code })
-                : t("login.errors.generic");
+          ? t("login.errors.userNotFound")
+          : code === "auth/wrong-password"
+          ? t("login.errors.wrongPassword")
+          : code
+          ? t("login.errors.genericWithCode", { code })
+          : t("login.errors.generic");
 
       setMsg({ type: "error", text });
     } finally {
@@ -100,7 +111,11 @@ export default function LoginPage() {
             if (e.key === "Enter") handleLogin();
           }}
         >
-          <TextField label={t("login.fields.email")} value={email} onChange={(e) => setEmail(e.target.value)} />
+          <TextField
+            label={t("login.fields.email")}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
 
           <TextField
             label={t("login.fields.password")}

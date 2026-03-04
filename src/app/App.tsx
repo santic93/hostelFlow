@@ -28,7 +28,8 @@ import { ErrorBoundary } from "@sentry/react";
 import { AuthProvider } from "./providers/AuthContext";
 
 // ✅ NUEVO
-import SuperAdminInvitesPage from "../features/superadmin/SuperAdminInvitesPage"; 
+import SuperAdminInvitesPage from "../features/superadmin/SuperAdminInvitesPage";
+import SuperAdminRoute from "../components/SuperAdminRoute";
 
 export const router = createBrowserRouter([
   {
@@ -41,7 +42,14 @@ export const router = createBrowserRouter([
       { path: "admin", element: <AdminRedirect /> },
 
       // ✅ SUPERADMIN (GLOBAL)
-      { path: "superadmin/invites", element: <SuperAdminInvitesPage /> },
+      {
+        path: "superadmin/invites",
+        element: (
+          <SuperAdminRoute>
+            <SuperAdminInvitesPage />
+          </SuperAdminRoute>
+        ),
+      },
 
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },

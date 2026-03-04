@@ -42,14 +42,14 @@ export const router = createBrowserRouter([
       { path: "admin", element: <AdminRedirect /> },
 
       // ✅ SUPERADMIN (GLOBAL)
-      {
-        path: "superadmin/invites",
-        element: (
-          <SuperAdminRoute>
-            <SuperAdminInvitesPage />
-          </SuperAdminRoute>
-        ),
-      },
+    {
+  path: "superadmin/invites",
+  element: (
+    <SuperAdminRoute>
+      <SuperAdminInvitesPage />
+    </SuperAdminRoute>
+  ),
+},
 
       { path: "forgot-password", element: <ForgotPasswordPage /> },
       { path: "reset-password", element: <ResetPasswordPage /> },

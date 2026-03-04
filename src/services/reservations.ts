@@ -1,3 +1,4 @@
+// src/services/reservations.ts
 import { httpsCallable } from "firebase/functions";
 import { functions } from "./firebase";
 
@@ -32,4 +33,24 @@ export async function cancelReservation(input: { hostelSlug: string; reservation
   const fn = httpsCallable(functions, "cancelReservation");
   const res = await fn(input);
   return res.data as { ok: boolean };
+}
+
+export type GetRoomAvailabilityInput = {
+  hostelSlug: string;
+  roomId: string;
+  from: string; // YYYY-MM-DD
+  to: string;   // YYYY-MM-DD (to exclusivo)
+};
+
+export type GetRoomAvailabilityResponse = {
+  ok: boolean;
+  dates: string[];
+  buildingIndex?: boolean;
+  rid?: string;
+};
+
+export async function getRoomAvailability(input: GetRoomAvailabilityInput) {
+  const fn = httpsCallable(functions, "getRoomAvailability");
+  const res = await fn(input);
+  return res.data as GetRoomAvailabilityResponse;
 }

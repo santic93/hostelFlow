@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import dayjs, { Dayjs } from "dayjs";
-import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
-import "dayjs/locale/es";
-import "dayjs/locale/en";
-import "dayjs/locale/pt-br";
-
 import {
   Alert,
   Box,
@@ -17,12 +11,21 @@ import {
   Stack,
   TextField,
   Typography,
+  CircularProgress,
 } from "@mui/material";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { doc, getDoc } from "firebase/firestore";
-import HotelLoading from "../../components/HotelLoading";
-import { createReservation } from "../../services/reservations";
+
+import dayjs, { Dayjs } from "dayjs";
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+
+import { getDoc, doc } from "firebase/firestore";
 import { db } from "../../services/firebase";
+
+import HotelLoading from "../../components/HotelLoading";
+
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { PickersDay } from "@mui/x-date-pickers/PickersDay";
+
+import { createReservation, getRoomAvailability } from "../../services/reservations";
 
 dayjs.extend(isSameOrBefore);
 
@@ -33,6 +36,64 @@ function getCallableErrorInfo(err: any) {
   return { code, message, details };
 }
 
+// helper: YYYY-MM-DD
+function fmt(d: Dayjs) {
+  return d.format("YYYY-MM-DD");
+}
+
+// check-in inclusive, check-out exclusive (nights)
+function eachNightInclusive(from: Dayjs, to: Dayjs) {
+  const out: string[] = [];
+  let cur = from.startOf("day");
+  const end = to.startOf("day");
+  while (cur.isBefore(end, "day")) {
+    out.push(fmt(cur));
+    cur = cur.add(1, "day");
+  }
+  return out;
+}
+
+/**
+ * CustomDay para MUI X v6/v7
+ * - No tipamos estricto PickersDayProps porque tu versión te está dando:
+ *   "PickersDayProps no es genérico" / incompatibilidades de SlotProps
+ * - Esto evita 100% los errores TS que estás viendo.
+ */
+function CustomDay(props: any) {
+  const { blockedSet, day, outsideCurrentMonth, ...other } = props;
+
+  const key = dayjs(day).format("YYYY-MM-DD");
+  const blocked = blockedSet instanceof Set ? blockedSet.has(key) : false;
+
+  return (
+    <Box sx={{ position: "relative" }}>
+      <PickersDay {...other} day={day} outsideCurrentMonth={outsideCurrentMonth} />
+
+      {blocked && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            fontSize: 11,
+            fontWeight: 900,
+            bgcolor: "rgba(0,0,0,0.15)",
+            pointerEvents: "none",
+            userSelect: "none",
+          }}
+        >
+          ×
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export const BookingPage = () => {
   const navigate = useNavigate();
   const { hostelSlug, roomId } = useParams();
@@ -40,6 +101,7 @@ export const BookingPage = () => {
 
   const lng = (i18n.language || "es").slice(0, 2);
   const dayjsLocale = lng === "pt" ? "pt-br" : lng === "en" ? "en" : "es";
+
   useEffect(() => {
     dayjs.locale(dayjsLocale);
   }, [dayjsLocale]);
@@ -51,13 +113,24 @@ export const BookingPage = () => {
   const [emailTouched, setEmailTouched] = useState(false);
 
   const [selectedRoom, setSelectedRoom] = useState<any>(null);
+
   const [loading, setLoading] = useState(false);
+  const [loadingAvail, setLoadingAvail] = useState(false);
+
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  // noches ocupadas (YYYY-MM-DD)
+  const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
 
   const isEmailValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
 
+  const today = dayjs().startOf("day");
+  const horizonFrom = today;
+  const horizonTo = today.add(365, "day");
+
+  // 1) room
   useEffect(() => {
     const fetchRoom = async () => {
       if (!hostelSlug || !roomId) return;
@@ -66,6 +139,49 @@ export const BookingPage = () => {
       else setSelectedRoom(null);
     };
     fetchRoom();
+  }, [hostelSlug, roomId]);
+
+  // 2) availability (room_nights) vía cloud function
+  useEffect(() => {
+    const run = async () => {
+      if (!hostelSlug || !roomId) return;
+
+      setLoadingAvail(true);
+      setFormError(null);
+
+      try {
+        const res = await getRoomAvailability({
+          hostelSlug,
+          roomId,
+          from: horizonFrom.format("YYYY-MM-DD"),
+          to: horizonTo.format("YYYY-MM-DD"),
+        });
+
+        const s = new Set<string>((res?.dates ?? []).filter(Boolean));
+        setBlockedSet(s);
+
+        // si el usuario tenía fechas elegidas, revalidamos
+        if (checkIn && s.has(fmt(checkIn))) {
+          setCheckIn(null);
+          setCheckOut(null);
+        }
+
+        if (checkIn && checkOut) {
+          const nightsArr = eachNightInclusive(checkIn, checkOut);
+          if (nightsArr.some((d) => s.has(d))) {
+            setCheckOut(null);
+          }
+        }
+      } catch (err: any) {
+        // Si falla availability, NO bloqueamos el booking (backend igual valida)
+        console.error("getRoomAvailability failed", err);
+      } finally {
+        setLoadingAvail(false);
+      }
+    };
+
+    run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hostelSlug, roomId]);
 
   const nights = useMemo(() => {
@@ -85,12 +201,23 @@ export const BookingPage = () => {
     fullName.trim().length > 2 &&
     isEmailValid;
 
+  const isBlockedDay = (d: Dayjs) => blockedSet.has(d.format("YYYY-MM-DD"));
+  const shouldDisable = (d: Dayjs) => d.isBefore(today, "day") || isBlockedDay(d);
+
   const handleConfirm = async () => {
     setFormError(null);
     if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
+    // guard extra: no permitir rangos que incluyan noches bloqueadas
+    const nightsArr = eachNightInclusive(checkIn, checkOut);
+    if (nightsArr.some((d) => blockedSet.has(d))) {
+      setFormError(t("booking.unavailable"));
+      return;
+    }
+
     try {
       setLoading(true);
+
       const payload = {
         hostelSlug,
         roomId: selectedRoom.id,
@@ -101,6 +228,7 @@ export const BookingPage = () => {
       };
 
       const res = await createReservation(payload);
+
       if (res?.ok) setSuccess(true);
       else setFormError(t("booking.errorSaving"));
     } catch (err: any) {
@@ -130,7 +258,9 @@ export const BookingPage = () => {
             <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
               {t("booking.successTitle")}
             </Typography>
-            <Typography sx={{ color: "text.secondary" }}>{t("booking.successText")}</Typography>
+            <Typography sx={{ color: "text.secondary" }}>
+              {t("booking.successText")}
+            </Typography>
           </CardContent>
         </Card>
       </Container>
@@ -140,7 +270,11 @@ export const BookingPage = () => {
   return (
     <Container sx={{ py: { xs: 3, sm: 5 } }}>
       <Stack spacing={2}>
-        <Button variant="outlined" onClick={() => navigate(-1)} sx={{ alignSelf: "flex-start" }}>
+        <Button
+          variant="outlined"
+          onClick={() => navigate(-1)}
+          sx={{ alignSelf: "flex-start" }}
+        >
           {t("booking.back")}
         </Button>
 
@@ -148,7 +282,17 @@ export const BookingPage = () => {
 
         {formError && <Alert severity="error">{formError}</Alert>}
 
-        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="stretch">
+        {loadingAvail && (
+          <Alert severity="info" icon={<CircularProgress size={16} />}>
+            {t("booking.loadingAvailability", "Cargando disponibilidad…")}
+          </Alert>
+        )}
+
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems="stretch"
+        >
           {/* FORM */}
           <Card sx={{ flex: 1 }}>
             <CardContent>
@@ -156,19 +300,90 @@ export const BookingPage = () => {
                 <DatePicker
                   label={t("booking.checkIn")}
                   value={checkIn}
+                  minDate={today}
+                  shouldDisableDate={(d) => shouldDisable(dayjs(d))}
                   onChange={(newValue) => {
-                    setCheckIn(newValue);
-                    if (checkOut && newValue && checkOut.isSameOrBefore(newValue, "day")) {
+                    setFormError(null);
+
+                    if (!newValue) {
+                      setCheckIn(null);
                       setCheckOut(null);
+                      return;
                     }
+
+                    const v = newValue.startOf("day");
+
+                    if (shouldDisable(v)) {
+                      setFormError(t("booking.unavailable"));
+                      return;
+                    }
+
+                    setCheckIn(v);
+
+                    if (checkOut && checkOut.isSameOrBefore(v, "day")) {
+                      setCheckOut(null);
+                    } else if (checkOut) {
+                      const nightsArr = eachNightInclusive(v, checkOut);
+                      if (nightsArr.some((d2) => blockedSet.has(d2))) {
+                        setCheckOut(null);
+                      }
+                    }
+                  }}
+                  slots={{ day: CustomDay }}
+                  slotProps={{
+                    day: {
+                      blockedSet,
+                    } as any,
                   }}
                 />
 
                 <DatePicker
                   label={t("booking.checkOut")}
                   value={checkOut}
-                  onChange={(newValue) => setCheckOut(newValue)}
-                  minDate={checkIn ? checkIn.add(1, "day") : undefined}
+                  minDate={checkIn ? checkIn.add(1, "day") : today.add(1, "day")}
+                  shouldDisableDate={(d) => shouldDisable(dayjs(d))}
+                  onChange={(newValue) => {
+                    setFormError(null);
+
+                    if (!newValue) {
+                      setCheckOut(null);
+                      return;
+                    }
+
+                    if (!checkIn) {
+                      setFormError(
+                        t("booking.selectCheckInFirst", "Primero elegí el check-in.")
+                      );
+                      return;
+                    }
+
+                    const v = newValue.startOf("day");
+
+                    if (v.isSameOrBefore(checkIn, "day")) {
+                      setCheckOut(null);
+                      return;
+                    }
+
+                    if (shouldDisable(v)) {
+                      setFormError(t("booking.unavailable"));
+                      return;
+                    }
+
+                    const nightsArr = eachNightInclusive(checkIn, v);
+                    if (nightsArr.some((d2) => blockedSet.has(d2))) {
+                      setFormError(t("booking.unavailable"));
+                      setCheckOut(null);
+                      return;
+                    }
+
+                    setCheckOut(v);
+                  }}
+                  slots={{ day: CustomDay }}
+                  slotProps={{
+                    day: {
+                      blockedSet,
+                    } as any,
+                  }}
                 />
 
                 <TextField
@@ -205,12 +420,18 @@ export const BookingPage = () => {
             <CardContent>
               {selectedRoom ? (
                 <Stack spacing={1.2}>
-                  <Typography sx={{ fontWeight: 900, fontSize: 18 }}>{selectedRoom.name}</Typography>
+                  <Typography sx={{ fontWeight: 900, fontSize: 18 }}>
+                    {selectedRoom.name}
+                  </Typography>
+
                   <Typography sx={{ color: "text.secondary" }}>
                     {t("booking.summaryPerNight", { price: selectedRoom.price })}
                   </Typography>
+
                   <Typography sx={{ color: "text.secondary" }}>
-                    {nights > 0 ? t("booking.summaryNights", { n: nights }) : t("booking.summarySelectDates")}
+                    {nights > 0
+                      ? t("booking.summaryNights", { n: nights })
+                      : t("booking.summarySelectDates")}
                   </Typography>
 
                   <Box sx={{ height: 10 }} />
@@ -224,7 +445,9 @@ export const BookingPage = () => {
                   </Typography>
                 </Stack>
               ) : (
-                <Typography sx={{ opacity: 0.75 }}>{t("booking.summarySelectRoom")}</Typography>
+                <Typography sx={{ opacity: 0.75 }}>
+                  {t("booking.summarySelectRoom")}
+                </Typography>
               )}
             </CardContent>
           </Card>

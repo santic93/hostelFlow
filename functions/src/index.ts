@@ -850,3 +850,4 @@ export const getRoomAvailability = onCall(
 
 
 export * from "./adminRooms";
+export * from "./getRoomAvailabity"

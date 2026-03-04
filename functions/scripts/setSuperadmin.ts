@@ -1,12 +1,25 @@
 import * as admin from "firebase-admin";
+import path from "path";
+import fs from "fs";
 
-admin.initializeApp();
+// ✅ Ruta al JSON (cambiá si lo guardaste en otro lado)
+const SERVICE_ACCOUNT_PATH = path.resolve(__dirname, "../serviceAccountKey.json");
+
+if (!fs.existsSync(SERVICE_ACCOUNT_PATH)) {
+  console.error("❌ No encuentro el service account JSON en:", SERVICE_ACCOUNT_PATH);
+  console.error("   Colocalo ahí o cambiá la ruta en el script.");
+  process.exit(1);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const serviceAccount = require(SERVICE_ACCOUNT_PATH);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 async function main() {
-  const email = process.argv[2];
-  if (!email) {
-    throw new Error('Uso: npx ts-node scripts/setSuperAdmin.ts "email@dominio.com"');
-  }
+  const email = "santiagocastro.sac@gmail.com";
 
   const user = await admin.auth().getUserByEmail(email);
 
@@ -14,11 +27,13 @@ async function main() {
     role: "superadmin",
   });
 
-  console.log("OK ✅ superadmin seteado:", { email, uid: user.uid });
-  console.log("IMPORTANTE: ese usuario debe cerrar sesión y volver a iniciar sesión para refrescar el token.");
+  console.log("✅ Superadmin asignado correctamente");
+  console.log("Email:", email);
+  console.log("UID:", user.uid);
+  console.log("IMPORTANTE: cerrar sesión y volver a loguearse para refrescar el token.");
 }
 
 main().catch((e) => {
-  console.error("ERROR:", e);
+  console.error("❌ Error asignando superadmin:", e);
   process.exit(1);
 });

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import * as XLSX from "xlsx";
 import {
@@ -48,19 +48,33 @@ type ReservationRow = {
   createdAt: Date | null;
 };
 
+function parseStatus(x: string | null): ReservationStatus | "all" {
+  if (x === "pending" || x === "confirmed" || x === "cancelled") return x;
+  if (x === "all") return "all";
+  return "all";
+}
+
 export default function ReservationsSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
   const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ✅ inicial desde URL si existe
+  const initialFrom = searchParams.get("from") || dayjs().startOf("month").format("YYYY-MM-DD");
+  const initialTo = searchParams.get("to") || dayjs().endOf("month").format("YYYY-MM-DD");
+  const initialStatus = parseStatus(searchParams.get("status"));
+  const initialQ = searchParams.get("q") || "";
+
   const [rows, setRows] = useState<ReservationRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [savingById, setSavingById] = useState<Record<string, boolean>>({});
 
-  const [status, setStatus] = useState<ReservationStatus | "all">("all");
-  const [from, setFrom] = useState<string>(dayjs().startOf("month").format("YYYY-MM-DD"));
-  const [to, setTo] = useState<string>(dayjs().endOf("month").format("YYYY-MM-DD"));
-  const [qText, setQText] = useState("");
+  const [status, setStatus] = useState<ReservationStatus | "all">(initialStatus);
+  const [from, setFrom] = useState<string>(initialFrom);
+  const [to, setTo] = useState<string>(initialTo);
+  const [qText, setQText] = useState(initialQ);
 
   const [err, setErr] = useState<string | null>(null);
 
@@ -80,6 +94,48 @@ export default function ReservationsSection() {
     setConfirmCancelOpen(false);
     setCancelTarget(null);
   };
+
+  // ✅ 1) Cuando cambian query params (ej: venís desde dashboard), sincronizamos estado
+  useEffect(() => {
+    const spFrom = searchParams.get("from");
+    const spTo = searchParams.get("to");
+    const spStatus = searchParams.get("status");
+    const spQ = searchParams.get("q");
+
+    if (spFrom && spFrom !== from) setFrom(spFrom);
+    if (spTo && spTo !== to) setTo(spTo);
+
+    const parsed = parseStatus(spStatus);
+    if (parsed !== status) setStatus(parsed as any);
+
+    if (spQ !== null && spQ !== qText) setQText(spQ);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  // ✅ 2) Cuando el usuario cambia filtros en UI, actualizamos la URL (copiable)
+  //     (esto NO navega de página, solo cambia querystring)
+  useEffect(() => {
+    // armamos params limpios
+    const next = new URLSearchParams(searchParams);
+
+    // from/to siempre
+    next.set("from", from);
+    next.set("to", to);
+
+    // status: si es all lo ponemos igual (así el dashboard puede mandar all también)
+    next.set("status", status);
+
+    // q: solo si hay algo
+    const q = qText.trim();
+    if (q) next.set("q", q);
+    else next.delete("q");
+
+    // evitamos loops: sólo seteamos si realmente cambia
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, to, status, qText]);
 
   const fetchReservations = async () => {
     if (!hostelSlug) return;
@@ -131,6 +187,7 @@ export default function ReservationsSection() {
     if (s === "cancelled") return t("admin.reservations.statusValues.cancelled", "Cancelada");
     return t("admin.reservations.statusValues.pending", "Pendiente");
   };
+
   function downloadBlob(blob: Blob, fileName: string) {
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
@@ -151,9 +208,6 @@ export default function ReservationsSection() {
   }) {
     const { hostelSlug, from, to, statusLabelText, searchText, rows, moneyFmt, statusLabelFn } = args;
 
-    // -------------------------
-    // Sheet 1: Reservations
-    // -------------------------
     const reservationsAoA: any[][] = [
       ["ID", "Huésped", "Habitación", "Email", "Check In", "Check Out", "Noches", "Total", "Estado", "Creada"],
     ];
@@ -161,8 +215,7 @@ export default function ReservationsSection() {
     for (const r of rows) {
       const checkInStr = r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "";
       const checkOutStr = r.checkOut ? dayjs(r.checkOut).format("YYYY-MM-DD") : "";
-      const nights =
-        r.checkIn && r.checkOut ? Math.max(0, dayjs(r.checkOut).diff(dayjs(r.checkIn), "day")) : "";
+      const nights = r.checkIn && r.checkOut ? Math.max(0, dayjs(r.checkOut).diff(dayjs(r.checkIn), "day")) : "";
 
       reservationsAoA.push([
         r.id,
@@ -180,33 +233,28 @@ export default function ReservationsSection() {
 
     const wsReservations = XLSX.utils.aoa_to_sheet(reservationsAoA);
 
-    // Formato numérico (Total) como número con 0 decimales (Excel)
-    // Columna Total = índice 7 (H)
     for (let r = 2; r <= reservationsAoA.length; r++) {
       const cellAddr = XLSX.utils.encode_cell({ r: r - 1, c: 7 });
       const cell = wsReservations[cellAddr];
       if (cell && typeof cell.v === "number") {
         cell.t = "n";
-        cell.z = "#,##0"; // formato numérico (si querés USD con símbolo, lo hacemos después)
+        cell.z = "#,##0";
       }
     }
 
     wsReservations["!cols"] = [
-      { wch: 24 }, // ID
-      { wch: 22 }, // Huésped
-      { wch: 20 }, // Habitación
-      { wch: 28 }, // Email
-      { wch: 12 }, // CheckIn
-      { wch: 12 }, // CheckOut
-      { wch: 8 },  // Noches
-      { wch: 12 }, // Total
-      { wch: 14 }, // Estado
-      { wch: 18 }, // Creada
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 28 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 18 },
     ];
 
-    // -------------------------
-    // Sheet 2: Summary
-    // -------------------------
     const total = rows.reduce((acc, r) => acc + Number(r.total ?? 0), 0);
     const byStatus = {
       pending: rows.filter((r) => r.status === "pending").length,
@@ -237,18 +285,12 @@ export default function ReservationsSection() {
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoA);
     wsSummary["!cols"] = [{ wch: 26 }, { wch: 40 }];
 
-    // Revenue numérico (fila donde está "Revenue")
-    // Ojo: depende del índice exacto (acá es la fila 15 en 1-based AoA)
-    // Lo dejamos como número (ya lo pusimos como number en AoA).
-    const revenueCell = XLSX.utils.encode_cell({ r: 14, c: 1 }); // (0-based) fila 15, col B
+    const revenueCell = XLSX.utils.encode_cell({ r: 14, c: 1 });
     if (wsSummary[revenueCell]) {
       wsSummary[revenueCell].t = "n";
       wsSummary[revenueCell].z = "#,##0";
     }
 
-    // -------------------------
-    // Workbook + download
-    // -------------------------
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, wsReservations, "Reservations");
     XLSX.utils.book_append_sheet(wb, wsSummary, "Summary");
@@ -263,6 +305,7 @@ export default function ReservationsSection() {
 
     downloadBlob(blob, fileName);
   }
+
   const updateStatus = async (reservationId: string, newStatus: ReservationStatus) => {
     if (!hostelSlug) return;
     if (savingById[reservationId]) return;
@@ -309,9 +352,9 @@ export default function ReservationsSection() {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredRows, isMobile]);
+
   const money = useMemo(() => {
     const lang = (i18n.language || "es").slice(0, 2);
-    // si después querés moneda por hostel, acá lo cambiás
     return new Intl.NumberFormat(lang, {
       style: "currency",
       currency: "USD",
@@ -331,10 +374,7 @@ export default function ReservationsSection() {
 
       const base = collection(db, "hostels", hostelSlug, "reservations");
 
-      const clauses: any[] = [
-        where("checkIn", ">=", fromDate),
-        where("checkIn", "<=", toDate),
-      ];
+      const clauses: any[] = [where("checkIn", ">=", fromDate), where("checkIn", "<=", toDate)];
       if (status !== "all") clauses.push(where("status", "==", status));
 
       const q = query(base, ...clauses, orderBy("checkIn", "asc"));
@@ -355,7 +395,6 @@ export default function ReservationsSection() {
         };
       });
 
-      // aplica búsqueda texto igual que UI
       const qLower = qText.trim().toLowerCase();
       if (qLower) {
         data = data.filter((r) =>
@@ -371,7 +410,9 @@ export default function ReservationsSection() {
       }
 
       const statusText =
-        status === "all" ? t("admin.reservations.filterAll", "Todos los estados") : statusLabel(status as ReservationStatus);
+        status === "all"
+          ? t("admin.reservations.filterAll", "Todos los estados")
+          : statusLabel(status as ReservationStatus);
 
       buildXlsxAndDownload({
         hostelSlug,
@@ -389,6 +430,7 @@ export default function ReservationsSection() {
       setLoading(false);
     }
   };
+
   const localeText =
     (i18n.language?.startsWith("es") ? esES : i18n.language?.startsWith("pt") ? ptBR : enUS).components
       .MuiDataGrid.defaultProps.localeText;
@@ -494,12 +536,12 @@ export default function ReservationsSection() {
         },
       },
     ];
-  }, [savingById, t, i18n.language]);
+  }, [savingById, t]);
+
   return (
     <>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
         <Stack spacing={1.5} sx={{ mb: 2 }}>
-
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={1.5}
@@ -538,6 +580,7 @@ export default function ReservationsSection() {
                 <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
                 <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
               </Select>
+
               <Button
                 variant="outlined"
                 onClick={exportXLSX}
@@ -548,6 +591,7 @@ export default function ReservationsSection() {
               </Button>
             </Stack>
           </Stack>
+
           <TextField
             size="small"
             value={qText}
@@ -624,11 +668,19 @@ export default function ReservationsSection() {
                               <CircularProgress size={18} />
                             ) : (
                               <Stack direction="row" spacing={1} alignItems="center">
-                                <IconButton size="small" onClick={() => updateStatus(r.id, "confirmed")} disabled={r.status === "confirmed"}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => updateStatus(r.id, "confirmed")}
+                                  disabled={r.status === "confirmed"}
+                                >
                                   <CheckIcon fontSize="small" />
                                 </IconButton>
 
-                                <IconButton size="small" onClick={() => openCancelDialog(r)} disabled={r.status === "cancelled"}>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openCancelDialog(r)}
+                                  disabled={r.status === "cancelled"}
+                                >
                                   <CancelIcon fontSize="small" />
                                 </IconButton>
 
@@ -654,7 +706,13 @@ export default function ReservationsSection() {
           </Stack>
         ) : (
           <Box sx={{ height: 660, width: "100%" }}>
-            <DataGrid rows={filteredRows} columns={columns} disableRowSelectionOnClick localeText={localeText} rowHeight={52} />
+            <DataGrid
+              rows={filteredRows}
+              columns={columns}
+              disableRowSelectionOnClick
+              localeText={localeText}
+              rowHeight={52}
+            />
           </Box>
         )}
       </Box>

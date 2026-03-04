@@ -32,12 +32,18 @@ type Reservation = {
   status?: ReservationStatus;
   checkIn?: any; // Timestamp
   checkOut?: any; // Timestamp
+  roomId?: string;
+  roomName?: string;
+};
+
+type Room = {
+  capacity?: number; // opcional
 };
 
 type Language = "es" | "en" | "pt";
 
-function isSameOrAfterDay(a: dayjs.Dayjs, b: dayjs.Dayjs) {
-  return a.isSame(b, "day") || a.isAfter(b, "day");
+function dateKey(d: Date) {
+  return dayjs(d).format("YYYY-MM-DD");
 }
 
 export default function DashboardSection() {
@@ -53,8 +59,13 @@ export default function DashboardSection() {
   const [totalRooms, setTotalRooms] = useState(0);
 
   const [pendingCount, setPendingCount] = useState(0);
-  const [nextCheckins, setNextCheckins] = useState(0);
-  const [nextCheckouts, setNextCheckouts] = useState(0);
+
+  // ✅ NUEVO: hoy y próximos 7
+  const [todayCheckins, setTodayCheckins] = useState(0);
+  const [todayCheckouts, setTodayCheckouts] = useState(0);
+  const [next7Checkins, setNext7Checkins] = useState(0);
+  const [next7Checkouts, setNext7Checkouts] = useState(0);
+
   const [occupancyPct, setOccupancyPct] = useState(0);
 
   // ✅ NO lo eliminamos: selector idioma predeterminado
@@ -72,15 +83,6 @@ export default function DashboardSection() {
         maximumFractionDigits: 0,
       }),
     [i18n.language]
-  );
-
-  const StatCard = ({ title, value }: { title: string; value: React.ReactNode }) => (
-    <Card sx={{ borderRadius: 4 }}>
-      <CardContent>
-        <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>{title}</Typography>
-        <Typography sx={{ fontWeight: 900, fontSize: 26, letterSpacing: -0.3 }}>{value}</Typography>
-      </CardContent>
-    </Card>
   );
 
   const badgeSx = { borderRadius: 999, fontWeight: 900, bgcolor: "rgba(0,0,0,0.06)" } as const;
@@ -101,6 +103,16 @@ export default function DashboardSection() {
     navigate(`/${hostelSlug}/admin/rooms`);
   };
 
+  const goReservationsWith = (params: { from?: string; to?: string; status?: string; q?: string }) => {
+    if (!hostelSlug) return;
+    const sp = new URLSearchParams();
+    if (params.from) sp.set("from", params.from);
+    if (params.to) sp.set("to", params.to);
+    if (params.status) sp.set("status", params.status);
+    if (params.q) sp.set("q", params.q);
+    navigate(`/${hostelSlug}/admin/reservations?${sp.toString()}`);
+  };
+
   const saveDefaultLanguage = async () => {
     if (!hostelSlug) return;
     setSavingLang(true);
@@ -117,6 +129,40 @@ export default function DashboardSection() {
       setSavingLang(false);
     }
   };
+
+  const StatCard = ({
+    title,
+    value,
+    hint,
+    onClick,
+  }: {
+    title: string;
+    value: React.ReactNode;
+    hint?: string;
+    onClick?: () => void;
+  }) => (
+    <Card
+      onClick={onClick}
+      sx={{
+        borderRadius: 4,
+        cursor: onClick ? "pointer" : "default",
+        transition: "transform 0.12s ease, box-shadow 0.12s ease",
+        "&:hover": onClick
+          ? { transform: "translateY(-1px)", boxShadow: "0 10px 30px rgba(0,0,0,0.10)" }
+          : undefined,
+      }}
+    >
+      <CardContent>
+        <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 26, letterSpacing: -0.3 }}>{value}</Typography>
+        {hint ? (
+          <Typography sx={{ mt: 0.5, fontSize: 12, opacity: 0.75 }}>
+            {hint}
+          </Typography>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
 
   useEffect(() => {
     let alive = true;
@@ -135,9 +181,7 @@ export default function DashboardSection() {
 
         if (!alive) return;
 
-        const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
-
-        // ✅ idioma predeterminado (no eliminar)
+        // idioma predeterminado
         if (hostelSnap.exists()) {
           const data = hostelSnap.data() as any;
           const lng = String(data?.defaultLanguage ?? "es").slice(0, 2) as Language;
@@ -146,40 +190,59 @@ export default function DashboardSection() {
           setDefaultLang("es");
         }
 
+        const rooms = roomsSnap.docs.map((d) => d.data() as Room);
+        const reservations = reservationsSnap.docs.map((d) => d.data() as Reservation);
+
         const revenue = reservations.reduce((acc, curr) => acc + Number(curr.total ?? 0), 0);
         setTotalRevenue(revenue);
         setTotalReservations(reservations.length);
         setTotalRooms(roomsSnap.size);
 
-        // badges
         const pending = reservations.filter((r) => (r.status ?? "pending") === "pending").length;
         setPendingCount(pending);
 
-        const now = dayjs();
-        const today = now.startOf("day");
+        // ✅ HOY + PRÓXIMOS 7
+        const today = dayjs().startOf("day");
+        const end7 = today.add(7, "day").endOf("day");
 
-        const nextIn = reservations.filter((r) => {
-          const d = r.checkIn?.toDate?.();
-          if (!d) return false;
-          return isSameOrAfterDay(dayjs(d).startOf("day"), today);
-        }).length;
+        let tIn = 0;
+        let tOut = 0;
+        let nIn7 = 0;
+        let nOut7 = 0;
 
-        const nextOut = reservations.filter((r) => {
-          const d = r.checkOut?.toDate?.();
-          if (!d) return false;
-          return isSameOrAfterDay(dayjs(d).startOf("day"), today);
-        }).length;
+        for (const r of reservations) {
+          const ci = r.checkIn?.toDate?.();
+          const co = r.checkOut?.toDate?.();
 
-        setNextCheckins(nextIn);
-        setNextCheckouts(nextOut);
+          if (ci) {
+            const d = dayjs(ci).startOf("day");
+            if (d.isSame(today, "day")) tIn++;
+            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(ci).isBefore(end7)) nIn7++;
+          }
+          if (co) {
+            const d = dayjs(co).startOf("day");
+            if (d.isSame(today, "day")) tOut++;
+            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(co).isBefore(end7)) nOut7++;
+          }
+        }
 
-        // ocupación simple (30 días)
+        setTodayCheckins(tIn);
+        setTodayCheckouts(tOut);
+        setNext7Checkins(nIn7);
+        setNext7Checkouts(nOut7);
+
+        // ✅ ocupación simple (30 días) con “capacidad” si existe, si no 1 por room
         const days = 30;
         const horizonStart = today;
         const horizonEnd = today.add(days, "day");
 
+        const totalCapacityNights =
+          Math.max(
+            1,
+            rooms.reduce((acc, r) => acc + Math.max(1, Number(r.capacity ?? 1)), 0)
+          ) * days;
+
         let occupiedNights = 0;
-        const totalCapacityNights = Math.max(1, roomsSnap.size) * days;
 
         for (const r of reservations) {
           const inD = r.checkIn?.toDate?.();
@@ -213,10 +276,7 @@ export default function DashboardSection() {
   const checklist = useMemo(() => {
     const hasHostel = Boolean(hostelSlug);
     const hasRoom = totalRooms > 0;
-
-    // ⚠️ proxy por ahora: en el próximo paso lo hacemos real leyendo rooms.imageUrls
-    const imagesOk = totalRooms > 0;
-
+    const imagesOk = totalRooms > 0; // TODO: próximo paso lo hacemos real leyendo imageUrls
     const hasReservation = totalReservations > 0;
     return { hasHostel, hasRoom, imagesOk, hasReservation };
   }, [hostelSlug, totalRooms, totalReservations]);
@@ -232,6 +292,9 @@ export default function DashboardSection() {
       <Typography sx={{ fontWeight: 800 }}>{label}</Typography>
     </Stack>
   );
+
+  const todayStr = dayjs().format("YYYY-MM-DD");
+  const end7Str = dayjs().add(7, "day").format("YYYY-MM-DD");
 
   return (
     <Container disableGutters>
@@ -357,8 +420,8 @@ export default function DashboardSection() {
 
                 <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                   <Chip sx={badgeSx} label={`${pendingCount} ${t("admin.dashboard.badges.pending")}`} />
-                  <Chip sx={badgeSx} label={`${nextCheckins} ${t("admin.dashboard.badges.nextCheckins")}`} />
-                  <Chip sx={badgeSx} label={`${nextCheckouts} ${t("admin.dashboard.badges.nextCheckouts")}`} />
+                  <Chip sx={badgeSx} label={`${next7Checkins} ${t("admin.dashboard.badges.nextCheckins")}`} />
+                  <Chip sx={badgeSx} label={`${next7Checkouts} ${t("admin.dashboard.badges.nextCheckouts")}`} />
                 </Stack>
               </Stack>
             </Stack>
@@ -387,7 +450,35 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        {/* Stats sin Grid MUI */}
+        {/* ✅ NUEVO: Cards “Hoy” y “Próximos 7” + clic a Reservas */}
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" } }}>
+          <StatCard
+            title={t("admin.dashboard.cards.checkinsToday", "Check-ins hoy")}
+            value={todayCheckins}
+            hint={t("admin.dashboard.cards.tapToSee", "Tocá para ver en Reservas")}
+            onClick={() => goReservationsWith({ from: todayStr, to: todayStr })}
+          />
+          <StatCard
+            title={t("admin.dashboard.cards.checkoutsToday", "Check-outs hoy")}
+            value={todayCheckouts}
+            hint={t("admin.dashboard.cards.tapToSee", "Tocá para ver en Reservas")}
+            onClick={() => goReservationsWith({ from: todayStr, to: todayStr })}
+          />
+          <StatCard
+            title={t("admin.dashboard.cards.next7Checkins", "Próx. 7 días · Check-ins")}
+            value={next7Checkins}
+            hint={`${todayStr} → ${end7Str}`}
+            onClick={() => goReservationsWith({ from: todayStr, to: end7Str })}
+          />
+          <StatCard
+            title={t("admin.dashboard.cards.pending", "Pendientes")}
+            value={pendingCount}
+            hint={t("admin.dashboard.cards.tapToSee", "Tocá para ver en Reservas")}
+            onClick={() => goReservationsWith({ status: "pending" })}
+          />
+        </Box>
+
+        {/* Stats “de negocio” */}
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" } }}>
           <StatCard title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
           <StatCard title={t("admin.dashboard.cards.reservations")} value={totalReservations} />

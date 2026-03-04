@@ -13,6 +13,8 @@ import {
   Typography,
   IconButton,
   InputAdornment,
+  Stack,
+  Divider,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
@@ -40,6 +42,13 @@ function validatePasswordStrong(pass: string) {
   return errors;
 }
 
+function normalizeCallableError(err: any) {
+  const code = String(err?.code || ""); // functions/permission-denied, etc
+  const message = String(err?.message || ""); // INVITE_NOT_FOUND, etc
+  const details = err?.details ? String(err.details) : "";
+  return { code, message, details };
+}
+
 export default function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -50,14 +59,14 @@ export default function RegisterPage() {
   const [showPass, setShowPass] = useState(false);
 
   // Step 2
-  const [inviteCode, setInviteCode] = useState(""); // ✅ NUEVO
+  const [inviteCode, setInviteCode] = useState("");
   const [hostelName, setHostelName] = useState("");
   const [hostelSlug, setHostelSlug] = useState("");
 
   const [createdUser, setCreatedUser] = useState<any>(null);
 
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const normalizedSlug = useMemo(() => slugify(hostelSlug), [hostelSlug]);
 
@@ -77,6 +86,22 @@ export default function RegisterPage() {
     const parts = passwordErrors.map((k) => t(`register.password.rules.${k}`));
     return parts.join(" · ");
   }, [password, passwordOk, passwordErrors, t]);
+
+  // ✅ contactos (cambiá a lo tuyo)
+  const SUPPORT_EMAIL = "santiagocastro.sac@gmail.com";
+  const WHATSAPP_E164 = "54911XXXXXXXX"; // <-- PONÉ TU NÚMERO EN FORMATO E164 (Argentina ej: 54911...)
+  const WHATSAPP_LINK = `https://wa.me/${WHATSAPP_E164}?text=${encodeURIComponent(
+    "Hola! Quiero activar mi hostel en Hostly. ¿Me pasan un código de activación (invite)?"
+  )}`;
+
+  const copyText = async (txt: string) => {
+    try {
+      await navigator.clipboard.writeText(txt);
+      setMessage({ type: "success", text: "Copiado al portapapeles." });
+    } catch {
+      setMessage({ type: "error", text: "No se pudo copiar. Copialo manualmente." });
+    }
+  };
 
   const handleCreateAccount = async () => {
     if (loading) return;
@@ -114,7 +139,10 @@ export default function RegisterPage() {
     if (!current) return setMessage({ type: "error", text: t("register.errors.sessionUnavailable") });
 
     if (!inviteCode.trim()) {
-      return setMessage({ type: "error", text: "Necesitás un código de activación (Invite)." });
+      return setMessage({
+        type: "error",
+        text: "Necesitás un código de activación para crear tu hostel.",
+      });
     }
 
     if (!hostelName.trim()) return setMessage({ type: "error", text: t("register.errors.hostelNameRequired") });
@@ -123,33 +151,71 @@ export default function RegisterPage() {
     try {
       setLoading(true);
 
-      const createHostel = httpsCallable(functions, "createHostel"); // ✅ mismo nombre, pero ahora exige inviteCode
-
+      const createHostel = httpsCallable(functions, "createHostel");
       await createHostel({
         name: hostelName.trim(),
         slug: normalizedSlug,
         inviteCode: inviteCode.trim().toUpperCase(),
       });
 
-      // claims/members pueden tardar 1 refresh
       await current.getIdToken(true);
 
       setMessage({ type: "success", text: t("register.messages.hostelCreatedRedirecting") });
       navigate(`/${normalizedSlug}/admin`, { replace: true });
     } catch (err: any) {
-      console.error(err);
+      console.error("CREATE HOSTEL ERROR =>", err);
       setCreatedUser(auth.currentUser ?? createdUser);
 
-      // errores típicos de functions
-      const code = String(err?.code || "");
-      if (code === "functions/permission-denied") {
-        setMessage({ type: "error", text: "Invite inválido o no tenés permiso para activar un hostel." });
-      } else if (code === "functions/not-found") {
-        setMessage({ type: "error", text: "El Invite no existe." });
-      } else if (code === "functions/failed-precondition" || code === "functions/already-exists") {
-        setMessage({ type: "error", text: "Ese Invite ya fue usado o está inactivo." });
-      } else if (err?.code === "functions/already-exists" || err?.message === "SLUG_TAKEN") {
+      const e = normalizeCallableError(err);
+      const msg = `${e.message || ""}`.trim();
+
+      // ✅ Primero: reconocer por message (lo más útil si vos mandás INVITE_* desde backend)
+      if (msg === "INVITE_REQUIRED") {
+        setMessage({ type: "error", text: "Necesitás un código de activación para crear tu hostel." });
+        return;
+      }
+      if (msg === "INVITE_NOT_FOUND") {
+        setMessage({
+          type: "error",
+          text: "Ese código no existe. Si querés activar tu hostel en Hostly, escribinos y te ayudamos.",
+        });
+        return;
+      }
+      if (msg === "INVITE_INACTIVE") {
+        setMessage({
+          type: "error",
+          text: "Ese código está inactivo. Si te lo pasaron, pedí uno nuevo por WhatsApp o email.",
+        });
+        return;
+      }
+      if (msg === "INVITE_USED") {
+        setMessage({
+          type: "error",
+          text: "Ese código ya fue usado. Escribinos y te generamos uno nuevo.",
+        });
+        return;
+      }
+      if (msg === "USER_ALREADY_HAS_HOSTEL") {
+        setMessage({
+          type: "error",
+          text: "Tu usuario ya tiene un hostel asociado. Si necesitás otro, escribinos.",
+        });
+        return;
+      }
+      if (msg === "SLUG_TAKEN") {
         setMessage({ type: "error", text: t("register.errors.slugTaken") });
+        return;
+      }
+
+      // ✅ fallback por err.code
+      if (e.code === "functions/permission-denied") {
+        setMessage({ type: "error", text: "No autorizado. Necesitás un código válido para activar tu hostel." });
+      } else if (e.code === "functions/not-found") {
+        setMessage({ type: "error", text: "El código no existe." });
+      } else if (e.code === "functions/already-exists") {
+        setMessage({ type: "error", text: "Ese código ya fue usado." });
+      } else if (e.code === "functions/failed-precondition") {
+        setMessage({ type: "error", text: "Ese código está inactivo." });
       } else {
         setMessage({ type: "error", text: t("register.errors.hostelCreateGeneric") });
       }
@@ -219,14 +285,50 @@ export default function RegisterPage() {
           </Alert>
 
           <Alert severity="info" sx={{ mb: 2 }}>
-            Para activar tu hostel necesitás un <b>código de activación</b> (Invite).
+            Para activar tu hostel necesitás un <b>código de activación</b>.
           </Alert>
+
+          {/* ✅ CTA de venta/soporte */}
+          <Paper variant="outlined" sx={{ p: 2.5, mb: 2, borderRadius: 2 }}>
+            <Typography sx={{ fontWeight: 800, mb: 0.5 }}>
+              ¿No tenés código?
+            </Typography>
+            <Typography sx={{ opacity: 0.8, mb: 1.5 }}>
+              Si querés tener tu hostel en Hostly, escribinos y te lo activamos.
+            </Typography>
+
+            <Stack spacing={1}>
+              <Button
+                component="a"
+                href={WHATSAPP_LINK}
+                target="_blank"
+                rel="noreferrer"
+                variant="contained"
+              >
+                Escribir por WhatsApp
+              </Button>
+
+              <Button variant="outlined" onClick={() => copyText(SUPPORT_EMAIL)}>
+                Copiar email de soporte
+              </Button>
+
+              <Divider />
+
+              <Typography sx={{ fontSize: 13, opacity: 0.75 }}>
+                Email: <b>{SUPPORT_EMAIL}</b>
+              </Typography>
+              <Typography sx={{ fontSize: 13, opacity: 0.75 }}>
+                WhatsApp: <b>{WHATSAPP_E164}</b>
+              </Typography>
+            </Stack>
+          </Paper>
 
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }} onKeyDown={(e) => e.key === "Enter" && handleCreateHostel()}>
             <TextField
-              label="Código de activación (Invite)"
+              label="Código de activación"
               value={inviteCode}
               onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              placeholder="Ej: S85BD2B3GX"
             />
 
             <TextField label={t("register.fields.hostelName")} value={hostelName} onChange={(e) => setHostelName(e.target.value)} />

@@ -795,5 +795,58 @@ export const removeMember = onCall(
     }
   }
 );
+
+// ✅ PUBLIC (con AppCheck): devuelve noches ocupadas para una room en un rango
+export const getRoomAvailability = onCall(
+  { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
+  async (req) => {
+    initSentryOnce();
+
+    const rid = createRid("getRoomAvailability");
+    logRid(rid, "start");
+
+    try {
+      const hostelSlug = String(req.data?.hostelSlug || "").trim();
+      const roomId = String(req.data?.roomId || "").trim();
+      const from = String(req.data?.from || "").trim(); // YYYY-MM-DD
+      const to = String(req.data?.to || "").trim();     // YYYY-MM-DD
+
+      assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
+      assert(roomId, "invalid-argument", "roomId requerido");
+      assert(/^\d{4}-\d{2}-\d{2}$/.test(from), "invalid-argument", "from inválido (YYYY-MM-DD)");
+      assert(/^\d{4}-\d{2}-\d{2}$/.test(to), "invalid-argument", "to inválido (YYYY-MM-DD)");
+      assert(from <= to, "invalid-argument", "from debe ser <= to");
+
+      // room_nights docs: hostels/{slug}/room_nights/{roomId_yyyyMMdd}
+      const col = db.collection(`hostels/${hostelSlug}/room_nights`);
+
+      // ⚠️ Este query puede pedir índice compuesto en Firestore (te explico abajo)
+      const snap = await col
+        .where("roomId", "==", roomId)
+        .where("date", ">=", from)
+        .where("date", "<=", to)
+        .get();
+
+      const dates = snap.docs
+        .map((d) => String((d.data() as any)?.date || ""))
+        .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x))
+        .sort();
+
+      logRid(rid, "ok", { count: dates.length });
+      return { ok: true, dates, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+      captureToSentry(err, { rid, fn: "getRoomAvailability" });
+
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
+  }
+);
+
+
+
+
+
+
 export * from "./adminRooms";
-// export * from "./otrosArchivos";

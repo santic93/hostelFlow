@@ -20,12 +20,14 @@ import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 import { getDoc, doc } from "firebase/firestore";
 import { db } from "../../services/firebase";
 
-import HotelLoading from "../../components/HotelLoading";
-
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { PickersDay } from "@mui/x-date-pickers/PickersDay";
 
-import { createReservation, getRoomAvailability } from "../../services/reservations";
+import {
+  createReservation,
+  getRoomAvailability,
+  type PublicRoom,
+} from "../../services/reservations";
 
 dayjs.extend(isSameOrBefore);
 
@@ -36,27 +38,23 @@ function getCallableErrorInfo(err: any) {
   return { code, message, details };
 }
 
-// helper: YYYY-MM-DD
 function fmt(d: Dayjs) {
   return d.format("YYYY-MM-DD");
 }
 
-// check-in inclusive, check-out exclusive (nights)
 function eachNightInclusive(from: Dayjs, to: Dayjs) {
   const out: string[] = [];
   let cur = from.startOf("day");
   const end = to.startOf("day");
+
   while (cur.isBefore(end, "day")) {
     out.push(fmt(cur));
     cur = cur.add(1, "day");
   }
+
   return out;
 }
 
-/**
- * CustomDay para MUI X v6/v7
- * - sin tipos estrictos para evitar conflictos TS por versión
- */
 function CustomDay(props: any) {
   const { blockedSet, day, outsideCurrentMonth, ...other } = props;
 
@@ -110,15 +108,17 @@ export const BookingPage = () => {
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
 
-  const [selectedRoom, setSelectedRoom] = useState<any>(null);
+  const [selectedRoom, setSelectedRoom] = useState<PublicRoom | null>(null);
+  const [loadingRoom, setLoadingRoom] = useState(true);
+  const [roomError, setRoomError] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [loadingAvail, setLoadingAvail] = useState(false);
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
 
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // noches ocupadas (YYYY-MM-DD)
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
 
   const isEmailValid = /^\S+@\S+\.\S+$/.test(email.trim());
@@ -128,7 +128,6 @@ export const BookingPage = () => {
   const horizonFrom = today;
   const horizonTo = today.add(365, "day");
 
-  // ✅ money formatter (mejora visual, no rompe nada)
   const money = useMemo(() => {
     const lang = (i18n.language || "es").slice(0, 2);
     return new Intl.NumberFormat(lang, {
@@ -138,24 +137,55 @@ export const BookingPage = () => {
     });
   }, [i18n.language]);
 
-  // 1) room
   useEffect(() => {
     const fetchRoom = async () => {
-      if (!hostelSlug || !roomId) return;
-      const docSnap = await getDoc(doc(db, "hostels", hostelSlug, "rooms", roomId));
-      if (docSnap.exists()) setSelectedRoom({ id: docSnap.id, ...docSnap.data() });
-      else setSelectedRoom(null);
-    };
-    fetchRoom();
-  }, [hostelSlug, roomId]);
+      if (!hostelSlug || !roomId) {
+        setLoadingRoom(false);
+        setRoomError(t("booking.roomNotFound", "No encontramos esta habitación."));
+        return;
+      }
 
-  // 2) availability (room_nights) vía cloud function
+      setLoadingRoom(true);
+      setRoomError(null);
+
+      try {
+        const docSnap = await getDoc(doc(db, "hostels", hostelSlug, "rooms", roomId));
+
+        if (!docSnap.exists()) {
+          setSelectedRoom(null);
+          setRoomError(t("booking.roomNotFound", "No encontramos esta habitación."));
+          return;
+        }
+
+        const raw = docSnap.data() as any;
+        setSelectedRoom({
+          id: docSnap.id,
+          name: raw.name ?? "",
+          price: Number(raw.price ?? 0),
+          capacity: Number(raw.capacity ?? 1),
+          description: raw.description ?? "",
+          imageUrls: Array.isArray(raw.imageUrls) ? raw.imageUrls : [],
+        });
+      } catch (err: any) {
+        console.error("fetchRoom failed", err);
+        setSelectedRoom(null);
+        setRoomError(
+          t("booking.roomLoadError", "No pudimos cargar esta habitación. Probá de nuevo.")
+        );
+      } finally {
+        setLoadingRoom(false);
+      }
+    };
+
+    fetchRoom();
+  }, [hostelSlug, roomId, t]);
+
   useEffect(() => {
     const run = async () => {
       if (!hostelSlug || !roomId) return;
 
       setLoadingAvail(true);
-      setFormError(null);
+      setAvailabilityWarning(null);
 
       try {
         const res = await getRoomAvailability({
@@ -168,7 +198,15 @@ export const BookingPage = () => {
         const s = new Set<string>((res?.dates ?? []).filter(Boolean));
         setBlockedSet(s);
 
-        // si el usuario tenía fechas elegidas, revalidamos
+        if (res?.buildingIndex) {
+          setAvailabilityWarning(
+            t(
+              "booking.availabilityPartial",
+              "La disponibilidad visual se está actualizando. La validación final se hace al confirmar la reserva."
+            )
+          );
+        }
+
         if (checkIn && s.has(fmt(checkIn))) {
           setCheckIn(null);
           setCheckOut(null);
@@ -181,8 +219,13 @@ export const BookingPage = () => {
           }
         }
       } catch (err: any) {
-        // Si falla availability, NO bloqueamos el booking (backend igual valida)
         console.error("getRoomAvailability failed", err);
+        setAvailabilityWarning(
+          t(
+            "booking.availabilityLoadError",
+            "No pudimos cargar la disponibilidad visual. La confirmación final se valida al reservar."
+          )
+        );
       } finally {
         setLoadingAvail(false);
       }
@@ -211,18 +254,15 @@ export const BookingPage = () => {
 
   const isBlockedNight = (d: Dayjs) => blockedSet.has(d.format("YYYY-MM-DD"));
 
-  // ✅ check-in: bloquea pasado + noches ocupadas
   const shouldDisableCheckIn = (d: Dayjs) => d.isBefore(today, "day") || isBlockedNight(d);
 
-  // ✅ check-out: SOLO bloquea pasado (porque checkOut es “exclusive”)
-  // (el rango se valida en onChange y confirm)
   const shouldDisableCheckOut = (d: Dayjs) => d.isBefore(today.add(1, "day"), "day");
 
   const handleConfirm = async () => {
     setFormError(null);
+
     if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
-    // guard extra: no permitir rangos que incluyan noches bloqueadas
     const nightsArr = eachNightInclusive(checkIn, checkOut);
     if (nightsArr.some((d) => blockedSet.has(d))) {
       setFormError(t("booking.unavailable"));
@@ -230,7 +270,7 @@ export const BookingPage = () => {
     }
 
     try {
-      setLoading(true);
+      setSubmitting(true);
 
       const payload = {
         hostelSlug,
@@ -243,8 +283,11 @@ export const BookingPage = () => {
 
       const res = await createReservation(payload);
 
-      if (res?.ok) setSuccess(true);
-      else setFormError(t("booking.errorSaving"));
+      if (res?.ok) {
+        setSuccess(true);
+      } else {
+        setFormError(t("booking.errorSaving"));
+      }
     } catch (err: any) {
       const info = getCallableErrorInfo(err);
       const msg = String(info.message || "").toLowerCase();
@@ -256,18 +299,16 @@ export const BookingPage = () => {
         setFormError(t("booking.errorSaving"));
       }
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   if (!hostelSlug) return null;
 
-  if (loading) return <HotelLoading />;
-
   if (success) {
     return (
       <Container sx={{ py: 6 }}>
-        <Card>
+        <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
               {t("booking.successTitle")}
@@ -281,6 +322,34 @@ export const BookingPage = () => {
     );
   }
 
+  if (loadingRoom) {
+    return (
+      <Container sx={{ py: 6 }}>
+        <Box sx={{ display: "flex", justifyContent: "center" }}>
+          <CircularProgress />
+        </Box>
+      </Container>
+    );
+  }
+
+  if (roomError) {
+    return (
+      <Container sx={{ py: 6 }}>
+        <Stack spacing={2}>
+          <Button
+            variant="outlined"
+            onClick={() => navigate(-1)}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            {t("booking.back")}
+          </Button>
+
+          <Alert severity="error">{roomError}</Alert>
+        </Stack>
+      </Container>
+    );
+  }
+
   return (
     <Container sx={{ py: { xs: 3, sm: 5 } }}>
       <Stack spacing={2}>
@@ -288,6 +357,7 @@ export const BookingPage = () => {
           variant="outlined"
           onClick={() => navigate(-1)}
           sx={{ alignSelf: "flex-start" }}
+          disabled={submitting}
         >
           {t("booking.back")}
         </Button>
@@ -295,6 +365,8 @@ export const BookingPage = () => {
         <Typography variant="h2">{t("booking.title")}</Typography>
 
         {formError && <Alert severity="error">{formError}</Alert>}
+
+        {availabilityWarning && <Alert severity="info">{availabilityWarning}</Alert>}
 
         {loadingAvail && (
           <Alert severity="info" icon={<CircularProgress size={16} />}>
@@ -307,8 +379,7 @@ export const BookingPage = () => {
           spacing={2}
           alignItems="stretch"
         >
-          {/* FORM */}
-          <Card sx={{ flex: 1 }}>
+          <Card sx={{ flex: 1, borderRadius: 4 }}>
             <CardContent>
               <Stack spacing={2}>
                 <DatePicker
@@ -355,7 +426,6 @@ export const BookingPage = () => {
                   label={t("booking.checkOut")}
                   value={checkOut}
                   minDate={checkIn ? checkIn.add(1, "day") : today.add(1, "day")}
-                  // ✅ ya NO bloqueamos por blockedSet
                   shouldDisableDate={(d) => shouldDisableCheckOut(dayjs(d))}
                   onChange={(newValue) => {
                     setFormError(null);
@@ -379,7 +449,6 @@ export const BookingPage = () => {
                       return;
                     }
 
-                    // validamos el rango (noches)
                     const nightsArr = eachNightInclusive(checkIn, v);
                     if (nightsArr.some((d2) => blockedSet.has(d2))) {
                       setFormError(t("booking.unavailable"));
@@ -402,6 +471,7 @@ export const BookingPage = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   fullWidth
+                  disabled={submitting}
                 />
 
                 <TextField
@@ -410,6 +480,7 @@ export const BookingPage = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   onBlur={() => setEmailTouched(true)}
                   fullWidth
+                  disabled={submitting}
                   error={showEmailError}
                   helperText={showEmailError ? t("booking.emailInvalid") : ""}
                 />
@@ -417,17 +488,18 @@ export const BookingPage = () => {
                 <Button
                   variant="contained"
                   size="large"
-                  disabled={!isFormValid || loadingAvail}
+                  disabled={!isFormValid || loadingAvail || submitting}
                   onClick={handleConfirm}
+                  startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : null}
+                  sx={{ minHeight: 48 }}
                 >
-                  {t("booking.confirm")}
+                  {submitting ? t("booking.confirming", "Confirmando…") : t("booking.confirm")}
                 </Button>
               </Stack>
             </CardContent>
           </Card>
 
-          {/* SUMMARY */}
-          <Card sx={{ width: { xs: "100%", md: 380 }, flexShrink: 0 }}>
+          <Card sx={{ width: { xs: "100%", md: 380 }, flexShrink: 0, borderRadius: 4 }}>
             <CardContent>
               {selectedRoom ? (
                 <Stack spacing={1.2}>
@@ -436,7 +508,9 @@ export const BookingPage = () => {
                   </Typography>
 
                   <Typography sx={{ color: "text.secondary" }}>
-                    {t("booking.summaryPerNight", { price: money.format(Number(selectedRoom.price || 0)) })}
+                    {t("booking.summaryPerNight", {
+                      price: money.format(Number(selectedRoom.price || 0)),
+                    })}
                   </Typography>
 
                   <Typography sx={{ color: "text.secondary" }}>
@@ -452,7 +526,10 @@ export const BookingPage = () => {
                   </Typography>
 
                   <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-                    Confirmación por email. Sin comisión.
+                    {t(
+                      "booking.summaryNote",
+                      "Confirmación por email. Sin comisión."
+                    )}
                   </Typography>
                 </Stack>
               ) : (

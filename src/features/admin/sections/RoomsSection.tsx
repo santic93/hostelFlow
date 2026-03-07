@@ -26,6 +26,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditIcon from "@mui/icons-material/Edit";
 import ImageIcon from "@mui/icons-material/Image";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 
 import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -43,6 +44,7 @@ type Room = {
   description: string;
   imageUrls: string[];
   imagePaths?: string[];
+  futureReservationsCount: number;
 };
 
 type ToastState = {
@@ -50,6 +52,8 @@ type ToastState = {
   message: string;
   severity: "success" | "error" | "info";
 };
+
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
 
 function AdminEmptyState({
   title,
@@ -109,6 +113,16 @@ function getCallableErrorMessage(err: any, fallback: string) {
   return rawMessage;
 }
 
+function isActiveFutureReservation(status: string, checkOut: any) {
+  const normalizedStatus = String(status || "") as ReservationStatus;
+  if (!["pending", "confirmed"].includes(normalizedStatus)) return false;
+
+  const checkOutDate = checkOut?.toDate?.();
+  if (!checkOutDate) return false;
+
+  return checkOutDate.getTime() > Date.now();
+}
+
 export default function RoomsSection() {
   const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
@@ -163,9 +177,27 @@ export default function RoomsSection() {
     setLoadingRooms(true);
 
     try {
-      const snapshot = await getDocs(collection(db, "hostels", hostelSlug, "rooms"));
+      const [roomsSnapshot, reservationsSnapshot] = await Promise.all([
+        getDocs(collection(db, "hostels", hostelSlug, "rooms")),
+        getDocs(collection(db, "hostels", hostelSlug, "reservations")),
+      ]);
 
-      const data: Room[] = snapshot.docs.map((docSnap) => {
+      const futureReservationsByRoom = new Map<string, number>();
+
+      reservationsSnapshot.docs.forEach((docSnap) => {
+        const raw = docSnap.data() as any;
+        const roomId = String(raw.roomId || "");
+
+        if (!roomId) return;
+        if (!isActiveFutureReservation(raw.status, raw.checkOut)) return;
+
+        futureReservationsByRoom.set(
+          roomId,
+          (futureReservationsByRoom.get(roomId) ?? 0) + 1
+        );
+      });
+
+      const data: Room[] = roomsSnapshot.docs.map((docSnap) => {
         const raw = docSnap.data() as any;
 
         return {
@@ -176,10 +208,15 @@ export default function RoomsSection() {
           description: raw.description ?? "",
           imageUrls: raw.imageUrls ?? (raw.imageUrl ? [raw.imageUrl] : []),
           imagePaths: raw.imagePaths ?? [],
+          futureReservationsCount: futureReservationsByRoom.get(docSnap.id) ?? 0,
         };
       });
 
       const sorted = data.sort((a, b) => {
+        if (b.futureReservationsCount !== a.futureReservationsCount) {
+          return b.futureReservationsCount - a.futureReservationsCount;
+        }
+
         const aHasImages = (a.imageUrls?.length ?? 0) > 0 ? 1 : 0;
         const bHasImages = (b.imageUrls?.length ?? 0) > 0 ? 1 : 0;
 
@@ -293,6 +330,13 @@ export default function RoomsSection() {
 
   const total = rooms.length;
   const withImages = rooms.filter((r) => (r.imageUrls?.length ?? 0) > 0).length;
+  const totalFutureReservations = rooms.reduce(
+    (acc, room) => acc + room.futureReservationsCount,
+    0
+  );
+  const roomsWithFutureReservations = rooms.filter(
+    (room) => room.futureReservationsCount > 0
+  ).length;
 
   const columns = useMemo<GridColDef[]>(
     () => [
@@ -312,6 +356,12 @@ export default function RoomsSection() {
         field: "capacity",
         headerName: t("admin.rooms.columns.capacity"),
         width: 120,
+      },
+      {
+        field: "futureReservationsCount",
+        headerName: t("admin.rooms.columns.futureReservations", "Reservas futuras"),
+        width: 160,
+        valueGetter: (_, r) => (r as Room).futureReservationsCount ?? 0,
       },
       {
         field: "images",
@@ -430,6 +480,22 @@ export default function RoomsSection() {
                     label={`${withImages}/${total} ${t(
                       "admin.rooms.badges.withImages",
                       "con fotos"
+                    )}`}
+                    sx={{ borderRadius: 999, fontWeight: 900 }}
+                  />
+                  <Chip
+                    icon={<EventAvailableIcon />}
+                    label={`${totalFutureReservations} ${t(
+                      "admin.rooms.badges.futureReservationsTotal",
+                      "reservas futuras"
+                    )}`}
+                    color={totalFutureReservations > 0 ? "primary" : "default"}
+                    sx={{ borderRadius: 999, fontWeight: 900 }}
+                  />
+                  <Chip
+                    label={`${roomsWithFutureReservations}/${total} ${t(
+                      "admin.rooms.badges.roomsWithFutureReservations",
+                      "con reservas"
                     )}`}
                     sx={{ borderRadius: 999, fontWeight: 900 }}
                   />
@@ -556,6 +622,21 @@ export default function RoomsSection() {
                         <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
                           {t("admin.rooms.labels.capacityShort", "Cap:")} {r.capacity}
                         </Typography>
+                      </Stack>
+
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Chip
+                          icon={<EventAvailableIcon />}
+                          label={
+                            r.futureReservationsCount > 0
+                              ? t("admin.rooms.badges.futureReservationsCount", "{{n}} reservas futuras", {
+                                  n: r.futureReservationsCount,
+                                })
+                              : t("admin.rooms.badges.noFutureReservations", "Sin reservas futuras")
+                          }
+                          color={r.futureReservationsCount > 0 ? "primary" : "default"}
+                          sx={{ borderRadius: 999, fontWeight: 900 }}
+                        />
                       </Stack>
 
                       <Stack direction="row" spacing={1}>

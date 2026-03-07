@@ -33,31 +33,21 @@ export const MainLayout = () => {
   const [open, setOpen] = useState(false);
 
   if (!slugFromUrl) return null;
-  const base = `/${slugFromUrl}`;
 
+  const base = `/${slugFromUrl}`;
   const closeDrawer = () => setOpen(false);
 
-  // ✅ público: Reservar va a rooms (nada de #book)
   const links = useMemo<NavItem[]>(
     () => [
       { label: t("nav.rooms"), to: `${base}/rooms`, variant: "text" },
-    
     ],
     [t, base]
   );
 
   const adminLink: NavItem | null =
-    user && canAccessAdmin && hostelSlug ? { label: t("nav.admin"), to: `${base}/admin`, variant: "outlined" } : null;
-
-  const desktopButtonSx = (isActive: boolean) => ({
-    px: 1.5,
-    borderRadius: 999,
-    textTransform: "none",
-    fontWeight: 800,
-    ...(isActive && {
-      backgroundColor: "rgba(255,255,255,0.10)",
-    }),
-  });
+    user && canAccessAdmin && hostelSlug
+      ? { label: t("nav.admin"), to: `${base}/admin`, variant: "outlined" }
+      : null;
 
   return (
     <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
@@ -65,24 +55,22 @@ export const MainLayout = () => {
         position="fixed"
         elevation={0}
         sx={{
-          backdropFilter: "blur(10px)",
-          backgroundColor: "rgba(18,18,18,0.72)",
+          backdropFilter: "blur(14px)",
+          backgroundColor: "rgba(20,17,15,0.72)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
+          color: "white",
         }}
       >
         <Container>
-          <Toolbar disableGutters sx={{ minHeight: 64, gap: 1, px: { xs: 1, sm: 0 } }}>
-            {/* Mobile menu */}
+          <Toolbar disableGutters sx={{ minHeight: 72, gap: 1, px: { xs: 1, sm: 0 } }}>
             <IconButton
               onClick={() => setOpen(true)}
-              sx={{ display: { xs: "inline-flex", sm: "none" } }}
-              color="inherit"
+              sx={{ display: { xs: "inline-flex", sm: "none" }, color: "inherit" }}
               aria-label="menu"
             >
               <MenuIcon />
             </IconButton>
 
-            {/* Brand */}
             <Typography
               component={NavLink}
               to={base}
@@ -91,7 +79,7 @@ export const MainLayout = () => {
                 textDecoration: "none",
                 color: "inherit",
                 fontWeight: 900,
-                letterSpacing: 1,
+                letterSpacing: 1.5,
                 mr: 1,
                 flexGrow: { xs: 1, sm: 0 },
                 fontSize: 14,
@@ -100,31 +88,33 @@ export const MainLayout = () => {
               HOSTLY
             </Typography>
 
-            {/* Desktop nav */}
-            <Stack direction="row" spacing={1} sx={{ display: { xs: "none", sm: "flex" }, ml: 1, alignItems: "center" }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                display: { xs: "none", sm: "flex" },
+                ml: 1,
+                alignItems: "center",
+              }}
+            >
               {links.map((l) => (
                 <Button
                   key={l.to + l.label}
                   component={NavLink}
                   to={l.to}
-                  // ✅ activa solo para rutas exactas cuando corresponde
                   end={l.to === base}
                   variant={l.variant ?? "text"}
-                  color={l.variant === "contained" ? "primary" : "inherit"}
-                  sx={() => ({
-                    ...desktopButtonSx(false),
-                    ...(typeof l.variant === "string" && l.variant !== "contained"
-                      ? { color: "white", opacity: 0.95 }
-                      : {}),
-                    "&.active": desktopButtonSx(true),
-                    ...(l.variant === "contained"
-                      ? {
-                          fontWeight: 900,
-                          boxShadow: "none",
-                          "&:hover": { boxShadow: "none" },
-                        }
-                      : {}),
-                  })}
+                  sx={{
+                    color: "white",
+                    px: 1.4,
+                    borderRadius: 999,
+                    textTransform: "none",
+                    fontWeight: 800,
+                    opacity: 0.92,
+                    "&.active": {
+                      backgroundColor: "rgba(255,255,255,0.10)",
+                    },
+                  }}
                 >
                   {l.label}
                 </Button>
@@ -140,9 +130,9 @@ export const MainLayout = () => {
                     borderRadius: 999,
                     textTransform: "none",
                     fontWeight: 800,
-                    borderColor: "rgba(255,255,255,0.35)",
+                    borderColor: "rgba(255,255,255,0.30)",
                     color: "white",
-                    "&:hover": { borderColor: "rgba(255,255,255,0.6)" },
+                    "&:hover": { borderColor: "rgba(255,255,255,0.55)" },
                     "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
                   }}
                 >
@@ -157,26 +147,29 @@ export const MainLayout = () => {
         </Container>
       </AppBar>
 
-      {/* spacer */}
-      <Toolbar />
+      <Toolbar sx={{ minHeight: "72px !important" }} />
 
-      {/* Mobile Drawer */}
       <Drawer
         anchor="left"
         open={open}
         onClose={closeDrawer}
         PaperProps={{
-          sx: { width: 300, backgroundColor: "#0f0f10", color: "white" },
+          sx: {
+            width: 300,
+            background:
+              "linear-gradient(180deg, #171310 0%, #1E1814 100%)",
+            color: "white",
+          },
         }}
       >
-        <Box sx={{ p: 2 }}>
-          <Typography sx={{ fontWeight: 900, letterSpacing: 1 }}>HOSTLY</Typography>
-          <Typography sx={{ opacity: 0.7, mt: 0.5, fontSize: 13 }}>{slugFromUrl}</Typography>
+        <Box sx={{ p: 2.25 }}>
+          <Typography sx={{ fontWeight: 900, letterSpacing: 1.5 }}>HOSTLY</Typography>
+          <Typography sx={{ opacity: 0.72, mt: 0.5, fontSize: 13 }}>{slugFromUrl}</Typography>
         </Box>
 
         <Divider sx={{ borderColor: "rgba(255,255,255,0.08)" }} />
 
-        <List sx={{ py: 0.5 }}>
+        <List sx={{ py: 0.75 }}>
           {links.map((l) => (
             <ListItemButton
               key={l.to + l.label}
@@ -184,7 +177,7 @@ export const MainLayout = () => {
               to={l.to}
               onClick={closeDrawer}
               sx={{
-                borderRadius: 2,
+                borderRadius: 2.5,
                 mx: 1,
                 my: 0.5,
                 "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
@@ -192,9 +185,7 @@ export const MainLayout = () => {
             >
               <ListItemText
                 primary={l.label}
-                primaryTypographyProps={{
-                  fontWeight: l.variant === "contained" ? 900 : 700,
-                }}
+                primaryTypographyProps={{ fontWeight: 800 }}
               />
             </ListItemButton>
           ))}
@@ -207,41 +198,44 @@ export const MainLayout = () => {
                 to={adminLink.to}
                 onClick={closeDrawer}
                 sx={{
-                  borderRadius: 2,
+                  borderRadius: 2.5,
                   mx: 1,
                   my: 0.5,
                   "&.active": { backgroundColor: "rgba(255,255,255,0.10)" },
                 }}
               >
-                <ListItemText primary={adminLink.label} primaryTypographyProps={{ fontWeight: 800 }} />
+                <ListItemText
+                  primary={adminLink.label}
+                  primaryTypographyProps={{ fontWeight: 800 }}
+                />
               </ListItemButton>
             </>
           )}
         </List>
       </Drawer>
 
-      {/* Main */}
       <Box component="main" sx={{ flex: 1, overflowX: "hidden" }}>
         <Outlet />
       </Box>
 
-      {/* Footer */}
       <Box
         component="footer"
         sx={{
-          borderTop: "1px solid rgba(0,0,0,0.08)",
-          background: "rgba(255,255,255,0.75)",
+          borderTop: "1px solid rgba(22,19,17,0.08)",
+          background: "rgba(255,253,249,0.82)",
           backdropFilter: "blur(8px)",
         }}
       >
-        <Container sx={{ py: 2 }}>
+        <Container sx={{ py: 2.5 }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1}
             justifyContent="space-between"
             alignItems={{ xs: "flex-start", sm: "center" }}
           >
-            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>© {new Date().getFullYear()} HOSTLY.</Typography>
+            <Typography sx={{ fontSize: 13, opacity: 0.8 }}>
+              © {new Date().getFullYear()} HOSTLY.
+            </Typography>
 
             <Stack direction="row" spacing={2} sx={{ fontSize: 13 }}>
               <Typography component={NavLink} to={`${base}/terms`} style={{ textDecoration: "none" }}>

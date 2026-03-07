@@ -1,12 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link as RouterLink } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
-import { Box, Button, Card, CardContent, Chip, Container, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Stack,
+  Typography,
+  Skeleton,
+  TextField,
+  InputAdornment,
+} from "@mui/material";
 import Grid from "@mui/material/GridLegacy";
+import SearchIcon from "@mui/icons-material/Search";
 import { useTranslation } from "react-i18next";
 import { db } from "../../../services/firebase";
 import { RoomCardCarousel } from "../../../components/RoomCardCarousel";
-
 
 type Room = {
   id: string;
@@ -22,6 +34,7 @@ export const RoomsPage = () => {
   const { t } = useTranslation();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [qText, setQText] = useState("");
 
   useEffect(() => {
     const fetchRooms = async () => {
@@ -41,36 +54,100 @@ export const RoomsPage = () => {
         };
       });
 
-      setRooms(data);
+      const sorted = data.sort((a, b) => {
+        const ai = (a.imageUrls?.length ?? 0) > 0 ? 1 : 0;
+        const bi = (b.imageUrls?.length ?? 0) > 0 ? 1 : 0;
+        if (ai !== bi) return bi - ai;
+        return (a.price ?? 0) - (b.price ?? 0);
+      });
+
+      setRooms(sorted);
       setLoading(false);
     };
 
     fetchRooms();
   }, [hostelSlug]);
 
+  const filteredRooms = useMemo(() => {
+    const q = qText.trim().toLowerCase();
+    if (!q) return rooms;
+
+    return rooms.filter((room) => {
+      return (
+        room.name.toLowerCase().includes(q) ||
+        room.description.toLowerCase().includes(q)
+      );
+    });
+  }, [rooms, qText]);
+
   if (loading) {
     return (
       <Container sx={{ py: 5 }}>
-        <Typography sx={{ opacity: 0.75 }}>{t("rooms.loading")}</Typography>
+        <Stack spacing={2}>
+          <Skeleton width={220} height={56} />
+          <Skeleton width={360} />
+          <Grid container spacing={2}>
+            {[0, 1, 2].map((item) => (
+              <Grid key={item} item xs={12} sm={6} md={4}>
+                <Card sx={{ borderRadius: 5, overflow: "hidden" }}>
+                  <Skeleton variant="rectangular" height={260} />
+                  <CardContent>
+                    <Skeleton width="70%" />
+                    <Skeleton width="100%" />
+                    <Skeleton width="85%" />
+                    <Skeleton variant="rectangular" height={42} sx={{ borderRadius: 999, mt: 2 }} />
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Stack>
       </Container>
     );
   }
 
   return (
     <Container sx={{ py: { xs: 3, sm: 5 } }}>
-      <Stack spacing={2} sx={{ mb: 2 }}>
-        <Typography variant="h2">{t("rooms.title")}</Typography>
-        <Typography sx={{ color: "text.secondary" }}>
-          {t("rooms.subtitle")}
-        </Typography>
+      <Stack spacing={2.5} sx={{ mb: 3 }}>
+        <Box>
+          <Typography variant="h2">{t("rooms.title")}</Typography>
+          <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
+            {t("rooms.subtitle")}
+          </Typography>
+        </Box>
+
+        <TextField
+          size="small"
+          value={qText}
+          onChange={(e) => setQText(e.target.value)}
+          placeholder={t("rooms.searchPlaceholder", "Buscar habitación…")}
+          sx={{ maxWidth: 420 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          }}
+        />
       </Stack>
 
-      {rooms.length === 0 ? (
-        <Typography sx={{ opacity: 0.75 }}>{t("rooms.noRooms")}</Typography>
+      {filteredRooms.length === 0 ? (
+        <Card sx={{ borderRadius: 5 }}>
+          <CardContent>
+            <Typography sx={{ fontWeight: 900 }}>
+              {t("rooms.noRooms")}
+            </Typography>
+            <Typography sx={{ color: "text.secondary", mt: 0.6 }}>
+              {t("rooms.noRoomsFiltered", "No encontramos habitaciones con esos filtros.")}
+            </Typography>
+          </CardContent>
+        </Card>
       ) : (
-        <Grid container spacing={2}>
-          {rooms.map((room) => {
+        <Grid container spacing={2.2}>
+          {filteredRooms.map((room) => {
             const urls = (room.imageUrls ?? []).filter(Boolean);
+
             return (
               <Grid item key={room.id} xs={12} sm={6} md={4}>
                 <Card
@@ -79,20 +156,32 @@ export const RoomsPage = () => {
                     height: "100%",
                     display: "flex",
                     flexDirection: "column",
+                    borderRadius: 5,
+                    background: "rgba(255,255,255,0.84)",
                   }}
                 >
                   <Box sx={{ position: "relative" }}>
                     <RoomCardCarousel urls={urls} alt={room.name} />
-                    <Chip
-                      label={t("rooms.capacity", { n: room.capacity })}
-                      size="small"
-                      sx={{
-                        position: "absolute",
-                        top: 10,
-                        left: 10,
-                        backgroundColor: "rgba(255,255,255,0.92)",
-                      }}
-                    />
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ position: "absolute", top: 12, left: 12, flexWrap: "wrap" }}
+                    >
+                      <Chip
+                        label={t("rooms.capacity", { n: room.capacity })}
+                        size="small"
+                        sx={{
+                          backgroundColor: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                      <Chip
+                        label={`$${room.price} ${t("rooms.perNight")}`}
+                        size="small"
+                        sx={{
+                          backgroundColor: "rgba(255,255,255,0.92)",
+                        }}
+                      />
+                    </Stack>
                   </Box>
 
                   <CardContent
@@ -100,20 +189,24 @@ export const RoomsPage = () => {
                       flex: 1,
                       display: "flex",
                       flexDirection: "column",
+                      p: 2.2,
                     }}
                   >
-                    <Typography sx={{ fontWeight: 900, mb: 0.5 }}>{room.name}</Typography>
+                    <Typography sx={{ fontWeight: 900, mb: 0.6, fontSize: 18 }}>
+                      {room.name}
+                    </Typography>
 
                     <Typography
                       sx={{
                         color: "text.secondary",
-                        fontSize: 13,
-                        mb: 1,
-                        minHeight: 40, // asegura altura parecida aunque sea corta
+                        fontSize: 14,
+                        mb: 1.2,
+                        minHeight: 66,
                         display: "-webkit-box",
-                        WebkitLineClamp: 2,
+                        WebkitLineClamp: 3,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
+                        lineHeight: 1.7,
                       }}
                     >
                       {room.description || t("rooms.defaultDesc")}
@@ -121,16 +214,15 @@ export const RoomsPage = () => {
 
                     <Box sx={{ flex: 1 }} />
 
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography sx={{ fontWeight: 900 }}>
-                        ${room.price}{" "}
-                        <span style={{ fontWeight: 600, opacity: 0.7 }}>{t("rooms.perNight")}</span>
-                      </Typography>
-
-                      <Button component={RouterLink} to={`/${hostelSlug}/rooms/${room.id}`} variant="contained" size="small">
-                        {t("rooms.viewRoom")}
-                      </Button>
-                    </Stack>
+                    <Button
+                      component={RouterLink}
+                      to={`/${hostelSlug}/rooms/${room.id}`}
+                      variant="contained"
+                      size="medium"
+                      sx={{ fontWeight: 900 }}
+                    >
+                      {t("rooms.viewRoom")}
+                    </Button>
                   </CardContent>
                 </Card>
               </Grid>

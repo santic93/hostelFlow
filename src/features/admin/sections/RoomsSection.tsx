@@ -27,6 +27,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import ImageIcon from "@mui/icons-material/Image";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 
 import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -35,6 +36,19 @@ import { db, functions } from "../../../services/firebase";
 import RoomFormModal from "../components/RoomFormModal";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../../../app/providers/AuthContext";
+
+type RoomReservationPreview = {
+  id: string;
+  roomId: string;
+  fullName: string;
+  email: string;
+  status: "pending" | "confirmed" | "cancelled";
+  nights: number;
+  total: number;
+  checkInLabel: string;
+  checkOutLabel: string;
+  checkInMs: number;
+};
 
 type Room = {
   id: string;
@@ -45,6 +59,7 @@ type Room = {
   imageUrls: string[];
   imagePaths?: string[];
   futureReservationsCount: number;
+  futureReservations: RoomReservationPreview[];
 };
 
 type ToastState = {
@@ -123,6 +138,17 @@ function isActiveFutureReservation(status: string, checkOut: any) {
   return checkOutDate.getTime() > Date.now();
 }
 
+function formatReservationDate(value: any) {
+  const date = value?.toDate?.();
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
 export default function RoomsSection() {
   const { t, i18n } = useTranslation();
   const isMobile = useMediaQuery("(max-width:900px)");
@@ -141,6 +167,9 @@ export default function RoomsSection() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [reservationsDialogOpen, setReservationsDialogOpen] = useState(false);
+  const [reservationsRoom, setReservationsRoom] = useState<Room | null>(null);
 
   const [toast, setToast] = useState<ToastState>({
     open: false,
@@ -170,6 +199,16 @@ export default function RoomsSection() {
     setToast((prev) => ({ ...prev, open: false }));
   };
 
+  const openReservationsDialog = (room: Room) => {
+    setReservationsRoom(room);
+    setReservationsDialogOpen(true);
+  };
+
+  const closeReservationsDialog = () => {
+    setReservationsDialogOpen(false);
+    setReservationsRoom(null);
+  };
+
   const fetchRooms = async () => {
     if (!hostelSlug) return;
 
@@ -182,7 +221,7 @@ export default function RoomsSection() {
         getDocs(collection(db, "hostels", hostelSlug, "reservations")),
       ]);
 
-      const futureReservationsByRoom = new Map<string, number>();
+      const futureReservationsByRoom = new Map<string, RoomReservationPreview[]>();
 
       reservationsSnapshot.docs.forEach((docSnap) => {
         const raw = docSnap.data() as any;
@@ -191,14 +230,30 @@ export default function RoomsSection() {
         if (!roomId) return;
         if (!isActiveFutureReservation(raw.status, raw.checkOut)) return;
 
-        futureReservationsByRoom.set(
+        const checkInDate = raw.checkIn?.toDate?.();
+        const preview: RoomReservationPreview = {
+          id: docSnap.id,
           roomId,
-          (futureReservationsByRoom.get(roomId) ?? 0) + 1
-        );
+          fullName: String(raw.fullName || "—"),
+          email: String(raw.email || "—"),
+          status: String(raw.status || "pending") as ReservationStatus,
+          nights: Number(raw.nights || 0),
+          total: Number(raw.total || 0),
+          checkInLabel: formatReservationDate(raw.checkIn),
+          checkOutLabel: formatReservationDate(raw.checkOut),
+          checkInMs: checkInDate ? checkInDate.getTime() : 0,
+        };
+
+        const existing = futureReservationsByRoom.get(roomId) ?? [];
+        existing.push(preview);
+        futureReservationsByRoom.set(roomId, existing);
       });
 
       const data: Room[] = roomsSnapshot.docs.map((docSnap) => {
         const raw = docSnap.data() as any;
+        const futureReservations = (futureReservationsByRoom.get(docSnap.id) ?? []).sort(
+          (a, b) => a.checkInMs - b.checkInMs
+        );
 
         return {
           id: docSnap.id,
@@ -208,7 +263,8 @@ export default function RoomsSection() {
           description: raw.description ?? "",
           imageUrls: raw.imageUrls ?? (raw.imageUrl ? [raw.imageUrl] : []),
           imagePaths: raw.imagePaths ?? [],
-          futureReservationsCount: futureReservationsByRoom.get(docSnap.id) ?? 0,
+          futureReservationsCount: futureReservations.length,
+          futureReservations,
         };
       });
 
@@ -225,6 +281,11 @@ export default function RoomsSection() {
       });
 
       setRooms(sorted);
+
+      if (reservationsRoom) {
+        const refreshedRoom = sorted.find((room) => room.id === reservationsRoom.id) ?? null;
+        setReservationsRoom(refreshedRoom);
+      }
     } catch (e: any) {
       setPageError(
         e?.message ?? t("admin.rooms.messages.loadError", "Error cargando habitaciones")
@@ -307,6 +368,11 @@ export default function RoomsSection() {
       await fn({ hostelSlug, roomId });
 
       setRooms((prev) => prev.filter((r) => r.id !== roomId));
+
+      if (reservationsRoom?.id === roomId) {
+        closeReservationsDialog();
+      }
+
       openToast("success", t("admin.rooms.messages.deletedOk", "Habitación eliminada ✅"));
     } catch (e: any) {
       const fallback = t(
@@ -373,7 +439,7 @@ export default function RoomsSection() {
       {
         field: "actions",
         headerName: t("admin.rooms.columns.actions"),
-        width: 260,
+        width: 390,
         sortable: false,
         filterable: false,
         renderCell: (params) => {
@@ -382,6 +448,17 @@ export default function RoomsSection() {
 
           return (
             <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<VisibilityOutlinedIcon />}
+                disabled={busy || r.futureReservationsCount === 0}
+                onClick={() => openReservationsDialog(r)}
+                sx={{ textTransform: "none", fontWeight: 800 }}
+              >
+                {t("admin.rooms.actions.viewReservations", "Ver reservas")}
+              </Button>
+
               <Button
                 size="small"
                 variant="outlined"
@@ -629,52 +706,73 @@ export default function RoomsSection() {
                           icon={<EventAvailableIcon />}
                           label={
                             r.futureReservationsCount > 0
-                              ? t("admin.rooms.badges.futureReservationsCount", "{{n}} reservas futuras", {
-                                  n: r.futureReservationsCount,
-                                })
-                              : t("admin.rooms.badges.noFutureReservations", "Sin reservas futuras")
+                              ? t(
+                                  "admin.rooms.badges.futureReservationsCount",
+                                  "{{n}} reservas futuras",
+                                  {
+                                    n: r.futureReservationsCount,
+                                  }
+                                )
+                              : t(
+                                  "admin.rooms.badges.noFutureReservations",
+                                  "Sin reservas futuras"
+                                )
                           }
                           color={r.futureReservationsCount > 0 ? "primary" : "default"}
                           sx={{ borderRadius: 999, fontWeight: 900 }}
                         />
                       </Stack>
 
-                      <Stack direction="row" spacing={1}>
+                      <Stack direction="column" spacing={1}>
                         <Button
                           size="small"
                           variant="outlined"
-                          startIcon={<EditIcon />}
-                          disabled={!canEditRooms || busy}
-                          onClick={() => {
-                            setSelectedRoom(r);
-                            setOpenModal(true);
-                          }}
+                          startIcon={<VisibilityOutlinedIcon />}
+                          disabled={busy || r.futureReservationsCount === 0}
+                          onClick={() => openReservationsDialog(r)}
                           fullWidth
                           sx={{ textTransform: "none", fontWeight: 800 }}
                         >
-                          {t("admin.rooms.actions.edit")}
+                          {t("admin.rooms.actions.viewReservations", "Ver reservas")}
                         </Button>
 
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          startIcon={
-                            busy ? (
-                              <CircularProgress size={14} color="inherit" />
-                            ) : (
-                              <DeleteOutlineIcon />
-                            )
-                          }
-                          disabled={!canDeleteRooms || busy}
-                          onClick={() => askDelete(r.id, r.name)}
-                          fullWidth
-                          sx={{ textTransform: "none", fontWeight: 800 }}
-                        >
-                          {busy
-                            ? t("common.deleting", "Eliminando…")
-                            : t("admin.rooms.actions.delete")}
-                        </Button>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            disabled={!canEditRooms || busy}
+                            onClick={() => {
+                              setSelectedRoom(r);
+                              setOpenModal(true);
+                            }}
+                            fullWidth
+                            sx={{ textTransform: "none", fontWeight: 800 }}
+                          >
+                            {t("admin.rooms.actions.edit")}
+                          </Button>
+
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="error"
+                            startIcon={
+                              busy ? (
+                                <CircularProgress size={14} color="inherit" />
+                              ) : (
+                                <DeleteOutlineIcon />
+                              )
+                            }
+                            disabled={!canDeleteRooms || busy}
+                            onClick={() => askDelete(r.id, r.name)}
+                            fullWidth
+                            sx={{ textTransform: "none", fontWeight: 800 }}
+                          >
+                            {busy
+                              ? t("common.deleting", "Eliminando…")
+                              : t("admin.rooms.actions.delete")}
+                          </Button>
+                        </Stack>
                       </Stack>
                     </Stack>
                   </CardContent>
@@ -761,6 +859,114 @@ export default function RoomsSection() {
               {deletingId !== null
                 ? t("common.deleting", "Eliminando…")
                 : t("common.delete", "Eliminar")}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={reservationsDialogOpen}
+          onClose={closeReservationsDialog}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle sx={{ fontWeight: 900 }}>
+            {reservationsRoom
+              ? `${t("admin.rooms.actions.viewReservations", "Ver reservas")} · ${reservationsRoom.name}`
+              : t("admin.rooms.actions.viewReservations", "Ver reservas")}
+          </DialogTitle>
+
+          <DialogContent dividers>
+            {!reservationsRoom ? (
+              <Typography sx={{ color: "text.secondary" }}>
+                {t("admin.rooms.messages.noReservationData", "No hay datos para mostrar.")}
+              </Typography>
+            ) : reservationsRoom.futureReservations.length === 0 ? (
+              <Alert severity="info">
+                {t(
+                  "admin.rooms.badges.noFutureReservations",
+                  "Sin reservas futuras"
+                )}
+              </Alert>
+            ) : (
+              <Stack spacing={1.5}>
+                {reservationsRoom.futureReservations.map((reservation) => (
+                  <Card
+                    key={reservation.id}
+                    sx={{
+                      borderRadius: 3,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      boxShadow: "none",
+                    }}
+                  >
+                    <CardContent>
+                      <Stack spacing={1}>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          justifyContent="space-between"
+                          alignItems={{ xs: "flex-start", sm: "center" }}
+                          spacing={1}
+                        >
+                          <Typography sx={{ fontWeight: 900 }}>
+                            {reservation.fullName}
+                          </Typography>
+
+                          <Chip
+                            size="small"
+                            label={
+                              reservation.status === "confirmed"
+                                ? t("admin.reservations.status.confirmed", "Confirmada")
+                                : t("admin.reservations.status.pending", "Pendiente")
+                            }
+                            color={reservation.status === "confirmed" ? "success" : "warning"}
+                            sx={{ borderRadius: 999, fontWeight: 900 }}
+                          />
+                        </Stack>
+
+                        <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                          {reservation.email}
+                        </Typography>
+
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={{ xs: 0.5, sm: 2 }}
+                        >
+                          <Typography sx={{ fontSize: 14 }}>
+                            <strong>{t("booking.checkIn", "Check-in")}:</strong>{" "}
+                            {reservation.checkInLabel}
+                          </Typography>
+
+                          <Typography sx={{ fontSize: 14 }}>
+                            <strong>{t("booking.checkOut", "Check-out")}:</strong>{" "}
+                            {reservation.checkOutLabel}
+                          </Typography>
+                        </Stack>
+
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={{ xs: 0.5, sm: 2 }}
+                        >
+                          <Typography sx={{ fontSize: 14 }}>
+                            <strong>{t("booking.summaryNights", "{{n}} noches", { n: reservation.nights })}:</strong>{" "}
+                            {reservation.nights}
+                          </Typography>
+
+                          <Typography sx={{ fontSize: 14 }}>
+                            <strong>{t("booking.summaryTotal", "Total")}:</strong>{" "}
+                            {money.format(reservation.total)}
+                          </Typography>
+                        </Stack>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
+              </Stack>
+            )}
+          </DialogContent>
+
+          <DialogActions>
+            <Button onClick={closeReservationsDialog}>
+              {t("common.close", "Cerrar")}
             </Button>
           </DialogActions>
         </Dialog>

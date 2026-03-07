@@ -18,11 +18,11 @@ import {
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
-
-import { auth, functions } from "../../services/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { httpsCallable } from "firebase/functions";
-import HotelLoading from "../../components/HotelLoading";
+import { auth, functions } from "../../../services/firebase";
+import HotelLoading from "../../../components/HotelLoading";
+
 
 function slugify(input: string) {
   return input

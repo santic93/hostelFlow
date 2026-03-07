@@ -18,11 +18,11 @@ import {
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
-
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../services/firebase";
-import { Seo } from "../../components/Seo";
-import { useAuth } from "../../app/providers/AuthContext";
+import { useAuth } from "../../../app/providers/AuthContext";
+import { auth } from "../../../services/firebase";
+import { Seo } from "../../../components/Seo";
+
 
 export default function LoginPage() {
   const { t } = useTranslation();

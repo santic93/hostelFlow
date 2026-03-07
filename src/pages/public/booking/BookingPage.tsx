@@ -18,18 +18,12 @@ import {
 
 import dayjs, { Dayjs } from "dayjs";
 import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
-
 import { getDoc, doc } from "firebase/firestore";
-import { db } from "../../services/firebase";
-
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { PickersDay } from "@mui/x-date-pickers/PickersDay";
+import { createReservation, getRoomAvailability, type PublicRoom } from "../../../services/reservations";
+import { db } from "../../../services/firebase";
 
-import {
-  createReservation,
-  getRoomAvailability,
-  type PublicRoom,
-} from "../../services/reservations";
 
 dayjs.extend(isSameOrBefore);
 

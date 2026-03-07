@@ -1,9 +1,7 @@
 import { Container, Divider, Stack, Typography } from "@mui/material";
-
 import { useParams } from "react-router-dom";
-import { Seo } from "../../components/Seo";
-
 import { Box,  Link } from "@mui/material";
+import { Seo } from "../../../components/Seo";
 
 
 function List({ items }: { items: React.ReactNode[] }) {

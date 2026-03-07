@@ -1,7 +1,7 @@
 import { Box, Typography } from "@mui/material";
-
 import { useParams } from "react-router-dom";
-import { Seo } from "../../components/Seo";
+import { Seo } from "../../../components/Seo";
+
 
 export function PrivacyPage() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();

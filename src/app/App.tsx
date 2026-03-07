@@ -5,17 +5,11 @@ import TenantGuard from "./layouts/tenant/TenantGuard";
 import AdminShell from "./layouts/admin/AdminShell";
 import AppErrorPage from "../features/AppErrorPage";
 import RootRedirect from "../routes/RootLanding";
-import LoginPage from "../features/login/LoginPage";
-import RegisterPage from "../features/register/RegisterPage";
 import AdminRedirect from "../features/admin/AdminRedirect";
 import ForgotPasswordPage from "../features/ForgotPassword";
 import ResetPasswordPage from "../features/ResetPasswordPage";
-import { HomePage } from "../features/home/pages/HomePage";
-import { RoomsPage } from "../features/rooms/pages/RoomsPage";
-import { RoomDetailPage } from "../features/rooms/pages/RoomDetailPage";
-import { BookingPage } from "../features/booking/BookingPage";
-import { TermsPage } from "../features/terms/TermsPage";
-import { PrivacyPage } from "../features/privacyPage/PrivacyPage";
+import { RoomsPage } from "../pages/public/rooms/RoomsPage";
+import { RoomDetailPage } from "../pages/public/rooms/RoomDetailPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import DashboardSection from "../features/admin/sections/DashboardSection";
 import RoomsSection from "../features/admin/sections/RoomsSection";
@@ -30,6 +24,12 @@ import { AuthProvider } from "./providers/AuthContext";
 // ✅ NUEVO
 import SuperAdminInvitesPage from "../features/superadmin/SuperAdminInvitesPage";
 import SuperAdminRoute from "../components/SuperAdminRoute";
+import LoginPage from "../pages/public/login/LoginPage";
+import RegisterPage from "../pages/public/register/RegisterPage";
+import { HomePage } from "../pages/public/home/HomePage";
+import { BookingPage } from "../pages/public/booking/BookingPage";
+import { TermsPage } from "../pages/public/terms/TermsPage";
+import { PrivacyPage } from "../pages/public/privacyPage/PrivacyPage";
 
 export const router = createBrowserRouter([
   {

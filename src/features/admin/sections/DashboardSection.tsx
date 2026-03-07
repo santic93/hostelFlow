@@ -30,19 +30,18 @@ type ReservationStatus = "pending" | "confirmed" | "cancelled";
 type Reservation = {
   total?: number;
   status?: ReservationStatus;
-  checkIn?: any; // Timestamp
-  checkOut?: any; // Timestamp
+  checkIn?: any;
+  checkOut?: any;
   roomId?: string;
   roomName?: string;
 };
 
 type Room = {
-  capacity?: number; // opcional
+  capacity?: number;
+  imageUrls?: string[];
 };
 
 type Language = "es" | "en" | "pt";
-
-
 
 export default function DashboardSection() {
   const { hostelSlug } = useParams<{ hostelSlug: string }>();
@@ -50,7 +49,9 @@ export default function DashboardSection() {
   const { t, i18n } = useTranslation();
 
   const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [msg, setMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(
+    null
+  );
 
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalReservations, setTotalReservations] = useState(0);
@@ -58,7 +59,6 @@ export default function DashboardSection() {
 
   const [pendingCount, setPendingCount] = useState(0);
 
-  // ✅ NUEVO: hoy y próximos 7
   const [todayCheckins, setTodayCheckins] = useState(0);
   const [todayCheckouts, setTodayCheckouts] = useState(0);
   const [next7Checkins, setNext7Checkins] = useState(0);
@@ -66,9 +66,10 @@ export default function DashboardSection() {
 
   const [occupancyPct, setOccupancyPct] = useState(0);
 
-  // ✅ NO lo eliminamos: selector idioma predeterminado
   const [defaultLang, setDefaultLang] = useState<Language>("es");
   const [savingLang, setSavingLang] = useState(false);
+
+  const [roomsWithImages, setRoomsWithImages] = useState(0);
 
   const base = window.location.origin;
   const publicUrl = hostelSlug ? `${base}/${hostelSlug}` : base;
@@ -98,16 +99,23 @@ export default function DashboardSection() {
 
   const goCreateRoom = () => {
     if (!hostelSlug) return;
-    navigate(`/${hostelSlug}/admin/rooms`);
+    navigate(`/${hostelSlug}/admin/rooms?new=1`);
   };
 
-  const goReservationsWith = (params: { from?: string; to?: string; status?: string; q?: string }) => {
+  const goReservationsWith = (params: {
+    from?: string;
+    to?: string;
+    status?: string;
+    q?: string;
+    roomId?: string;
+  }) => {
     if (!hostelSlug) return;
     const sp = new URLSearchParams();
     if (params.from) sp.set("from", params.from);
     if (params.to) sp.set("to", params.to);
     if (params.status) sp.set("status", params.status);
     if (params.q) sp.set("q", params.q);
+    if (params.roomId) sp.set("roomId", params.roomId);
     navigate(`/${hostelSlug}/admin/reservations?${sp.toString()}`);
   };
 
@@ -115,6 +123,7 @@ export default function DashboardSection() {
     if (!hostelSlug) return;
     setSavingLang(true);
     setMsg(null);
+
     try {
       await updateDoc(doc(db, "hostels", hostelSlug), {
         defaultLanguage: defaultLang,
@@ -179,7 +188,6 @@ export default function DashboardSection() {
 
         if (!alive) return;
 
-        // idioma predeterminado
         if (hostelSnap.exists()) {
           const data = hostelSnap.data() as any;
           const lng = String(data?.defaultLanguage ?? "es").slice(0, 2) as Language;
@@ -196,10 +204,12 @@ export default function DashboardSection() {
         setTotalReservations(reservations.length);
         setTotalRooms(roomsSnap.size);
 
+        const roomsImgs = rooms.filter((room) => Array.isArray(room.imageUrls) && room.imageUrls.length > 0).length;
+        setRoomsWithImages(roomsImgs);
+
         const pending = reservations.filter((r) => (r.status ?? "pending") === "pending").length;
         setPendingCount(pending);
 
-        // ✅ HOY + PRÓXIMOS 7
         const today = dayjs().startOf("day");
         const end7 = today.add(7, "day").endOf("day");
 
@@ -215,12 +225,17 @@ export default function DashboardSection() {
           if (ci) {
             const d = dayjs(ci).startOf("day");
             if (d.isSame(today, "day")) tIn++;
-            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(ci).isBefore(end7)) nIn7++;
+            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(ci).isBefore(end7)) {
+              nIn7++;
+            }
           }
+
           if (co) {
             const d = dayjs(co).startOf("day");
             if (d.isSame(today, "day")) tOut++;
-            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(co).isBefore(end7)) nOut7++;
+            if ((d.isAfter(today, "day") || d.isSame(today, "day")) && dayjs(co).isBefore(end7)) {
+              nOut7++;
+            }
           }
         }
 
@@ -229,7 +244,6 @@ export default function DashboardSection() {
         setNext7Checkins(nIn7);
         setNext7Checkouts(nOut7);
 
-        // ✅ ocupación simple (30 días) con “capacidad” si existe, si no 1 por room
         const days = 30;
         const horizonStart = today;
         const horizonEnd = today.add(days, "day");
@@ -256,7 +270,10 @@ export default function DashboardSection() {
           occupiedNights += Math.max(0, end.diff(start, "day"));
         }
 
-        const pct = Math.max(0, Math.min(100, Math.round((occupiedNights / totalCapacityNights) * 100)));
+        const pct = Math.max(
+          0,
+          Math.min(100, Math.round((occupiedNights / totalCapacityNights) * 100))
+        );
         setOccupancyPct(pct);
       } catch {
         setMsg({ type: "error", text: t("admin.dashboard.loadError") });
@@ -274,10 +291,10 @@ export default function DashboardSection() {
   const checklist = useMemo(() => {
     const hasHostel = Boolean(hostelSlug);
     const hasRoom = totalRooms > 0;
-    const imagesOk = totalRooms > 0; // TODO: próximo paso lo hacemos real leyendo imageUrls
+    const imagesOk = totalRooms > 0 && roomsWithImages > 0;
     const hasReservation = totalReservations > 0;
     return { hasHostel, hasRoom, imagesOk, hasReservation };
-  }, [hostelSlug, totalRooms, totalReservations]);
+  }, [hostelSlug, totalRooms, totalReservations, roomsWithImages]);
 
   const ChecklistItem = ({ done, label }: { done: boolean; label: string }) => (
     <Stack direction="row" spacing={1} alignItems="center">
@@ -337,14 +354,17 @@ export default function DashboardSection() {
 
         {msg && <Alert severity={msg.type}>{msg.text}</Alert>}
 
-        {/* ✅ Config - NO se elimina */}
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Typography sx={{ fontWeight: 900, mb: 1 }}>
               {t("admin.dashboard.configTitle")}
             </Typography>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2} alignItems={{ sm: "center" }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1.2}
+              alignItems={{ sm: "center" }}
+            >
               <Box sx={{ minWidth: 220 }}>
                 <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 0.5 }}>
                   {t("admin.dashboard.defaultLanguageLabel")}
@@ -383,7 +403,6 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        {/* Public link + badges */}
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Stack spacing={1.2}>
@@ -391,7 +410,11 @@ export default function DashboardSection() {
                 {t("admin.dashboard.publicLinkTitle")}
               </Typography>
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1}
+                alignItems={{ sm: "center" }}
+              >
                 <Box
                   sx={{
                     px: 1.5,
@@ -426,7 +449,6 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        {/* Checklist */}
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Typography sx={{ fontWeight: 900, mb: 1 }}>
@@ -448,7 +470,6 @@ export default function DashboardSection() {
           </CardContent>
         </Card>
 
-        {/* ✅ NUEVO: Cards “Hoy” y “Próximos 7” + clic a Reservas */}
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" } }}>
           <StatCard
             title={t("admin.dashboard.cards.checkinsToday", "Check-ins hoy")}
@@ -476,14 +497,12 @@ export default function DashboardSection() {
           />
         </Box>
 
-        {/* Stats “de negocio” */}
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" } }}>
           <StatCard title={t("admin.dashboard.cards.revenue")} value={money.format(totalRevenue)} />
           <StatCard title={t("admin.dashboard.cards.reservations")} value={totalReservations} />
           <StatCard title={t("admin.dashboard.cards.rooms")} value={totalRooms} />
         </Box>
 
-        {/* Occupancy */}
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
             <Stack direction="row" justifyContent="space-between" alignItems="center">

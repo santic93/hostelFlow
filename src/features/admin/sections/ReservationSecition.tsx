@@ -28,6 +28,9 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import CheckIcon from "@mui/icons-material/CheckCircleOutline";
 import CancelIcon from "@mui/icons-material/CancelOutlined";
+import MeetingRoomOutlinedIcon from "@mui/icons-material/MeetingRoomOutlined";
+import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlined";
+import AttachMoneyOutlinedIcon from "@mui/icons-material/AttachMoneyOutlined";
 
 import { DataGrid, type GridColDef } from "@mui/x-data-grid";
 import dayjs from "dayjs";
@@ -39,6 +42,7 @@ import { esES, enUS, ptBR } from "@mui/x-data-grid/locales";
 type ReservationRow = {
   id: string;
   fullName: string;
+  roomId: string;
   roomName: string;
   email: string;
   total: number;
@@ -61,11 +65,11 @@ export default function ReservationsSection() {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // ✅ inicial desde URL si existe
   const initialFrom = searchParams.get("from") || dayjs().startOf("month").format("YYYY-MM-DD");
   const initialTo = searchParams.get("to") || dayjs().endOf("month").format("YYYY-MM-DD");
   const initialStatus = parseStatus(searchParams.get("status"));
   const initialQ = searchParams.get("q") || "";
+  const initialRoomId = searchParams.get("roomId") || "all";
 
   const [rows, setRows] = useState<ReservationRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -75,10 +79,10 @@ export default function ReservationsSection() {
   const [from, setFrom] = useState<string>(initialFrom);
   const [to, setTo] = useState<string>(initialTo);
   const [qText, setQText] = useState(initialQ);
+  const [roomIdFilter, setRoomIdFilter] = useState<string>(initialRoomId);
 
   const [err, setErr] = useState<string | null>(null);
 
-  // ✅ Confirm dialog state
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<{ id: string; label: string } | null>(null);
 
@@ -95,47 +99,45 @@ export default function ReservationsSection() {
     setCancelTarget(null);
   };
 
-  // ✅ 1) Cuando cambian query params (ej: venís desde dashboard), sincronizamos estado
   useEffect(() => {
     const spFrom = searchParams.get("from");
     const spTo = searchParams.get("to");
     const spStatus = searchParams.get("status");
     const spQ = searchParams.get("q");
+    const spRoomId = searchParams.get("roomId");
 
     if (spFrom && spFrom !== from) setFrom(spFrom);
     if (spTo && spTo !== to) setTo(spTo);
 
     const parsed = parseStatus(spStatus);
-    if (parsed !== status) setStatus(parsed as any);
+    if (parsed !== status) setStatus(parsed);
 
     if (spQ !== null && spQ !== qText) setQText(spQ);
+
+    const nextRoomId = spRoomId || "all";
+    if (nextRoomId !== roomIdFilter) setRoomIdFilter(nextRoomId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // ✅ 2) Cuando el usuario cambia filtros en UI, actualizamos la URL (copiable)
-  //     (esto NO navega de página, solo cambia querystring)
   useEffect(() => {
-    // armamos params limpios
     const next = new URLSearchParams(searchParams);
 
-    // from/to siempre
     next.set("from", from);
     next.set("to", to);
-
-    // status: si es all lo ponemos igual (así el dashboard puede mandar all también)
     next.set("status", status);
 
-    // q: solo si hay algo
     const q = qText.trim();
     if (q) next.set("q", q);
     else next.delete("q");
 
-    // evitamos loops: sólo seteamos si realmente cambia
+    if (roomIdFilter && roomIdFilter !== "all") next.set("roomId", roomIdFilter);
+    else next.delete("roomId");
+
     if (next.toString() !== searchParams.toString()) {
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to, status, qText]);
+  }, [from, to, status, qText, roomIdFilter]);
 
   const fetchReservations = async () => {
     if (!hostelSlug) return;
@@ -148,7 +150,11 @@ export default function ReservationsSection() {
 
       const base = collection(db, "hostels", hostelSlug, "reservations");
 
-      const clauses: any[] = [where("checkIn", ">=", fromDate), where("checkIn", "<=", toDate)];
+      const clauses: any[] = [
+        where("checkIn", ">=", fromDate),
+        where("checkIn", "<=", toDate),
+      ];
+
       if (status !== "all") clauses.push(where("status", "==", status));
 
       const q = query(base, ...clauses, orderBy("checkIn", "asc"));
@@ -159,6 +165,7 @@ export default function ReservationsSection() {
         return {
           id: docu.id,
           fullName: raw.fullName ?? "",
+          roomId: raw.roomId ?? "",
           roomName: raw.roomName ?? "",
           email: raw.email ?? "",
           total: raw.total ?? 0,
@@ -202,11 +209,22 @@ export default function ReservationsSection() {
     to: string;
     statusLabelText: string;
     searchText: string;
+    roomFilterText: string;
     rows: ReservationRow[];
     moneyFmt: Intl.NumberFormat;
     statusLabelFn: (s: ReservationStatus) => string;
   }) {
-    const { hostelSlug, from, to, statusLabelText, searchText, rows, moneyFmt, statusLabelFn } = args;
+    const {
+      hostelSlug,
+      from,
+      to,
+      statusLabelText,
+      searchText,
+      roomFilterText,
+      rows,
+      moneyFmt,
+      statusLabelFn,
+    } = args;
 
     const reservationsAoA: any[][] = [
       ["ID", "Huésped", "Habitación", "Email", "Check In", "Check Out", "Noches", "Total", "Estado", "Creada"],
@@ -215,7 +233,10 @@ export default function ReservationsSection() {
     for (const r of rows) {
       const checkInStr = r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "";
       const checkOutStr = r.checkOut ? dayjs(r.checkOut).format("YYYY-MM-DD") : "";
-      const nights = r.checkIn && r.checkOut ? Math.max(0, dayjs(r.checkOut).diff(dayjs(r.checkIn), "day")) : "";
+      const nights =
+        r.checkIn && r.checkOut
+          ? Math.max(0, dayjs(r.checkOut).diff(dayjs(r.checkIn), "day"))
+          : "";
 
       reservationsAoA.push([
         r.id,
@@ -270,6 +291,7 @@ export default function ReservationsSection() {
       ["Hasta", to],
       ["Estado", statusLabelText],
       ["Búsqueda", searchText || "—"],
+      ["Habitación", roomFilterText || "Todas"],
       ["Generado", dayjs().format("YYYY-MM-DD HH:mm")],
       [""],
       ["Totales"],
@@ -285,7 +307,7 @@ export default function ReservationsSection() {
     const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoA);
     wsSummary["!cols"] = [{ wch: 26 }, { wch: 40 }];
 
-    const revenueCell = XLSX.utils.encode_cell({ r: 14, c: 1 });
+    const revenueCell = XLSX.utils.encode_cell({ r: 15, c: 1 });
     if (wsSummary[revenueCell]) {
       wsSummary[revenueCell].t = "n";
       wsSummary[revenueCell].z = "#,##0";
@@ -313,13 +335,17 @@ export default function ReservationsSection() {
     setSavingById((prev) => ({ ...prev, [reservationId]: true }));
 
     const prevRows = rows;
-    setRows((prev) => prev.map((r) => (r.id === reservationId ? { ...r, status: newStatus } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r.id === reservationId ? { ...r, status: newStatus } : r))
+    );
 
     try {
       await setReservationStatus({ hostelSlug, reservationId, newStatus });
     } catch (e: any) {
       setRows(prevRows);
-      setErr(e?.message ?? t("admin.reservations.updateError", "No se pudo actualizar el estado"));
+      setErr(
+        e?.message ?? t("admin.reservations.updateError", "No se pudo actualizar el estado")
+      );
     } finally {
       setSavingById((prev) => ({ ...prev, [reservationId]: false }));
     }
@@ -331,25 +357,45 @@ export default function ReservationsSection() {
     closeCancelDialog();
   };
 
+  const roomOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    rows.forEach((r) => {
+      if (r.roomId) {
+        map.set(r.roomId, r.roomName || r.roomId);
+      }
+    });
+
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
   const filteredRows = useMemo(() => {
     const q = qText.trim().toLowerCase();
-    if (!q) return rows;
+
     return rows.filter((r) => {
-      return (
+      const matchesSearch =
+        !q ||
         (r.fullName || "").toLowerCase().includes(q) ||
         (r.email || "").toLowerCase().includes(q) ||
-        (r.roomName || "").toLowerCase().includes(q)
-      );
+        (r.roomName || "").toLowerCase().includes(q);
+
+      const matchesRoom = roomIdFilter === "all" || r.roomId === roomIdFilter;
+
+      return matchesSearch && matchesRoom;
     });
-  }, [rows, qText]);
+  }, [rows, qText, roomIdFilter]);
 
   const groupedMobile = useMemo(() => {
     if (!isMobile) return [];
     const map = new Map<string, ReservationRow[]>();
+
     for (const r of filteredRows) {
       const key = r.checkIn ? dayjs(r.checkIn).format("YYYY-MM-DD") : "unknown";
       map.set(key, [...(map.get(key) ?? []), r]);
     }
+
     return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
   }, [filteredRows, isMobile]);
 
@@ -362,6 +408,16 @@ export default function ReservationsSection() {
     });
   }, [i18n.language]);
 
+  const totals = useMemo(() => {
+    return {
+      totalReservations: filteredRows.length,
+      totalRevenue: filteredRows.reduce((acc, r) => acc + Number(r.total ?? 0), 0),
+      pending: filteredRows.filter((r) => r.status === "pending").length,
+      confirmed: filteredRows.filter((r) => r.status === "confirmed").length,
+      cancelled: filteredRows.filter((r) => r.status === "cancelled").length,
+    };
+  }, [filteredRows]);
+
   const exportXLSX = async () => {
     if (!hostelSlug) return;
 
@@ -373,8 +429,11 @@ export default function ReservationsSection() {
       const toDate = dayjs(to).endOf("day").toDate();
 
       const base = collection(db, "hostels", hostelSlug, "reservations");
+      const clauses: any[] = [
+        where("checkIn", ">=", fromDate),
+        where("checkIn", "<=", toDate),
+      ];
 
-      const clauses: any[] = [where("checkIn", ">=", fromDate), where("checkIn", "<=", toDate)];
       if (status !== "all") clauses.push(where("status", "==", status));
 
       const q = query(base, ...clauses, orderBy("checkIn", "asc"));
@@ -385,6 +444,7 @@ export default function ReservationsSection() {
         return {
           id: docu.id,
           fullName: raw.fullName ?? "",
+          roomId: raw.roomId ?? "",
           roomName: raw.roomName ?? "",
           email: raw.email ?? "",
           total: raw.total ?? 0,
@@ -397,15 +457,25 @@ export default function ReservationsSection() {
 
       const qLower = qText.trim().toLowerCase();
       if (qLower) {
-        data = data.filter((r) =>
-          (r.fullName || "").toLowerCase().includes(qLower) ||
-          (r.email || "").toLowerCase().includes(qLower) ||
-          (r.roomName || "").toLowerCase().includes(qLower)
+        data = data.filter(
+          (r) =>
+            (r.fullName || "").toLowerCase().includes(qLower) ||
+            (r.email || "").toLowerCase().includes(qLower) ||
+            (r.roomName || "").toLowerCase().includes(qLower)
         );
       }
 
+      if (roomIdFilter !== "all") {
+        data = data.filter((r) => r.roomId === roomIdFilter);
+      }
+
       if (!data.length) {
-        setErr(t("admin.reservations.noDataToExport", "No hay reservas para exportar con los filtros actuales."));
+        setErr(
+          t(
+            "admin.reservations.noDataToExport",
+            "No hay reservas para exportar con los filtros actuales."
+          )
+        );
         return;
       }
 
@@ -414,12 +484,18 @@ export default function ReservationsSection() {
           ? t("admin.reservations.filterAll", "Todos los estados")
           : statusLabel(status as ReservationStatus);
 
+      const roomFilterText =
+        roomIdFilter === "all"
+          ? t("admin.reservations.allRooms", "Todas las habitaciones")
+          : roomOptions.find((room) => room.id === roomIdFilter)?.name || roomIdFilter;
+
       buildXlsxAndDownload({
         hostelSlug,
         from,
         to,
         statusLabelText: statusText,
         searchText: qText.trim(),
+        roomFilterText,
         rows: data,
         moneyFmt: money,
         statusLabelFn: statusLabel,
@@ -432,31 +508,53 @@ export default function ReservationsSection() {
   };
 
   const localeText =
-    (i18n.language?.startsWith("es") ? esES : i18n.language?.startsWith("pt") ? ptBR : enUS).components
-      .MuiDataGrid.defaultProps.localeText;
+    (
+      i18n.language?.startsWith("es")
+        ? esES
+        : i18n.language?.startsWith("pt")
+        ? ptBR
+        : enUS
+    ).components.MuiDataGrid.defaultProps.localeText;
 
   const columns = useMemo<GridColDef[]>(() => {
     return [
-      { field: "fullName", headerName: t("admin.reservations.columns.guest", "Huésped"), flex: 1, minWidth: 160 },
-      { field: "roomName", headerName: t("admin.reservations.columns.room", "Habitación"), flex: 1, minWidth: 150 },
-      { field: "email", headerName: t("admin.reservations.columns.email", "Email"), flex: 1, minWidth: 220 },
+      {
+        field: "fullName",
+        headerName: t("admin.reservations.columns.guest", "Huésped"),
+        flex: 1,
+        minWidth: 160,
+      },
+      {
+        field: "roomName",
+        headerName: t("admin.reservations.columns.room", "Habitación"),
+        flex: 1,
+        minWidth: 150,
+      },
+      {
+        field: "email",
+        headerName: t("admin.reservations.columns.email", "Email"),
+        flex: 1,
+        minWidth: 220,
+      },
       {
         field: "checkIn",
         headerName: t("admin.reservations.columns.checkIn", "Check In"),
         width: 130,
-        valueGetter: (_, row) => (row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-"),
+        valueGetter: (_, row) =>
+          row.checkIn ? dayjs(row.checkIn).format("DD/MM/YYYY") : "-",
       },
       {
         field: "checkOut",
         headerName: t("admin.reservations.columns.checkOut", "Check Out"),
         width: 130,
-        valueGetter: (_, row) => (row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-"),
+        valueGetter: (_, row) =>
+          row.checkOut ? dayjs(row.checkOut).format("DD/MM/YYYY") : "-",
       },
       {
         field: "total",
         headerName: t("admin.reservations.columns.total", "Total"),
-        width: 120,
-        valueGetter: (_, row) => `$${row.total}`,
+        width: 130,
+        valueGetter: (_, row) => money.format(Number(row.total ?? 0)),
       },
       {
         field: "status",
@@ -527,21 +625,27 @@ export default function ReservationsSection() {
                 onChange={(e) => updateStatus(id, e.target.value as ReservationStatus)}
                 sx={{ minWidth: 170 }}
               >
-                <MenuItem value="pending">{t("admin.reservations.statusValues.pending", "Pendiente")}</MenuItem>
-                <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
-                <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
+                <MenuItem value="pending">
+                  {t("admin.reservations.statusValues.pending", "Pendiente")}
+                </MenuItem>
+                <MenuItem value="confirmed">
+                  {t("admin.reservations.statusValues.confirmed", "Confirmada")}
+                </MenuItem>
+                <MenuItem value="cancelled">
+                  {t("admin.reservations.statusValues.cancelled", "Cancelada")}
+                </MenuItem>
               </Select>
             </Box>
           );
         },
       },
     ];
-  }, [savingById, t]);
+  }, [savingById, t, money]);
 
   return (
     <>
       <Box sx={{ p: { xs: 2, md: 3 } }}>
-        <Stack spacing={1.5} sx={{ mb: 2 }}>
+        <Stack spacing={2} sx={{ mb: 2 }}>
           <Stack
             direction={{ xs: "column", md: "row" }}
             spacing={1.5}
@@ -552,51 +656,144 @@ export default function ReservationsSection() {
               {t("admin.reservations.title", "Reservas")}
             </Typography>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
-              <TextField
-                size="small"
-                type="date"
-                label={t("admin.reservations.filterFrom", "Desde")}
-                InputLabelProps={{ shrink: true }}
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-              <TextField
-                size="small"
-                type="date"
-                label={t("admin.reservations.filterTo", "Hasta")}
-                InputLabelProps={{ shrink: true }}
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-              <Select
-                size="small"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
-                sx={{ minWidth: 180 }}
-              >
-                <MenuItem value="all">{t("admin.reservations.filterAll", "Todos los estados")}</MenuItem>
-                <MenuItem value="pending">{t("admin.reservations.statusValues.pending", "Pendiente")}</MenuItem>
-                <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
-                <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
-              </Select>
+            <Button
+              variant="outlined"
+              onClick={exportXLSX}
+              sx={{ borderRadius: 999, fontWeight: 900, whiteSpace: "nowrap" }}
+              disabled={loading || !hostelSlug}
+            >
+              Exportar XLSX
+            </Button>
+          </Stack>
 
-              <Button
-                variant="outlined"
-                onClick={exportXLSX}
-                sx={{ borderRadius: 999, fontWeight: 900, whiteSpace: "nowrap" }}
-                disabled={loading || !hostelSlug}
-              >
-                Exportar XLSX
-              </Button>
-            </Stack>
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1.5,
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", lg: "repeat(4, 1fr)" },
+            }}
+          >
+            <Card sx={{ borderRadius: 4 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <MeetingRoomOutlinedIcon fontSize="small" />
+                  <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                    {t("admin.reservations.cards.totalReservations", "Reservas")}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ mt: 0.75, fontWeight: 900, fontSize: 28 }}>
+                  {totals.totalReservations}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ borderRadius: 4 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <EventAvailableOutlinedIcon fontSize="small" />
+                  <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                    {t("admin.reservations.cards.pending", "Pendientes")}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ mt: 0.75, fontWeight: 900, fontSize: 28 }}>
+                  {totals.pending}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ borderRadius: 4 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <EventAvailableOutlinedIcon fontSize="small" />
+                  <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                    {t("admin.reservations.cards.confirmed", "Confirmadas")}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ mt: 0.75, fontWeight: 900, fontSize: 28 }}>
+                  {totals.confirmed}
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ borderRadius: 4 }}>
+              <CardContent>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <AttachMoneyOutlinedIcon fontSize="small" />
+                  <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+                    {t("admin.reservations.cards.revenue", "Revenue")}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ mt: 0.75, fontWeight: 900, fontSize: 28 }}>
+                  {money.format(totals.totalRevenue)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Box>
+
+          <Stack direction={{ xs: "column", lg: "row" }} spacing={1.2}>
+            <TextField
+              size="small"
+              type="date"
+              label={t("admin.reservations.filterFrom", "Desde")}
+              InputLabelProps={{ shrink: true }}
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+            />
+
+            <TextField
+              size="small"
+              type="date"
+              label={t("admin.reservations.filterTo", "Hasta")}
+              InputLabelProps={{ shrink: true }}
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+            />
+
+            <Select
+              size="small"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as any)}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="all">
+                {t("admin.reservations.filterAll", "Todos los estados")}
+              </MenuItem>
+              <MenuItem value="pending">
+                {t("admin.reservations.statusValues.pending", "Pendiente")}
+              </MenuItem>
+              <MenuItem value="confirmed">
+                {t("admin.reservations.statusValues.confirmed", "Confirmada")}
+              </MenuItem>
+              <MenuItem value="cancelled">
+                {t("admin.reservations.statusValues.cancelled", "Cancelada")}
+              </MenuItem>
+            </Select>
+
+            <Select
+              size="small"
+              value={roomIdFilter}
+              onChange={(e) => setRoomIdFilter(e.target.value)}
+              sx={{ minWidth: 220 }}
+            >
+              <MenuItem value="all">
+                {t("admin.reservations.allRooms", "Todas las habitaciones")}
+              </MenuItem>
+              {roomOptions.map((room) => (
+                <MenuItem key={room.id} value={room.id}>
+                  {room.name}
+                </MenuItem>
+              ))}
+            </Select>
           </Stack>
 
           <TextField
             size="small"
             value={qText}
             onChange={(e) => setQText(e.target.value)}
-            placeholder={t("admin.reservations.searchPlaceholder", "Buscar por nombre, email o habitación…")}
+            placeholder={t(
+              "admin.reservations.searchPlaceholder",
+              "Buscar por nombre, email o habitación…"
+            )}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -605,6 +802,28 @@ export default function ReservationsSection() {
               ),
             }}
           />
+
+          {(roomIdFilter !== "all" || qText.trim()) && (
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+              {roomIdFilter !== "all" && (
+                <Chip
+                  label={`${
+                    roomOptions.find((room) => room.id === roomIdFilter)?.name || roomIdFilter
+                  }`}
+                  onDelete={() => setRoomIdFilter("all")}
+                  sx={{ borderRadius: 999, fontWeight: 900 }}
+                />
+              )}
+
+              {qText.trim() && (
+                <Chip
+                  label={qText.trim()}
+                  onDelete={() => setQText("")}
+                  sx={{ borderRadius: 999, fontWeight: 900 }}
+                />
+              )}
+            </Stack>
+          )}
 
           {err && <Alert severity="error">{err}</Alert>}
         </Stack>
@@ -615,94 +834,124 @@ export default function ReservationsSection() {
           </Box>
         ) : isMobile ? (
           <Stack spacing={2}>
-            {groupedMobile.map(([dayKey, list]) => (
-              <Box key={dayKey}>
-                <Typography sx={{ fontWeight: 900, mb: 1 }}>
-                  {dayKey === "unknown"
-                    ? t("admin.reservations.unknownDate", "Fecha desconocida")
-                    : dayjs(dayKey).format("ddd DD/MM")}
-                </Typography>
+            {groupedMobile.length === 0 ? (
+              <Alert severity="info">
+                {t("admin.reservations.empty", "No hay reservas para los filtros actuales.")}
+              </Alert>
+            ) : (
+              groupedMobile.map(([dayKey, list]) => (
+                <Box key={dayKey}>
+                  <Typography sx={{ fontWeight: 900, mb: 1 }}>
+                    {dayKey === "unknown"
+                      ? t("admin.reservations.unknownDate", "Fecha desconocida")
+                      : dayjs(dayKey).format("ddd DD/MM")}
+                  </Typography>
 
-                <Stack spacing={1.2}>
-                  {list.map((r) => {
-                    const saving = !!savingById[r.id];
-                    return (
-                      <Card key={r.id} sx={{ borderRadius: 3 }}>
-                        <CardContent>
-                          <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
-                              {r.fullName || "—"}
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={statusLabel(r.status)}
-                              color={
-                                (r.status === "confirmed" ? "success" : r.status === "cancelled" ? "error" : "warning") as any
-                              }
-                            />
-                          </Stack>
+                  <Stack spacing={1.2}>
+                    {list.map((r) => {
+                      const saving = !!savingById[r.id];
 
-                          <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
-                            {r.roomName} · {r.email}
-                          </Typography>
+                      return (
+                        <Card key={r.id} sx={{ borderRadius: 3 }}>
+                          <CardContent>
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              spacing={1}
+                            >
+                              <Typography variant="subtitle1" sx={{ fontWeight: 900 }}>
+                                {r.fullName || "—"}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={statusLabel(r.status)}
+                                color={
+                                  (r.status === "confirmed"
+                                    ? "success"
+                                    : r.status === "cancelled"
+                                    ? "error"
+                                    : "warning") as any
+                                }
+                              />
+                            </Stack>
 
-                          <Divider sx={{ my: 1.2 }} />
-
-                          <Stack direction="row" justifyContent="space-between">
-                            <Typography variant="body2">
-                              {t("admin.reservations.columns.checkIn", "Check In")}:{" "}
-                              {r.checkIn ? dayjs(r.checkIn).format("DD/MM") : "—"}
-                            </Typography>
-                            <Typography variant="body2">
-                              {t("admin.reservations.columns.checkOut", "Check Out")}:{" "}
-                              {r.checkOut ? dayjs(r.checkOut).format("DD/MM") : "—"}
-                            </Typography>
-                          </Stack>
-
-                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 900 }}>
-                              {t("admin.reservations.columns.total", "Total")}: ${r.total}
+                            <Typography variant="body2" sx={{ opacity: 0.8, mt: 0.5 }}>
+                              {r.roomName} · {r.email}
                             </Typography>
 
-                            {saving ? (
-                              <CircularProgress size={18} />
-                            ) : (
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => updateStatus(r.id, "confirmed")}
-                                  disabled={r.status === "confirmed"}
-                                >
-                                  <CheckIcon fontSize="small" />
-                                </IconButton>
+                            <Divider sx={{ my: 1.2 }} />
 
-                                <IconButton
-                                  size="small"
-                                  onClick={() => openCancelDialog(r)}
-                                  disabled={r.status === "cancelled"}
-                                >
-                                  <CancelIcon fontSize="small" />
-                                </IconButton>
+                            <Stack direction="row" justifyContent="space-between">
+                              <Typography variant="body2">
+                                {t("admin.reservations.columns.checkIn", "Check In")}:{" "}
+                                {r.checkIn ? dayjs(r.checkIn).format("DD/MM") : "—"}
+                              </Typography>
+                              <Typography variant="body2">
+                                {t("admin.reservations.columns.checkOut", "Check Out")}:{" "}
+                                {r.checkOut ? dayjs(r.checkOut).format("DD/MM") : "—"}
+                              </Typography>
+                            </Stack>
 
-                                <Select
-                                  size="small"
-                                  value={r.status}
-                                  onChange={(e) => updateStatus(r.id, e.target.value as ReservationStatus)}
-                                >
-                                  <MenuItem value="pending">{t("admin.reservations.statusValues.pending", "Pendiente")}</MenuItem>
-                                  <MenuItem value="confirmed">{t("admin.reservations.statusValues.confirmed", "Confirmada")}</MenuItem>
-                                  <MenuItem value="cancelled">{t("admin.reservations.statusValues.cancelled", "Cancelada")}</MenuItem>
-                                </Select>
-                              </Stack>
-                            )}
-                          </Stack>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </Stack>
-              </Box>
-            ))}
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              sx={{ mt: 1 }}
+                            >
+                              <Typography variant="body2" sx={{ fontWeight: 900 }}>
+                                {t("admin.reservations.columns.total", "Total")}:{" "}
+                                {money.format(Number(r.total ?? 0))}
+                              </Typography>
+
+                              {saving ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => updateStatus(r.id, "confirmed")}
+                                    disabled={r.status === "confirmed"}
+                                  >
+                                    <CheckIcon fontSize="small" />
+                                  </IconButton>
+
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => openCancelDialog(r)}
+                                    disabled={r.status === "cancelled"}
+                                  >
+                                    <CancelIcon fontSize="small" />
+                                  </IconButton>
+
+                                  <Select
+                                    size="small"
+                                    value={r.status}
+                                    onChange={(e) =>
+                                      updateStatus(r.id, e.target.value as ReservationStatus)
+                                    }
+                                  >
+                                    <MenuItem value="pending">
+                                      {t("admin.reservations.statusValues.pending", "Pendiente")}
+                                    </MenuItem>
+                                    <MenuItem value="confirmed">
+                                      {t("admin.reservations.statusValues.confirmed", "Confirmada")}
+                                    </MenuItem>
+                                    <MenuItem value="cancelled">
+                                      {t("admin.reservations.statusValues.cancelled", "Cancelada")}
+                                    </MenuItem>
+                                  </Select>
+                                </Stack>
+                              )}
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </Stack>
+                </Box>
+              ))
+            )}
           </Stack>
         ) : (
           <Box sx={{ height: 660, width: "100%" }}>
@@ -717,7 +966,6 @@ export default function ReservationsSection() {
         )}
       </Box>
 
-      {/* ✅ Confirm Cancel Dialog */}
       <Dialog open={confirmCancelOpen} onClose={closeCancelDialog} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ fontWeight: 900 }}>
           {t("admin.reservations.confirmCancel.title", "¿Cancelar reserva?")}
@@ -740,7 +988,12 @@ export default function ReservationsSection() {
           <Button onClick={closeCancelDialog} variant="outlined" sx={{ borderRadius: 999 }}>
             {t("admin.reservations.confirmCancel.keep", "Mantener")}
           </Button>
-          <Button onClick={confirmCancel} variant="contained" color="error" sx={{ borderRadius: 999, fontWeight: 900 }}>
+          <Button
+            onClick={confirmCancel}
+            variant="contained"
+            color="error"
+            sx={{ borderRadius: 999, fontWeight: 900 }}
+          >
             {t("admin.reservations.confirmCancel.confirm", "Cancelar")}
           </Button>
         </DialogActions>

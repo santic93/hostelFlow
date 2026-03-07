@@ -28,6 +28,7 @@ import ImageIcon from "@mui/icons-material/Image";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 
 import { collection, getDocs } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -207,6 +208,25 @@ export default function RoomsSection() {
   const closeReservationsDialog = () => {
     setReservationsDialogOpen(false);
     setReservationsRoom(null);
+  };
+
+  const goToReservationsForRoom = (room: Room) => {
+    if (!hostelSlug) return;
+
+    const params = new URLSearchParams();
+    params.set("from", new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .slice(0, 10));
+    params.set(
+      "to",
+      new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+        .toISOString()
+        .slice(0, 10)
+    );
+    params.set("status", "all");
+    params.set("roomId", room.id);
+
+    navigate(`/${hostelSlug}/admin/reservations?${params.toString()}`);
   };
 
   const fetchRooms = async () => {
@@ -439,7 +459,7 @@ export default function RoomsSection() {
       {
         field: "actions",
         headerName: t("admin.rooms.columns.actions"),
-        width: 390,
+        width: 500,
         sortable: false,
         filterable: false,
         renderCell: (params) => {
@@ -457,6 +477,17 @@ export default function RoomsSection() {
                 sx={{ textTransform: "none", fontWeight: 800 }}
               >
                 {t("admin.rooms.actions.viewReservations", "Ver reservas")}
+              </Button>
+
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<OpenInNewIcon />}
+                disabled={busy || r.futureReservationsCount === 0}
+                onClick={() => goToReservationsForRoom(r)}
+                sx={{ textTransform: "none", fontWeight: 800 }}
+              >
+                {t("admin.rooms.actions.goToReservations", "Ir a reservas")}
               </Button>
 
               <Button
@@ -736,6 +767,18 @@ export default function RoomsSection() {
                           {t("admin.rooms.actions.viewReservations", "Ver reservas")}
                         </Button>
 
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<OpenInNewIcon />}
+                          disabled={busy || r.futureReservationsCount === 0}
+                          onClick={() => goToReservationsForRoom(r)}
+                          fullWidth
+                          sx={{ textTransform: "none", fontWeight: 800 }}
+                        >
+                          {t("admin.rooms.actions.goToReservations", "Ir a reservas")}
+                        </Button>
+
                         <Stack direction="row" spacing={1}>
                           <Button
                             size="small"
@@ -964,10 +1007,33 @@ export default function RoomsSection() {
             )}
           </DialogContent>
 
-          <DialogActions>
+          <DialogActions
+            sx={{
+              px: 3,
+              py: 2,
+              justifyContent: "space-between",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 1,
+            }}
+          >
             <Button onClick={closeReservationsDialog}>
               {t("common.close", "Cerrar")}
             </Button>
+
+            {reservationsRoom && reservationsRoom.futureReservationsCount > 0 ? (
+              <Button
+                variant="contained"
+                startIcon={<OpenInNewIcon />}
+                onClick={() => {
+                  const room = reservationsRoom;
+                  closeReservationsDialog();
+                  goToReservationsForRoom(room);
+                }}
+                sx={{ borderRadius: 999, fontWeight: 900, textTransform: "none" }}
+              >
+                {t("admin.rooms.actions.goToReservations", "Ir a reservas")}
+              </Button>
+            ) : null}
           </DialogActions>
         </Dialog>
 

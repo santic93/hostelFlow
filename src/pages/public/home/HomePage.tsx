@@ -112,75 +112,13 @@ function RoomPreviewCard({
         background: "rgba(255,255,255,0.86)",
       }}
     >
-      <Box
-        sx={{
-          height: 250,
-          position: "relative",
-          bgcolor: "grey.50",
-          borderBottom: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        {cover ? (
-          <>
-            <Box
-              component="img"
-              src={cover}
-              alt={room.name}
-              sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-            <Box
-              sx={{
-                position: "absolute",
-                inset: 0,
-                background:
-                  "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.08) 52%, rgba(0,0,0,0.02))",
-              }}
-            />
-          </>
-        ) : (
-          <>
-            <Box
-              sx={{
-                position: "absolute",
-                inset: 0,
-                background:
-                  "radial-gradient(circle at 20% 20%, rgba(124,58,45,0.08), transparent 55%), radial-gradient(circle at 80% 0%, rgba(31,59,55,0.06), transparent 45%)",
-              }}
-            />
-            <Box
-              sx={{
-                position: "absolute",
-                inset: 0,
-                display: "grid",
-                placeItems: "center",
-                px: 2,
-              }}
-            >
-              <Stack spacing={0.5} alignItems="center">
-                <Typography sx={{ fontWeight: 900, fontSize: 14, opacity: 0.9 }}>
-                  Sin fotos
-                </Typography>
-                <Typography
-                  sx={{ fontSize: 12, color: "text.secondary", textAlign: "center" }}
-                >
-                  Esta habitación todavía no tiene imágenes.
-                </Typography>
-              </Stack>
-            </Box>
-          </>
-        )}
-
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ position: "absolute", top: 14, left: 14, flexWrap: "wrap" }}
-        >
+      <CardContent sx={{ pb: 1.25 }}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
           <Chip
             size="small"
             label={`${room.capacity} pax`}
             sx={{
-              bgcolor: "rgba(255,255,255,0.92)",
+              bgcolor: "rgba(255,255,255,0.96)",
               fontWeight: 900,
             }}
           />
@@ -189,24 +127,88 @@ function RoomPreviewCard({
               size="small"
               label={`$${room.price} / noche`}
               sx={{
-                bgcolor: "rgba(255,255,255,0.92)",
+                bgcolor: "rgba(255,255,255,0.96)",
                 fontWeight: 900,
               }}
             />
           )}
         </Stack>
+      </CardContent>
 
-        <Box sx={{ position: "absolute", left: 16, right: 16, bottom: 16 }}>
-          <Typography
-            sx={{
-              color: "white",
-              fontWeight: 900,
-              fontSize: 20,
-              textShadow: "0 4px 16px rgba(0,0,0,0.30)",
-            }}
-          >
-            {room.name}
-          </Typography>
+      <Box sx={{ px: 1.5 }}>
+        <Box
+          sx={{
+            height: 250,
+            position: "relative",
+            bgcolor: "grey.50",
+            border: "1px solid",
+            borderColor: "divider",
+            borderRadius: 4,
+            overflow: "hidden",
+          }}
+        >
+          {cover ? (
+            <>
+              <Box
+                component="img"
+                src={cover}
+                alt={room.name}
+                sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "linear-gradient(to top, rgba(0,0,0,0.48), rgba(0,0,0,0.08) 52%, rgba(0,0,0,0.02))",
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  background:
+                    "radial-gradient(circle at 20% 20%, rgba(124,58,45,0.08), transparent 55%), radial-gradient(circle at 80% 0%, rgba(31,59,55,0.06), transparent 45%)",
+                }}
+              />
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "grid",
+                  placeItems: "center",
+                  px: 2,
+                }}
+              >
+                <Stack spacing={0.5} alignItems="center">
+                  <Typography sx={{ fontWeight: 900, fontSize: 14, opacity: 0.9 }}>
+                    Sin fotos
+                  </Typography>
+                  <Typography
+                    sx={{ fontSize: 12, color: "text.secondary", textAlign: "center" }}
+                  >
+                    Esta habitación todavía no tiene imágenes.
+                  </Typography>
+                </Stack>
+              </Box>
+            </>
+          )}
+
+          <Box sx={{ position: "absolute", left: 16, right: 16, bottom: 16, zIndex: 2 }}>
+            <Typography
+              sx={{
+                color: "white",
+                fontWeight: 900,
+                fontSize: 20,
+                textShadow: "0 4px 16px rgba(0,0,0,0.30)",
+              }}
+            >
+              {room.name}
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
@@ -538,6 +540,12 @@ export const HomePage = () => {
                   >
                     {[0, 1, 2].map((k) => (
                       <Card key={k} sx={{ borderRadius: 5, overflow: "hidden" }}>
+                        <CardContent>
+                          <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                            <Skeleton width={90} height={28} />
+                            <Skeleton width={140} height={28} />
+                          </Stack>
+                        </CardContent>
                         <Skeleton variant="rectangular" height={250} />
                         <CardContent>
                           <Skeleton width="70%" />

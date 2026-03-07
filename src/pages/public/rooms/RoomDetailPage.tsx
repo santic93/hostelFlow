@@ -75,6 +75,12 @@ export const RoomDetailPage = () => {
         <Stack spacing={2}>
           <Skeleton width={180} height={44} />
           <Card sx={{ overflow: "hidden", borderRadius: 5 }}>
+            <CardContent>
+              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                <Skeleton width={90} height={28} />
+                <Skeleton width={160} height={28} />
+              </Stack>
+            </CardContent>
             <Skeleton variant="rectangular" height={420} />
             <CardContent>
               <Skeleton width="50%" height={54} />
@@ -120,28 +126,20 @@ export const RoomDetailPage = () => {
             background: "rgba(255,255,255,0.82)",
           }}
         >
-          <Box sx={{ position: "relative" }}>
-            <RoomCardCarousel urls={urls} alt={room.name} />
-            <Stack
-              direction="row"
-              spacing={1}
-              sx={{
-                position: "absolute",
-                top: 14,
-                left: 14,
-                flexWrap: "wrap",
-              }}
-            >
+          <CardContent sx={{ pb: 1.25 }}>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
               <Chip
                 label={t("rooms.capacity", { n: room.capacity })}
-                sx={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                sx={{ backgroundColor: "rgba(255,255,255,0.96)", fontWeight: 900 }}
               />
               <Chip
                 label={`${money.format(room.price)} ${t("rooms.perNight")}`}
-                sx={{ backgroundColor: "rgba(255,255,255,0.92)" }}
+                sx={{ backgroundColor: "rgba(255,255,255,0.96)", fontWeight: 900 }}
               />
             </Stack>
-          </Box>
+          </CardContent>
+
+          <RoomCardCarousel urls={urls} alt={room.name} />
 
           <CardContent sx={{ p: { xs: 2.2, sm: 3 } }}>
             <Stack spacing={2}>

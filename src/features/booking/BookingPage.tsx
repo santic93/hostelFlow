@@ -7,11 +7,13 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Stack,
   TextField,
   Typography,
   CircularProgress,
+  Divider,
 } from "@mui/material";
 
 import dayjs, { Dayjs } from "dayjs";
@@ -30,6 +32,16 @@ import {
 } from "../../services/reservations";
 
 dayjs.extend(isSameOrBefore);
+
+type ReservationSuccessData = {
+  fullName: string;
+  email: string;
+  roomName: string;
+  checkInLabel: string;
+  checkOutLabel: string;
+  nights: number;
+  total: number;
+};
 
 function getCallableErrorInfo(err: any) {
   const code = err?.code ?? err?.name ?? "unknown";
@@ -107,6 +119,7 @@ export const BookingPage = () => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [emailTouched, setEmailTouched] = useState(false);
+  const [nameTouched, setNameTouched] = useState(false);
 
   const [selectedRoom, setSelectedRoom] = useState<PublicRoom | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
@@ -117,12 +130,16 @@ export const BookingPage = () => {
   const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
 
   const [success, setSuccess] = useState(false);
+  const [successData, setSuccessData] = useState<ReservationSuccessData | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const [blockedSet, setBlockedSet] = useState<Set<string>>(new Set());
 
   const isEmailValid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const isNameValid = fullName.trim().length >= 3;
+
   const showEmailError = emailTouched && email.length > 0 && !isEmailValid;
+  const showNameError = nameTouched && fullName.length > 0 && !isNameValid;
 
   const today = dayjs().startOf("day");
   const horizonFrom = today;
@@ -245,21 +262,24 @@ export const BookingPage = () => {
     return nights * Number(selectedRoom.price || 0);
   }, [selectedRoom, nights]);
 
+  const roomImage = selectedRoom?.imageUrls?.[0] || null;
+
   const isFormValid =
     !!hostelSlug &&
     !!selectedRoom &&
     nights > 0 &&
-    fullName.trim().length > 2 &&
+    isNameValid &&
     isEmailValid;
 
   const isBlockedNight = (d: Dayjs) => blockedSet.has(d.format("YYYY-MM-DD"));
 
   const shouldDisableCheckIn = (d: Dayjs) => d.isBefore(today, "day") || isBlockedNight(d);
-
   const shouldDisableCheckOut = (d: Dayjs) => d.isBefore(today.add(1, "day"), "day");
 
   const handleConfirm = async () => {
     setFormError(null);
+    setNameTouched(true);
+    setEmailTouched(true);
 
     if (!isFormValid || !hostelSlug || !selectedRoom || !checkIn || !checkOut) return;
 
@@ -284,6 +304,15 @@ export const BookingPage = () => {
       const res = await createReservation(payload);
 
       if (res?.ok) {
+        setSuccessData({
+          fullName: fullName.trim(),
+          email: email.trim().toLowerCase(),
+          roomName: selectedRoom.name,
+          checkInLabel: checkIn.format("DD/MM/YYYY"),
+          checkOutLabel: checkOut.format("DD/MM/YYYY"),
+          nights,
+          total,
+        });
         setSuccess(true);
       } else {
         setFormError(t("booking.errorSaving"));
@@ -310,12 +339,61 @@ export const BookingPage = () => {
       <Container sx={{ py: 6 }}>
         <Card sx={{ borderRadius: 4 }}>
           <CardContent>
-            <Typography variant="h5" sx={{ fontWeight: 900, mb: 1 }}>
-              {t("booking.successTitle")}
-            </Typography>
-            <Typography sx={{ color: "text.secondary" }}>
-              {t("booking.successText")}
-            </Typography>
+            <Stack spacing={2}>
+              <Typography variant="h5" sx={{ fontWeight: 900 }}>
+                {t("booking.successTitle")}
+              </Typography>
+
+              <Typography sx={{ color: "text.secondary" }}>
+                {t("booking.successText")}
+              </Typography>
+
+              {successData && (
+                <>
+                  <Divider />
+                  <Stack spacing={1}>
+                    <Typography sx={{ fontWeight: 800 }}>
+                      {successData.roomName}
+                    </Typography>
+                    <Typography sx={{ color: "text.secondary", fontSize: 14 }}>
+                      {successData.fullName} · {successData.email}
+                    </Typography>
+                    <Typography sx={{ fontSize: 14 }}>
+                      {t("booking.checkIn", "Check-in")}: {successData.checkInLabel}
+                    </Typography>
+                    <Typography sx={{ fontSize: 14 }}>
+                      {t("booking.checkOut", "Check-out")}: {successData.checkOutLabel}
+                    </Typography>
+                    <Typography sx={{ fontSize: 14 }}>
+                      {t("booking.summaryNights", { n: successData.nights })}
+                    </Typography>
+                    <Typography sx={{ fontWeight: 900 }}>
+                      {t("booking.summaryTotal", {
+                        total: money.format(successData.total),
+                      })}
+                    </Typography>
+                  </Stack>
+                </>
+              )}
+
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate(`/${hostelSlug}`)}
+                  sx={{ borderRadius: 999, textTransform: "none", fontWeight: 900 }}
+                >
+                  {t("booking.backToSite", "Volver al sitio")}
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  onClick={() => navigate(-1)}
+                  sx={{ borderRadius: 999, textTransform: "none", fontWeight: 900 }}
+                >
+                  {t("booking.back", "Volver")}
+                </Button>
+              </Stack>
+            </Stack>
           </CardContent>
         </Card>
       </Container>
@@ -356,7 +434,7 @@ export const BookingPage = () => {
         <Button
           variant="outlined"
           onClick={() => navigate(-1)}
-          sx={{ alignSelf: "flex-start" }}
+          sx={{ alignSelf: "flex-start", borderRadius: 999, textTransform: "none" }}
           disabled={submitting}
         >
           {t("booking.back")}
@@ -365,7 +443,6 @@ export const BookingPage = () => {
         <Typography variant="h2">{t("booking.title")}</Typography>
 
         {formError && <Alert severity="error">{formError}</Alert>}
-
         {availabilityWarning && <Alert severity="info">{availabilityWarning}</Alert>}
 
         {loadingAvail && (
@@ -374,11 +451,7 @@ export const BookingPage = () => {
           </Alert>
         )}
 
-        <Stack
-          direction={{ xs: "column", md: "row" }}
-          spacing={2}
-          alignItems="stretch"
-        >
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="stretch">
           <Card sx={{ flex: 1, borderRadius: 4 }}>
             <CardContent>
               <Stack spacing={2}>
@@ -470,8 +543,11 @@ export const BookingPage = () => {
                   label={t("booking.fullName")}
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  onBlur={() => setNameTouched(true)}
                   fullWidth
                   disabled={submitting}
+                  error={showNameError}
+                  helperText={showNameError ? t("booking.nameInvalid", "Ingresá un nombre válido.") : ""}
                 />
 
                 <TextField
@@ -491,7 +567,7 @@ export const BookingPage = () => {
                   disabled={!isFormValid || loadingAvail || submitting}
                   onClick={handleConfirm}
                   startIcon={submitting ? <CircularProgress size={16} color="inherit" /> : null}
-                  sx={{ minHeight: 48 }}
+                  sx={{ minHeight: 48, borderRadius: 999, textTransform: "none", fontWeight: 900 }}
                 >
                   {submitting ? t("booking.confirming", "Confirmando…") : t("booking.confirm")}
                 </Button>
@@ -502,10 +578,44 @@ export const BookingPage = () => {
           <Card sx={{ width: { xs: "100%", md: 380 }, flexShrink: 0, borderRadius: 4 }}>
             <CardContent>
               {selectedRoom ? (
-                <Stack spacing={1.2}>
-                  <Typography sx={{ fontWeight: 900, fontSize: 18 }}>
+                <Stack spacing={1.4}>
+                  {roomImage ? (
+                    <Box
+                      component="img"
+                      src={roomImage}
+                      alt={selectedRoom.name}
+                      sx={{
+                        width: "100%",
+                        height: 180,
+                        objectFit: "cover",
+                        borderRadius: 3,
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    />
+                  ) : null}
+
+                  <Typography sx={{ fontWeight: 900, fontSize: 20 }}>
                     {selectedRoom.name}
                   </Typography>
+
+                  {selectedRoom.capacity ? (
+                    <Chip
+                      label={t("booking.capacityLabel", {
+                        count: selectedRoom.capacity,
+                        defaultValue: `Capacidad: ${selectedRoom.capacity}`,
+                      })}
+                      sx={{ alignSelf: "flex-start", borderRadius: 999, fontWeight: 900 }}
+                    />
+                  ) : null}
+
+                  {selectedRoom.description ? (
+                    <Typography sx={{ color: "text.secondary", fontSize: 14 }}>
+                      {selectedRoom.description}
+                    </Typography>
+                  ) : null}
+
+                  <Divider />
 
                   <Typography sx={{ color: "text.secondary" }}>
                     {t("booking.summaryPerNight", {
@@ -519,9 +629,22 @@ export const BookingPage = () => {
                       : t("booking.summarySelectDates")}
                   </Typography>
 
-                  <Box sx={{ height: 10 }} />
+                  {checkIn && checkOut ? (
+                    <Stack spacing={0.4}>
+                      <Typography sx={{ fontSize: 14 }}>
+                        <strong>{t("booking.checkIn", "Check-in")}:</strong>{" "}
+                        {checkIn.format("DD/MM/YYYY")}
+                      </Typography>
+                      <Typography sx={{ fontSize: 14 }}>
+                        <strong>{t("booking.checkOut", "Check-out")}:</strong>{" "}
+                        {checkOut.format("DD/MM/YYYY")}
+                      </Typography>
+                    </Stack>
+                  ) : null}
 
-                  <Typography sx={{ fontWeight: 900, fontSize: 20 }}>
+                  <Box sx={{ height: 6 }} />
+
+                  <Typography sx={{ fontWeight: 900, fontSize: 22 }}>
                     {t("booking.summaryTotal", { total: money.format(total) })}
                   </Typography>
 

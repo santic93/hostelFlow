@@ -1,16 +1,13 @@
 import * as admin from "firebase-admin";
 
 /**
- * Inicializa el Admin SDK una sola vez.
- * Esto evita el error "default app does not exist"
- * incluso durante el análisis del deploy.
+ * Inicializa Firebase Admin una sola vez.
  */
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-export { admin };
+const db = admin.firestore();
+const auth = admin.auth();
 
-// Helpers comunes
-export const db = admin.firestore();
-export const auth = admin.auth();
+export { admin, db, auth };

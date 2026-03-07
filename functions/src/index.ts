@@ -1,69 +1,95 @@
-// functions/src/index.ts
-import * as admin from "firebase-admin";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret, defineString } from "firebase-functions/params";
+import { setGlobalOptions } from "firebase-functions/v2";
 import axios from "axios";
 import type { CallableRequest } from "firebase-functions/v2/https";
+
+import { admin, auth, db } from "./admin";
 import { SENTRY_DSN, initSentryOnce, captureToSentry } from "./monitoring/sentry";
-import { setGlobalOptions } from "firebase-functions/v2";
 
 setGlobalOptions({ region: "us-central1" });
-
-function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any>["auth"]> {
-  if (!req.auth) throw new HttpsError("unauthenticated", "Requiere login");
-  return req.auth;
-}
-
-admin.initializeApp();
-const db = admin.firestore();
 
 // -------------------- Params / Secrets
 const MAIL_FROM_EMAIL = defineString("MAIL_FROM_EMAIL", { default: "no-reply@hostly.app" });
 const MAIL_FROM_NAME = defineString("MAIL_FROM_NAME", { default: "Hostly" });
-
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
-// -------------------- Helpers
+// -------------------- Types
+type MemberRole = "owner" | "manager" | "staff";
+type ReservationStatus = "pending" | "confirmed" | "cancelled";
+
+// -------------------- Generic helpers
+function requireAuth(req: CallableRequest<any>): NonNullable<CallableRequest<any>["auth"]> {
+  if (!req.auth) {
+    throw new HttpsError("unauthenticated", "Requiere login");
+  }
+  return req.auth;
+}
+
 function createRid(prefix = "rid") {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 }
 
 function logRid(rid: string, step: string, data?: Record<string, any>) {
-  if (data) console.log("[RID]", rid, step, data);
-  else console.log("[RID]", rid, step);
+  if (data) {
+    console.log("[RID]", rid, step, data);
+  } else {
+    console.log("[RID]", rid, step);
+  }
+}
+
+function assert(condition: any, code: any, message: string) {
+  if (!condition) {
+    throw new HttpsError(code, message);
+  }
 }
 
 function isNonEmptyString(v: any, minLen: number) {
   return typeof v === "string" && v.trim().length >= minLen;
 }
 
-function assert(condition: any, code: any, message: string) {
-  if (!condition) throw new HttpsError(code, message);
-}
-
-type MemberRole = "owner" | "manager" | "staff";
 function isValidMemberRole(r: string): r is MemberRole {
   return r === "owner" || r === "manager" || r === "staff";
 }
 
-type ReservationStatus = "pending" | "confirmed" | "cancelled";
 function isValidStatus(s: string): s is ReservationStatus {
   return s === "pending" || s === "confirmed" || s === "cancelled";
 }
+
 function canTransition(from: ReservationStatus, to: ReservationStatus) {
   if (from === "cancelled") return false;
   return true;
 }
 
+function normalizeSlug(input: string) {
+  return (input || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function randomCode(len = 10) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < len; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+// -------------------- Date helpers
 function toUTCDateOnly(d: Date) {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 }
+
 function formatYYYYMMDD_UTC(date: Date) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
   const d = String(date.getUTCDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
 /**
  * check-in inclusive, check-out exclusive
  */
@@ -71,16 +97,37 @@ function buildNights(from: Date, to: Date) {
   const start = toUTCDateOnly(from);
   const end = toUTCDateOnly(to);
   const nights: string[] = [];
+
   for (let cur = new Date(start); cur < end; cur.setUTCDate(cur.getUTCDate() + 1)) {
     nights.push(formatYYYYMMDD_UTC(cur));
   }
+
   return nights;
 }
+
 function lockDocId(roomId: string, yyyyMMdd: string) {
   return `${roomId}_${yyyyMMdd}`;
 }
 
-// -------------------- Membership (RBAC)
+function isYYYYMMDD(s: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+// -------------------- Claims helpers
+async function setMergedCustomClaims(
+  uid: string,
+  patch: Record<string, any>
+) {
+  const user = await auth.getUser(uid);
+  const currentClaims = user.customClaims || {};
+
+  await auth.setCustomUserClaims(uid, {
+    ...currentClaims,
+    ...patch,
+  });
+}
+
+// -------------------- RBAC helpers
 async function requireMemberRole(
   uid: string,
   hostelSlug: string,
@@ -88,14 +135,41 @@ async function requireMemberRole(
 ): Promise<{ role: MemberRole }> {
   const ref = db.doc(`hostels/${hostelSlug}/members/${uid}`);
   const snap = await ref.get();
+
   assert(snap.exists, "permission-denied", "No sos miembro de este hostel");
+
   const role = String(snap.data()?.role || "");
   assert(isValidMemberRole(role), "permission-denied", "Rol inválido");
   assert(allowed.includes(role as MemberRole), "permission-denied", "No autorizado");
+
   return { role: role as MemberRole };
 }
 
-// -------------------- Email
+function canInviteRole(actorRole: MemberRole, targetRole: MemberRole) {
+  if (actorRole === "owner") {
+    return targetRole === "manager" || targetRole === "staff";
+  }
+
+  if (actorRole === "manager") {
+    return targetRole === "staff";
+  }
+
+  return false;
+}
+
+function canRemoveRole(actorRole: MemberRole, targetRole: MemberRole) {
+  if (actorRole === "owner") {
+    return targetRole === "manager" || targetRole === "staff";
+  }
+
+  if (actorRole === "manager") {
+    return targetRole === "staff";
+  }
+
+  return false;
+}
+
+// -------------------- Email helpers
 function reservationEmailHtml(args: {
   title: string;
   hostelName: string;
@@ -108,6 +182,7 @@ function reservationEmailHtml(args: {
   status: string;
 }) {
   const { title, hostelName, roomName, fullName, checkIn, checkOut, nights, total, status } = args;
+
   return `
     <h2>${title}</h2>
     <p>Hola ${fullName},</p>
@@ -125,6 +200,7 @@ function reservationEmailHtml(args: {
 
 async function sendEmailBrevo(args: { to: string; toName?: string; subject: string; html: string }) {
   const apiKey = BREVO_API_KEY.value();
+
   if (!apiKey) {
     console.warn("BREVO_API_KEY not set. Skipping email.");
     return { ok: false as const, skipped: true as const };
@@ -133,7 +209,10 @@ async function sendEmailBrevo(args: { to: string; toName?: string; subject: stri
   const res = await axios.post(
     "https://api.brevo.com/v3/smtp/email",
     {
-      sender: { email: MAIL_FROM_EMAIL.value(), name: MAIL_FROM_NAME.value() },
+      sender: {
+        email: MAIL_FROM_EMAIL.value(),
+        name: MAIL_FROM_NAME.value(),
+      },
       to: [{ email: args.to, name: args.toName || "" }],
       subject: args.subject,
       htmlContent: args.html,
@@ -163,6 +242,7 @@ async function logEmail(args: {
   error?: any;
 }) {
   const ref = db.collection(`hostels/${args.hostelSlug}/email_logs`).doc();
+
   await ref.set({
     kind: args.kind,
     to: args.to,
@@ -224,35 +304,23 @@ async function sendEmailBrevoSafe(args: {
   }
 }
 
-// -------------------- Invite helpers (NUEVO)
-function randomCode(len = 10) {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
-  return out;
-}
-
-function normalizeSlug(input: string) {
-  return (input || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)+/g, "");
-}
-
-// -------------------- FUNCTIONS
+// -------------------- Functions
 export const createInvite = onCall(
   { region: "us-central1", enforceAppCheck: true },
   async (req) => {
     const uid = req.auth?.uid;
-    if (!uid) throw new HttpsError("unauthenticated", "Debes estar logueado.");
+    if (!uid) {
+      throw new HttpsError("unauthenticated", "Debes estar logueado.");
+    }
 
     const role = String((req.auth?.token as any)?.role || "");
-    if (role !== "superadmin") throw new HttpsError("permission-denied", "Solo superadmin.");
+    if (role !== "superadmin") {
+      throw new HttpsError("permission-denied", "Solo superadmin.");
+    }
 
     const notes = (req.data?.notes ?? null) as string | null;
-
     const code = randomCode(10);
+
     await db.collection("invites").doc(code).set({
       active: true,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -265,93 +333,109 @@ export const createInvite = onCall(
     return { code };
   }
 );
-/**
- * ✅ createHostel (MODIFICADO)
- * - exige inviteCode
- * - crea /hostels/{slug}
- * - crea /hostels/{slug}/members/{uid} role=owner
- * - upsert /users/{uid}.activeHostelSlug (merge)
- * - setCustomUserClaims para Storage: owner + activeHostelSlug
- */
-export const createHostel = onCall(async (req) => {
-  const uid = req.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Debes estar logueado.");
 
-  const name = String(req.data?.name || "").trim();
-  const slugInput = String(req.data?.slug || "").trim();
-  const inviteCode = String(req.data?.inviteCode || "").trim().toUpperCase();
+export const createHostel = onCall(
+  { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
+  async (req) => {
+    initSentryOnce();
 
-  if (!inviteCode) throw new HttpsError("permission-denied", "INVITE_REQUIRED");
-  if (!name || name.length < 2) throw new HttpsError("invalid-argument", "NAME_INVALID");
+    const rid = createRid("createHostel");
+    logRid(rid, "start", { hasAuth: !!req.auth });
 
-  const slug = normalizeSlug(slugInput);
-  if (!slug || slug.length < 2) throw new HttpsError("invalid-argument", "SLUG_INVALID");
+    try {
+      const uid = req.auth?.uid;
+      if (!uid) {
+        throw new HttpsError("unauthenticated", "Debes estar logueado.");
+      }
 
-  const inviteRef = db.collection("invites").doc(inviteCode);
-  const hostelRef = db.collection("hostels").doc(slug);
-  const memberRef = hostelRef.collection("members").doc(uid);
-  const userRef = db.collection("users").doc(uid);
+      const name = String(req.data?.name || "").trim();
+      const slugInput = String(req.data?.slug || "").trim();
+      const inviteCode = String(req.data?.inviteCode || "").trim().toUpperCase();
 
-  await db.runTransaction(async (tx) => {
-    const inviteSnap = await tx.get(inviteRef);
-    if (!inviteSnap.exists) throw new HttpsError("not-found", "INVITE_NOT_FOUND");
-    const invite = inviteSnap.data() as any;
-    if (!invite.active) throw new HttpsError("failed-precondition", "INVITE_INACTIVE");
-    if (invite.usedByUid) throw new HttpsError("already-exists", "INVITE_USED");
+      assert(!!inviteCode, "permission-denied", "INVITE_REQUIRED");
+      assert(!!name && name.length >= 2, "invalid-argument", "NAME_INVALID");
 
-    const hostelSnap = await tx.get(hostelRef);
-    if (hostelSnap.exists) throw new HttpsError("already-exists", "SLUG_TAKEN");
+      const slug = normalizeSlug(slugInput);
+      assert(!!slug && slug.length >= 2, "invalid-argument", "SLUG_INVALID");
 
-    // impedir que el mismo usuario cree 2 hostels
-    const userSnap = await tx.get(userRef);
-    if (userSnap.exists) {
-      const u = userSnap.data() as any;
-      if (u?.activeHostelSlug) throw new HttpsError("failed-precondition", "USER_ALREADY_HAS_HOSTEL");
-    }
+      const inviteRef = db.collection("invites").doc(inviteCode);
+      const hostelRef = db.collection("hostels").doc(slug);
+      const memberRef = hostelRef.collection("members").doc(uid);
+      const userRef = db.collection("users").doc(uid);
 
-    // hostels/{slug}
-    tx.set(hostelRef, {
-      name,
-      slug,
-      ownerUid: uid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+      await db.runTransaction(async (tx) => {
+        const inviteSnap = await tx.get(inviteRef);
+        if (!inviteSnap.exists) {
+          throw new HttpsError("not-found", "INVITE_NOT_FOUND");
+        }
 
-    // hostels/{slug}/members/{uid}
-    tx.set(memberRef, {
-      role: "owner",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+        const invite = inviteSnap.data() as any;
+        if (!invite.active) {
+          throw new HttpsError("failed-precondition", "INVITE_INACTIVE");
+        }
 
-    // users/{uid} (merge, no rompe tu regla de keys si el doc lo crea el cliente con email/createdAt)
-    // OJO: tus rules de users SOLO permiten keys ["activeHostelSlug", "createdAt", "email"] desde cliente,
-    // pero esto es Admin SDK -> puede escribir igual.
-    tx.set(
-      userRef,
-      {
-        email: (req.auth?.token as any)?.email ?? null,
+        if (invite.usedByUid) {
+          throw new HttpsError("already-exists", "INVITE_USED");
+        }
+
+        const hostelSnap = await tx.get(hostelRef);
+        if (hostelSnap.exists) {
+          throw new HttpsError("already-exists", "SLUG_TAKEN");
+        }
+
+        const userSnap = await tx.get(userRef);
+        if (userSnap.exists) {
+          const u = userSnap.data() as any;
+          if (u?.activeHostelSlug) {
+            throw new HttpsError("failed-precondition", "USER_ALREADY_HAS_HOSTEL");
+          }
+        }
+
+        tx.set(hostelRef, {
+          name,
+          slug,
+          ownerUid: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        tx.set(memberRef, {
+          role: "owner",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        tx.set(
+          userRef,
+          {
+            email: (req.auth?.token as any)?.email ?? null,
+            activeHostelSlug: slug,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        tx.update(inviteRef, {
+          active: false,
+          usedByUid: uid,
+          usedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+
+      await setMergedCustomClaims(uid, {
+        role: "owner",
         activeHostelSlug: slug,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true }
-    );
+      });
 
-    // invites/{code}
-    tx.update(inviteRef, {
-      active: false,
-      usedByUid: uid,
-      usedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
+      logRid(rid, "ok", { slug });
+      return { ok: true, slug, rid };
+    } catch (err: any) {
+      logRid(rid, "error", { code: err?.code, message: err?.message });
+      captureToSentry(err, { rid, fn: "createHostel" });
 
-  // ✅ Storage depende de claims
-  await admin.auth().setCustomUserClaims(uid, {
-    role: "owner",
-    activeHostelSlug: slug,
-  });
-
-  return { ok: true, slug };
-});
+      if (err instanceof HttpsError) throw err;
+      throw new HttpsError("internal", `Error interno (RID: ${rid})`);
+    }
+  }
+);
 
 export const setActiveHostel = onCall(
   { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
@@ -362,9 +446,8 @@ export const setActiveHostel = onCall(
     logRid(rid, "start", { hasAuth: !!req.auth });
 
     try {
-      if (!req.auth) throw new HttpsError("unauthenticated", "Requiere login");
-
-      const uid = req.auth.uid;
+      const authData = requireAuth(req);
+      const uid = authData.uid;
       const slug = String(req.data?.slug || "").trim();
 
       assert(isNonEmptyString(slug, 2), "invalid-argument", "slug requerido");
@@ -382,7 +465,7 @@ export const setActiveHostel = onCall(
         throw new HttpsError("permission-denied", "Rol inválido");
       }
 
-      await admin.auth().setCustomUserClaims(uid, {
+      await setMergedCustomClaims(uid, {
         role,
         activeHostelSlug: slug,
       });
@@ -399,10 +482,6 @@ export const setActiveHostel = onCall(
   }
 );
 
-/**
- * inviteMember (MANAGER+)
- * data: { hostelSlug, email, role }
- */
 export const inviteMember = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (req) => {
@@ -412,8 +491,8 @@ export const inviteMember = onCall(
     logRid(rid, "start", { hasAuth: !!req.auth });
 
     try {
-      const auth = requireAuth(req);
-      const uid = auth.uid;
+      const authData = requireAuth(req);
+      const uid = authData.uid;
 
       const hostelSlug = String(req.data?.hostelSlug || "").trim();
       const email = String(req.data?.email || "").trim().toLowerCase();
@@ -425,17 +504,24 @@ export const inviteMember = onCall(
       assert(/^\S+@\S+\.\S+$/.test(email), "invalid-argument", "email inválido");
       assert(isValidMemberRole(roleRaw), "invalid-argument", "role inválido");
 
-      await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      const { role: actorRole } = await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      const targetRole = roleRaw as MemberRole;
 
-      const targetUser = await admin.auth().getUserByEmail(email).catch(() => null);
+      assert(
+        canInviteRole(actorRole, targetRole),
+        "permission-denied",
+        "No autorizado para asignar ese rol"
+      );
+
+      const targetUser = await auth.getUserByEmail(email).catch(() => null);
       assert(targetUser, "not-found", "No existe usuario con ese email (primero debe registrarse)");
 
       const targetUid = targetUser!.uid;
-
       const memberRef = db.doc(`hostels/${hostelSlug}/members/${targetUid}`);
+
       await memberRef.set(
         {
-          role: roleRaw,
+          role: targetRole,
           email,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           createdBy: uid,
@@ -445,6 +531,7 @@ export const inviteMember = onCall(
 
       const userRef = db.doc(`users/${targetUid}`);
       const userSnap = await userRef.get();
+
       if (!userSnap.exists) {
         await userRef.set({
           email,
@@ -463,11 +550,11 @@ export const inviteMember = onCall(
         kind: "invite_member",
         to: email,
         subject: `Te invitaron a colaborar en ${hostelSlug}`,
-        html: `<p>Te agregaron como <b>${roleRaw}</b> en el hostel <b>${hostelSlug}</b>.</p><p>Entrá y andá a /${hostelSlug}/admin</p>`,
-        meta: { rid, role: roleRaw, invitedUid: targetUid },
+        html: `<p>Te agregaron como <b>${targetRole}</b> en el hostel <b>${hostelSlug}</b>.</p><p>Entrá y andá a /${hostelSlug}/admin</p>`,
+        meta: { rid, role: targetRole, invitedUid: targetUid },
       });
 
-      logRid(rid, "ok", { invitedUid: targetUid });
+      logRid(rid, "ok", { invitedUid: targetUid, targetRole });
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
@@ -479,10 +566,6 @@ export const inviteMember = onCall(
   }
 );
 
-/**
- * createReservation (PUBLIC)
- * data: { hostelSlug, roomId, checkInISO, checkOutISO, fullName, email }
- */
 export const createReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (request) => {
@@ -511,7 +594,12 @@ export const createReservation = onCall(
 
       const checkIn = new Date(checkInISO);
       const checkOut = new Date(checkOutISO);
-      assert(!isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()), "invalid-argument", "fechas inválidas");
+
+      assert(
+        !isNaN(checkIn.getTime()) && !isNaN(checkOut.getTime()),
+        "invalid-argument",
+        "fechas inválidas"
+      );
 
       const nightsArr = buildNights(checkIn, checkOut);
       assert(nightsArr.length > 0, "failed-precondition", "La estadía debe ser al menos 1 noche");
@@ -525,23 +613,35 @@ export const createReservation = onCall(
       const result = await db.runTransaction(async (tx) => {
         const hostelSnap = await tx.get(hostelRef);
         assert(hostelSnap.exists, "not-found", "Hostel no existe");
+
         const hostelData = hostelSnap.data() as any;
         const hostelName = String(hostelData?.name || hostelSlug);
 
         const roomSnap = await tx.get(roomRef);
         assert(roomSnap.exists, "not-found", "Habitación no existe");
+
         const roomData = roomSnap.data() as any;
         const roomName = String(roomData?.name || "Room");
         const pricePerNight = Number(roomData?.price || 0);
-        assert(Number.isFinite(pricePerNight) && pricePerNight >= 0, "failed-precondition", "Precio inválido");
+
+        assert(
+          Number.isFinite(pricePerNight) && pricePerNight >= 0,
+          "failed-precondition",
+          "Precio inválido"
+        );
 
         for (const yyyyMMdd of nightsArr) {
           const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
           const lockSnap = await tx.get(lockRef);
-          if (lockSnap.exists) throw new HttpsError("already-exists", "Fechas no disponibles");
+
+          if (lockSnap.exists) {
+            throw new HttpsError("already-exists", "Fechas no disponibles");
+          }
         }
+
         for (const yyyyMMdd of nightsArr) {
           const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
+
           tx.set(lockRef, {
             hostelSlug,
             roomId,
@@ -570,7 +670,13 @@ export const createReservation = onCall(
           source: "PUBLIC_WEB",
         });
 
-        return { reservationId: reservationRef.id, hostelName, roomName, nights, total };
+        return {
+          reservationId: reservationRef.id,
+          hostelName,
+          roomName,
+          nights,
+          total,
+        };
       });
 
       const checkInStr = formatYYYYMMDD_UTC(toUTCDateOnly(checkIn));
@@ -608,10 +714,6 @@ export const createReservation = onCall(
   }
 );
 
-/**
- * setReservationStatus (STAFF+)
- * data: { hostelSlug, reservationId, newStatus }
- */
 export const setReservationStatus = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (req) => {
@@ -621,8 +723,8 @@ export const setReservationStatus = onCall(
     logRid(rid, "start", { hasAuth: !!req.auth });
 
     try {
-      const auth = requireAuth(req);
-      const uid = auth.uid;
+      const authData = requireAuth(req);
+      const uid = authData.uid;
 
       const hostelSlug = String(req.data?.hostelSlug || "").trim();
       const reservationId = String(req.data?.reservationId || "").trim();
@@ -640,10 +742,15 @@ export const setReservationStatus = onCall(
 
       const resRef = db.doc(`hostels/${hostelSlug}/reservations/${reservationId}`);
       const snap = await resRef.get();
+
       assert(snap.exists, "not-found", "Reserva no existe");
 
       const current = (snap.data()?.status ?? "pending") as ReservationStatus;
-      assert(canTransition(current, newStatus), "failed-precondition", `No se puede pasar de ${current} a ${newStatus}`);
+      assert(
+        canTransition(current, newStatus),
+        "failed-precondition",
+        `No se puede pasar de ${current} a ${newStatus}`
+      );
 
       await resRef.update({
         status: newStatus,
@@ -696,10 +803,6 @@ export const setReservationStatus = onCall(
   }
 );
 
-/**
- * cancelReservation (MANAGER+)
- * data: { hostelSlug, reservationId }
- */
 export const cancelReservation = onCall(
   { region: "us-central1", secrets: [BREVO_API_KEY, SENTRY_DSN], enforceAppCheck: true },
   async (request) => {
@@ -709,8 +812,8 @@ export const cancelReservation = onCall(
     logRid(rid, "start", { hasAuth: !!request.auth });
 
     try {
-      assert(request.auth, "unauthenticated", "Requiere login");
-      const uid = request.auth!.uid;
+      const authData = requireAuth(request);
+      const uid = authData.uid;
 
       const hostelSlug = String(request.data?.hostelSlug || "").trim();
       const reservationId = String(request.data?.reservationId || "").trim();
@@ -727,10 +830,13 @@ export const cancelReservation = onCall(
       const result = await db.runTransaction(async (tx) => {
         const resSnap = await tx.get(resRef);
         assert(resSnap.exists, "not-found", "Reserva no existe");
-        const res = resSnap.data() as any;
 
+        const res = resSnap.data() as any;
         const currentStatus = String(res?.status || "pending") as ReservationStatus;
-        if (currentStatus === "cancelled") return res;
+
+        if (currentStatus === "cancelled") {
+          return res;
+        }
 
         const roomId = String(res?.roomId || "");
         const checkInDate = res?.checkIn?.toDate?.();
@@ -738,6 +844,7 @@ export const cancelReservation = onCall(
 
         if (roomId && checkInDate && checkOutDate) {
           const nightsArr = buildNights(checkInDate as Date, checkOutDate as Date);
+
           for (const yyyyMMdd of nightsArr) {
             const lockRef = roomNightsCol.doc(lockDocId(roomId, yyyyMMdd));
             tx.delete(lockRef);
@@ -802,10 +909,6 @@ export const cancelReservation = onCall(
   }
 );
 
-/**
- * removeMember (MANAGER+)
- * data: { hostelSlug, targetUid }
- */
 export const removeMember = onCall(
   { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
   async (req) => {
@@ -815,8 +918,8 @@ export const removeMember = onCall(
     logRid(rid, "start", { hasAuth: !!req.auth });
 
     try {
-      const auth = requireAuth(req);
-      const uid = auth.uid;
+      const authData = requireAuth(req);
+      const uid = authData.uid;
 
       const hostelSlug = String(req.data?.hostelSlug || "").trim();
       const targetUid = String(req.data?.targetUid || "").trim();
@@ -826,15 +929,31 @@ export const removeMember = onCall(
       assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
       assert(targetUid, "invalid-argument", "targetUid requerido");
 
-      await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
+      const { role: actorRole } = await requireMemberRole(uid, hostelSlug, ["owner", "manager"]);
 
       if (uid === targetUid) {
         throw new HttpsError("failed-precondition", "No podés eliminarte a vos mismo");
       }
 
-      await db.doc(`hostels/${hostelSlug}/members/${targetUid}`).delete();
+      const targetRef = db.doc(`hostels/${hostelSlug}/members/${targetUid}`);
+      const targetSnap = await targetRef.get();
 
-      logRid(rid, "ok", { targetUid });
+      assert(targetSnap.exists, "not-found", "El miembro no existe");
+
+      const targetRoleRaw = String(targetSnap.data()?.role || "");
+      assert(isValidMemberRole(targetRoleRaw), "failed-precondition", "Rol del miembro inválido");
+
+      const targetRole = targetRoleRaw as MemberRole;
+
+      assert(
+        canRemoveRole(actorRole, targetRole),
+        "permission-denied",
+        "No autorizado para eliminar este miembro"
+      );
+
+      await targetRef.delete();
+
+      logRid(rid, "ok", { targetUid, targetRole });
       return { ok: true, rid };
     } catch (err: any) {
       logRid(rid, "error", { code: err?.code, message: err?.message });
@@ -846,7 +965,6 @@ export const removeMember = onCall(
   }
 );
 
-// ✅ PUBLIC (con AppCheck): devuelve noches ocupadas para una room en un rango
 export const getRoomAvailability = onCall(
   { region: "us-central1", enforceAppCheck: true, secrets: [SENTRY_DSN] },
   async (req) => {
@@ -858,27 +976,45 @@ export const getRoomAvailability = onCall(
     try {
       const hostelSlug = String(req.data?.hostelSlug || "").trim();
       const roomId = String(req.data?.roomId || "").trim();
-      const from = String(req.data?.from || "").trim(); // YYYY-MM-DD
-      const to = String(req.data?.to || "").trim(); // YYYY-MM-DD
+      const from = String(req.data?.from || "").trim();
+      const to = String(req.data?.to || "").trim();
 
       assert(hostelSlug, "invalid-argument", "hostelSlug requerido");
       assert(roomId, "invalid-argument", "roomId requerido");
-      assert(/^\d{4}-\d{2}-\d{2}$/.test(from), "invalid-argument", "from inválido (YYYY-MM-DD)");
-      assert(/^\d{4}-\d{2}-\d{2}$/.test(to), "invalid-argument", "to inválido (YYYY-MM-DD)");
-      assert(from <= to, "invalid-argument", "from debe ser <= to");
+      assert(isYYYYMMDD(from), "invalid-argument", "from inválido (YYYY-MM-DD)");
+      assert(isYYYYMMDD(to), "invalid-argument", "to inválido (YYYY-MM-DD)");
+      assert(from < to, "invalid-argument", "from debe ser menor que to (to es exclusivo)");
 
       const col = db.collection(`hostels/${hostelSlug}/room_nights`);
 
-      const snap = await col.where("roomId", "==", roomId).where("date", ">=", from).where("date", "<=", to).get();
+      const snap = await col
+        .where("roomId", "==", roomId)
+        .where("date", ">=", from)
+        .where("date", "<", to)
+        .orderBy("date", "asc")
+        .get();
 
       const dates = snap.docs
         .map((d) => String((d.data() as any)?.date || ""))
-        .filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x))
-        .sort();
+        .filter((x) => isYYYYMMDD(x));
 
       logRid(rid, "ok", { count: dates.length });
       return { ok: true, dates, rid };
     } catch (err: any) {
+      const msg = String(err?.message ?? "");
+      const code = Number(err?.code ?? 0);
+
+      const isIndexError =
+        code === 9 &&
+        (msg.includes("The query requires an index") ||
+          msg.includes("index is currently building") ||
+          msg.includes("create it here"));
+
+      if (isIndexError) {
+        logRid(rid, "index_building_or_missing", { msg });
+        return { ok: true, dates: [], buildingIndex: true, rid };
+      }
+
       logRid(rid, "error", { code: err?.code, message: err?.message });
       captureToSentry(err, { rid, fn: "getRoomAvailability" });
 

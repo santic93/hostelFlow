@@ -9,9 +9,10 @@ import {
   Typography,
   Alert,
   Snackbar,
+  CircularProgress,
 } from "@mui/material";
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -49,6 +50,11 @@ type ToastState = {
   severity: "success" | "error" | "info";
 };
 
+type UploadedImage = {
+  url: string;
+  path: string;
+};
+
 export default function RoomFormModal({
   open,
   onClose,
@@ -60,6 +66,13 @@ export default function RoomFormModal({
   const { hostelSlug: hostelSlugCtx, loading: authLoading, canAccessAdmin } = useAuth();
 
   const resolvedHostelSlug = hostelSlugProp ?? hostelSlugCtx ?? null;
+
+  const MAX_IMAGES = 6;
+  const MAX_MB = 2;
+  const ALLOWED_TYPES = useMemo(
+    () => ["image/jpeg", "image/png", "image/webp"],
+    []
+  );
 
   const {
     register,
@@ -75,10 +88,6 @@ export default function RoomFormModal({
       description: "",
     },
   });
-
-  const MAX_IMAGES = 6;
-  const MAX_MB = 2;
-  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -97,6 +106,7 @@ export default function RoomFormModal({
   });
 
   const totalCount = existingUrls.length + files.length;
+  const readyForWrite = !authLoading && canAccessAdmin && Boolean(resolvedHostelSlug);
 
   useEffect(() => {
     if (initialData) {
@@ -138,10 +148,17 @@ export default function RoomFormModal({
     setToast({ open: true, severity, message });
   }
 
+  function closeToast() {
+    setToast((prev) => ({ ...prev, open: false }));
+  }
+
   function validateFileBasics(file: File) {
     if (!ALLOWED_TYPES.includes(file.type)) {
-      throw new Error(t("admin.rooms.messages.invalidFormat", "Formato inválido (JPG/PNG/WebP)."));
+      throw new Error(
+        t("admin.rooms.messages.invalidFormat", "Formato inválido (JPG/PNG/WebP).")
+      );
     }
+
     const mb = file.size / (1024 * 1024);
     if (mb > MAX_MB * 3) {
       throw new Error(
@@ -159,7 +176,8 @@ export default function RoomFormModal({
     try {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
-        img.onerror = () => reject(new Error(t("admin.rooms.messages.invalidImage", "Imagen inválida.")));
+        img.onerror = () =>
+          reject(new Error(t("admin.rooms.messages.invalidImage", "Imagen inválida.")));
         img.src = url;
       });
 
@@ -173,13 +191,20 @@ export default function RoomFormModal({
       canvas.height = h;
 
       const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("No canvas");
+      if (!ctx) {
+        throw new Error(t("admin.rooms.messages.compressFailed", "No se pudo comprimir."));
+      }
 
       ctx.drawImage(img, 0, 0, w, h);
 
       const blob: Blob = await new Promise((resolve, reject) => {
         canvas.toBlob(
-          (b) => (b ? resolve(b) : reject(new Error(t("admin.rooms.messages.compressFailed", "No se pudo comprimir.")))),
+          (b) =>
+            b
+              ? resolve(b)
+              : reject(
+                  new Error(t("admin.rooms.messages.compressFailed", "No se pudo comprimir."))
+                ),
           "image/jpeg",
           0.82
         );
@@ -192,7 +217,7 @@ export default function RoomFormModal({
   }
 
   async function uploadImages(hostelId: string, roomId: string, filesToUpload: File[]) {
-    const uploaded: { url: string; path: string }[] = [];
+    const uploaded: UploadedImage[] = [];
 
     for (const file of filesToUpload) {
       const blob = await compressToJpeg(file);
@@ -206,7 +231,10 @@ export default function RoomFormModal({
         );
       }
 
-      const safeName = `${Date.now()}_${file.name}`.replace(/\s+/g, "_");
+      const safeName = `${Date.now()}_${file.name}`
+        .replace(/\s+/g, "_")
+        .replace(/[^\w.-]/g, "");
+
       const path = `hostels/${hostelId}/rooms/${roomId}/${safeName}`;
       const fileRef = ref(storage, path);
 
@@ -220,14 +248,25 @@ export default function RoomFormModal({
   }
 
   async function deleteStorageByPath(path: string) {
+    if (!path) return;
     await deleteObject(ref(storage, path));
   }
 
-  const readyForWrite = !authLoading && canAccessAdmin && Boolean(resolvedHostelSlug);
+  async function cleanupUploadedImages(uploaded: UploadedImage[]) {
+    if (!uploaded.length) return;
+    await Promise.allSettled(uploaded.map((img) => deleteStorageByPath(img.path)));
+  }
+
+  function cleanupLocalPreviews() {
+    previews.forEach((p) => URL.revokeObjectURL(p));
+    setFiles([]);
+    setPreviews([]);
+  }
 
   const onSubmit = async (data: RoomFormValues) => {
     if (!readyForWrite || !resolvedHostelSlug) {
-      setFormError(t("admin.rooms.messages.waitHostel", "Esperá a que cargue tu hostel/permisos…"));
+      const msg = t("admin.rooms.messages.waitHostel", "Esperá a que cargue tu hostel/permisos…");
+      setFormError(msg);
       openToast("info", t("admin.rooms.messages.waitHostelToast", "Cargando permisos…"));
       return;
     }
@@ -235,17 +274,17 @@ export default function RoomFormModal({
     setFormError(null);
     setSaving(true);
 
+    const hostelSlug = resolvedHostelSlug;
+    const payloadBase = {
+      name: String(data.name ?? "").trim(),
+      price: Number(data.price),
+      capacity: Number(data.capacity),
+      description: String(data.description ?? "").trim(),
+    };
+
+    let uploaded: UploadedImage[] = [];
+
     try {
-      const hostelSlug = resolvedHostelSlug;
-
-      const payloadBase = {
-        name: String(data.name ?? "").trim(),
-        price: Number(data.price),
-        capacity: Number(data.capacity),
-        description: String(data.description ?? ""),
-      };
-
-      // 1) create/update BASE vía Functions (seguro)
       let roomId = initialData?.id;
 
       if (!roomId) {
@@ -256,35 +295,30 @@ export default function RoomFormModal({
           imageUrls: [],
           imagePaths: [],
         });
+
         roomId = String((res.data as any)?.roomId ?? "");
-        if (!roomId) throw new Error("No se recibió roomId.");
+        if (!roomId) {
+          throw new Error("No se recibió roomId.");
+        }
       } else {
-        const updateFn = httpsCallable(functions, "adminUpdateRoom");
-        await updateFn({
+        const updateBaseFn = httpsCallable(functions, "adminUpdateRoom");
+        await updateBaseFn({
           hostelSlug,
           roomId,
           ...payloadBase,
-          // por ahora mandamos las actuales; luego las “finales” las volvemos a mandar
           imageUrls: existingUrls,
           imagePaths: existingPaths,
         });
       }
 
-      // 2) borrar imágenes marcadas (storage)
-      if (pathsToDelete.length) {
-        await Promise.allSettled(pathsToDelete.map((p) => deleteStorageByPath(p)));
-      }
+      uploaded = files.length ? await uploadImages(hostelSlug, roomId, files) : [];
 
-      // 3) subir nuevas (storage)
-      const uploaded = files.length ? await uploadImages(hostelSlug, roomId, files) : [];
       const newUrls = uploaded.map((u) => u.url);
       const newPaths = uploaded.map((u) => u.path);
 
-      // 4) calcular finales (máx 6)
       const finalUrls = [...existingUrls, ...newUrls].slice(0, MAX_IMAGES);
       const finalPaths = [...existingPaths, ...newPaths].slice(0, MAX_IMAGES);
 
-      // 5) persistir finales vía Function (seguro)
       const updateFinalFn = httpsCallable(functions, "adminUpdateRoom");
       await updateFinalFn({
         hostelSlug,
@@ -294,19 +328,22 @@ export default function RoomFormModal({
         imagePaths: finalPaths,
       });
 
-      // cleanup
-      previews.forEach((p) => URL.revokeObjectURL(p));
-      setFiles([]);
-      setPreviews([]);
-      setPathsToDelete([]);
+      if (pathsToDelete.length) {
+        await Promise.allSettled(pathsToDelete.map((p) => deleteStorageByPath(p)));
+      }
 
+      cleanupLocalPreviews();
+      setPathsToDelete([]);
       openToast("success", t("admin.rooms.messages.savedOk", "Guardado ✅"));
       onSuccess();
       onClose();
     } catch (e: any) {
+      await cleanupUploadedImages(uploaded);
+
       const msg =
         e?.message ||
         t("admin.rooms.messages.saveError", "No se pudo guardar. Revisá permisos / logs.");
+
       setFormError(msg);
       openToast("error", msg);
     } finally {
@@ -326,44 +363,66 @@ export default function RoomFormModal({
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>
-          {initialData ? t("admin.rooms.modal.editTitle", "Editar habitación") : t("admin.rooms.modal.createTitle", "Crear habitación")}
+        <DialogTitle sx={{ fontWeight: 900 }}>
+          {initialData
+            ? t("admin.rooms.modal.editTitle", "Editar habitación")
+            : t("admin.rooms.modal.createTitle", "Crear habitación")}
         </DialogTitle>
 
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={1}>
-            {!readyForWrite && <Alert severity="info">{t("admin.rooms.messages.loadingPermissions", "Cargando permisos…")}</Alert>}
+            {!readyForWrite && (
+              <Alert severity="info">
+                {t("admin.rooms.messages.loadingPermissions", "Cargando permisos…")}
+              </Alert>
+            )}
 
             <TextField
               label={t("admin.rooms.form.name", "Nombre")}
-              {...register("name", { required: t("admin.rooms.errors.nameRequired", "Nombre requerido") as any })}
+              {...register("name", {
+                required: t("admin.rooms.errors.nameRequired", "Nombre requerido") as any,
+                minLength: {
+                  value: 2,
+                  message: t("admin.rooms.errors.nameRequired", "Nombre requerido") as any,
+                },
+              })}
               error={!!errors.name}
               helperText={errors.name?.message as any}
               disabled={saving}
+              fullWidth
             />
 
             <TextField
               label={t("admin.rooms.form.price", "Precio")}
               type="number"
+              inputProps={{ min: 1, step: 1 }}
               {...register("price", {
+                valueAsNumber: true,
                 required: t("admin.rooms.errors.priceRequired", "Precio requerido") as any,
                 min: { value: 1, message: t("admin.rooms.errors.priceMin", "Mínimo 1") as any },
               })}
               error={!!errors.price}
               helperText={errors.price?.message as any}
               disabled={saving}
+              fullWidth
             />
 
             <TextField
               label={t("admin.rooms.form.capacity", "Capacidad")}
               type="number"
+              inputProps={{ min: 1, step: 1 }}
               {...register("capacity", {
+                valueAsNumber: true,
                 required: t("admin.rooms.errors.capacityRequired", "Capacidad requerida") as any,
-                min: { value: 1, message: t("admin.rooms.errors.capacityMin", "Mínimo 1") as any },
+                min: {
+                  value: 1,
+                  message: t("admin.rooms.errors.capacityMin", "Mínimo 1") as any,
+                },
               })}
               error={!!errors.capacity}
               helperText={errors.capacity?.message as any}
               disabled={saving}
+              fullWidth
             />
 
             <TextField
@@ -372,14 +431,14 @@ export default function RoomFormModal({
               rows={3}
               {...register("description")}
               disabled={saving}
+              fullWidth
             />
 
             {formError && <Alert severity="error">{formError}</Alert>}
 
-            {/* EXISTENTES */}
             {existingUrls.length > 0 && (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 900 }}>
                   {t("admin.rooms.messages.currentImages", "Imágenes actuales")}
                 </Typography>
 
@@ -406,7 +465,11 @@ export default function RoomFormModal({
                         disabled={saving}
                         onClick={() => {
                           const path = existingPaths[idx];
-                          if (path) setPathsToDelete((prev) => [...prev, path]);
+                          if (path) {
+                            setPathsToDelete((prev) =>
+                              prev.includes(path) ? prev : [...prev, path]
+                            );
+                          }
 
                           setExistingUrls((prev) => prev.filter((_, i) => i !== idx));
                           setExistingPaths((prev) => prev.filter((_, i) => i !== idx));
@@ -421,7 +484,6 @@ export default function RoomFormModal({
               </Box>
             )}
 
-            {/* SUBIR NUEVAS */}
             <Box>
               <Button
                 variant="outlined"
@@ -433,14 +495,17 @@ export default function RoomFormModal({
                 <input
                   hidden
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
                   multiple
                   onChange={(e) => {
                     const selected = Array.from(e.target.files ?? []);
                     if (!selected.length) return;
 
                     try {
-                      const remaining = Math.max(0, MAX_IMAGES - existingUrls.length - files.length);
+                      const remaining = Math.max(
+                        0,
+                        MAX_IMAGES - existingUrls.length - files.length
+                      );
                       const limited = selected.slice(0, remaining);
 
                       limited.forEach(validateFileBasics);
@@ -449,9 +514,15 @@ export default function RoomFormModal({
                       setFiles((prev) => [...prev, ...limited]);
                       setPreviews((prev) => [...prev, ...nextPreviews]);
 
-                      openToast("info", t("admin.rooms.messages.imagesSelected", { n: limited.length }) || `Imágenes: ${limited.length}`);
+                      openToast(
+                        "info",
+                        t("admin.rooms.messages.imagesSelected", { n: limited.length }) ||
+                          `Imágenes: ${limited.length}`
+                      );
                     } catch (err: any) {
-                      const msg = err?.message ?? t("admin.rooms.messages.invalidFile", "Archivo inválido");
+                      const msg =
+                        err?.message ||
+                        t("admin.rooms.messages.invalidFile", "Archivo inválido");
                       setFormError(msg);
                       openToast("error", msg);
                     } finally {
@@ -503,7 +574,7 @@ export default function RoomFormModal({
           </Box>
         </DialogContent>
 
-        <DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={onClose} disabled={saving}>
             {t("admin.rooms.common.cancel", "Cancelar")}
           </Button>
@@ -512,9 +583,12 @@ export default function RoomFormModal({
             variant="contained"
             onClick={handleSubmit(onSubmit)}
             disabled={!isValid || saving || !readyForWrite}
-            sx={{ borderRadius: 999 }}
+            sx={{ borderRadius: 999, minWidth: 140 }}
+            startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}
           >
-            {saving ? t("admin.rooms.common.saving", "Guardando…") : t("admin.rooms.common.save", "Guardar")}
+            {saving
+              ? t("admin.rooms.common.saving", "Guardando…")
+              : t("admin.rooms.common.save", "Guardar")}
           </Button>
         </DialogActions>
       </Dialog>
@@ -522,11 +596,11 @@ export default function RoomFormModal({
       <Snackbar
         open={toast.open}
         autoHideDuration={3200}
-        onClose={() => setToast((p) => ({ ...p, open: false }))}
+        onClose={closeToast}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          onClose={() => setToast((p) => ({ ...p, open: false }))}
+          onClose={closeToast}
           severity={toast.severity}
           variant="filled"
           sx={{

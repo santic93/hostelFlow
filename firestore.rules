@@ -3,9 +3,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // -------------------------
-    // Helpers
-    // -------------------------
     function isSignedIn() {
       return request.auth != null;
     }
@@ -20,10 +17,6 @@ service cloud.firestore {
 
     function hasUserDoc() {
       return isSignedIn() && exists(userDocPath());
-    }
-
-    function userDoc() {
-      return get(userDocPath());
     }
 
     function isNonEmptyString(v, minLen) {
@@ -54,18 +47,11 @@ service cloud.firestore {
       return isMember(hostelSlug) && memberRole(hostelSlug) in ["owner", "manager"];
     }
 
-    // -------------------------
-    // INVITES (NUEVO)
-    // -------------------------
     match /invites/{code} {
       allow read, create, update, delete: if isSuperAdmin();
     }
 
-    // -------------------------
-    // USERS
-    // -------------------------
     match /users/{uid} {
-      // (opcional) superadmin puede leer users si querés auditar
       allow read: if (isSignedIn() && request.auth.uid == uid) || isSuperAdmin();
 
       allow create: if isSignedIn()
@@ -85,115 +71,51 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // -------------------------
-    // HOSTELS
-    // -------------------------
     match /hostels/{hostelSlug} {
-
-      // público
       allow read: if true;
 
-      // 🔒 El doc /hostels/{hostelSlug} NO se crea desde cliente
       allow create: if false;
 
-      // Actualizar hostel: manager+ sin tocar ownerUid/slug
       allow update: if isManagerPlus(hostelSlug)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.slug == resource.data.slug;
 
       allow delete: if false;
 
-      // -------------------------
-      // MEMBERS
-      // -------------------------
       match /members/{memberUid} {
         allow read: if (isSignedIn() && request.auth.uid == memberUid)
           || isManagerPlus(hostelSlug);
 
-        // 🔒 Nadie escribe membresía desde cliente
         allow create, update, delete: if false;
       }
 
-      // -------------------------
-      // ROOMS
-      // -------------------------
       match /rooms/{roomId} {
-
-        function validRoomCreate() {
-          return request.resource.data.keys().hasOnly([
-              "name", "price", "capacity", "description",
-              "imageUrls", "imagePaths",
-              "createdAt", "updatedAt"
-            ])
-            && isNonEmptyString(request.resource.data.name, 2)
-            && (request.resource.data.price is int || request.resource.data.price is number)
-            && request.resource.data.price > 0
-            && (request.resource.data.capacity is int || request.resource.data.capacity is number)
-            && request.resource.data.capacity >= 1
-            && (!("description" in request.resource.data) || request.resource.data.description is string)
-            && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
-            && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            && request.resource.data.createdAt == request.time
-            && request.resource.data.updatedAt == request.time;
-        }
-
-        function validRoomUpdate() {
-          return request.resource.data.keys().hasOnly([
-              "name", "price", "capacity", "description",
-              "imageUrls", "imagePaths",
-              "createdAt", "updatedAt"
-            ])
-            && isNonEmptyString(request.resource.data.name, 2)
-            && (request.resource.data.price is int || request.resource.data.price is number)
-            && request.resource.data.price > 0
-            && (request.resource.data.capacity is int || request.resource.data.capacity is number)
-            && request.resource.data.capacity >= 1
-            && (!("description" in request.resource.data) || request.resource.data.description is string)
-            && (!("imageUrls" in request.resource.data) || request.resource.data.imageUrls is list)
-            && (!("imagePaths" in request.resource.data) || request.resource.data.imagePaths is list)
-            && request.resource.data.createdAt == resource.data.createdAt
-            && request.resource.data.updatedAt == request.time;
-        }
-
         allow read: if true;
 
-        // ✅ SOLO OWNER (vía members)
-        allow create: if isOwner(hostelSlug) && validRoomCreate();
-        allow update: if isOwner(hostelSlug) && validRoomUpdate();
-        allow delete: if isOwner(hostelSlug);
+        // Escritura SOLO por backend (Cloud Functions con Admin SDK)
+        allow create, update, delete: if false;
       }
 
-      // -------------------------
-      // RESERVATIONS
-      // -------------------------
       match /reservations/{reservationId} {
         allow read: if isStaffPlus(hostelSlug);
-        allow create, update, delete: if false; // solo backend
+        allow create, update, delete: if false;
       }
 
-      // -------------------------
-      // EMAIL LOGS
-      // -------------------------
       match /email_logs/{logId} {
         allow read: if isManagerPlus(hostelSlug);
         allow create, update, delete: if false;
       }
 
-      // -------------------------
-      // LOCKS
-      // -------------------------
       match /room_nights/{lockId} {
         allow read: if false;
         allow create, update, delete: if false;
       }
 
-      // deny unknown subcollections
       match /{document=**} {
         allow read, write: if false;
       }
     }
 
-    // deny by default
     match /{document=**} {
       allow read, write: if false;
     }

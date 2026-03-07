@@ -55,9 +55,7 @@ function eachNightInclusive(from: Dayjs, to: Dayjs) {
 
 /**
  * CustomDay para MUI X v6/v7
- * - No tipamos estricto PickersDayProps porque tu versión te está dando:
- *   "PickersDayProps no es genérico" / incompatibilidades de SlotProps
- * - Esto evita 100% los errores TS que estás viendo.
+ * - sin tipos estrictos para evitar conflictos TS por versión
  */
 function CustomDay(props: any) {
   const { blockedSet, day, outsideCurrentMonth, ...other } = props;
@@ -130,6 +128,16 @@ export const BookingPage = () => {
   const horizonFrom = today;
   const horizonTo = today.add(365, "day");
 
+  // ✅ money formatter (mejora visual, no rompe nada)
+  const money = useMemo(() => {
+    const lang = (i18n.language || "es").slice(0, 2);
+    return new Intl.NumberFormat(lang, {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    });
+  }, [i18n.language]);
+
   // 1) room
   useEffect(() => {
     const fetchRoom = async () => {
@@ -201,8 +209,14 @@ export const BookingPage = () => {
     fullName.trim().length > 2 &&
     isEmailValid;
 
-  const isBlockedDay = (d: Dayjs) => blockedSet.has(d.format("YYYY-MM-DD"));
-  const shouldDisable = (d: Dayjs) => d.isBefore(today, "day") || isBlockedDay(d);
+  const isBlockedNight = (d: Dayjs) => blockedSet.has(d.format("YYYY-MM-DD"));
+
+  // ✅ check-in: bloquea pasado + noches ocupadas
+  const shouldDisableCheckIn = (d: Dayjs) => d.isBefore(today, "day") || isBlockedNight(d);
+
+  // ✅ check-out: SOLO bloquea pasado (porque checkOut es “exclusive”)
+  // (el rango se valida en onChange y confirm)
+  const shouldDisableCheckOut = (d: Dayjs) => d.isBefore(today.add(1, "day"), "day");
 
   const handleConfirm = async () => {
     setFormError(null);
@@ -301,7 +315,7 @@ export const BookingPage = () => {
                   label={t("booking.checkIn")}
                   value={checkIn}
                   minDate={today}
-                  shouldDisableDate={(d) => shouldDisable(dayjs(d))}
+                  shouldDisableDate={(d) => shouldDisableCheckIn(dayjs(d))}
                   onChange={(newValue) => {
                     setFormError(null);
 
@@ -313,7 +327,7 @@ export const BookingPage = () => {
 
                     const v = newValue.startOf("day");
 
-                    if (shouldDisable(v)) {
+                    if (shouldDisableCheckIn(v)) {
                       setFormError(t("booking.unavailable"));
                       return;
                     }
@@ -341,7 +355,8 @@ export const BookingPage = () => {
                   label={t("booking.checkOut")}
                   value={checkOut}
                   minDate={checkIn ? checkIn.add(1, "day") : today.add(1, "day")}
-                  shouldDisableDate={(d) => shouldDisable(dayjs(d))}
+                  // ✅ ya NO bloqueamos por blockedSet
+                  shouldDisableDate={(d) => shouldDisableCheckOut(dayjs(d))}
                   onChange={(newValue) => {
                     setFormError(null);
 
@@ -364,11 +379,7 @@ export const BookingPage = () => {
                       return;
                     }
 
-                    if (shouldDisable(v)) {
-                      setFormError(t("booking.unavailable"));
-                      return;
-                    }
-
+                    // validamos el rango (noches)
                     const nightsArr = eachNightInclusive(checkIn, v);
                     if (nightsArr.some((d2) => blockedSet.has(d2))) {
                       setFormError(t("booking.unavailable"));
@@ -406,7 +417,7 @@ export const BookingPage = () => {
                 <Button
                   variant="contained"
                   size="large"
-                  disabled={!isFormValid}
+                  disabled={!isFormValid || loadingAvail}
                   onClick={handleConfirm}
                 >
                   {t("booking.confirm")}
@@ -425,7 +436,7 @@ export const BookingPage = () => {
                   </Typography>
 
                   <Typography sx={{ color: "text.secondary" }}>
-                    {t("booking.summaryPerNight", { price: selectedRoom.price })}
+                    {t("booking.summaryPerNight", { price: money.format(Number(selectedRoom.price || 0)) })}
                   </Typography>
 
                   <Typography sx={{ color: "text.secondary" }}>
@@ -437,7 +448,7 @@ export const BookingPage = () => {
                   <Box sx={{ height: 10 }} />
 
                   <Typography sx={{ fontWeight: 900, fontSize: 20 }}>
-                    {t("booking.summaryTotal", { total })}
+                    {t("booking.summaryTotal", { total: money.format(total) })}
                   </Typography>
 
                   <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
